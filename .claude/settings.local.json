@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run dev:*)",
+      "Bash(for i in 1 2 3 4 5)",
+      "Bash(do echo \"waiting...\")",
+      "Bash(done)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(echo '=== Aya Dashboard Project Structure ===' echo echo '--- Config Files ---' ls -la *.json *.ts *.js .env.example)",
+      "Bash(ls:*)"
+    ]
+  }
+}
