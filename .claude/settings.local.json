@@ -11,7 +11,10 @@
       "Bash(curl:*)",
       "Bash(pkill:*)",
       "Bash(echo '=== Aya Dashboard Project Structure ===' echo echo '--- Config Files ---' ls -la *.json *.ts *.js .env.example)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run db:push:*)",
+      "Bash(grep:*)"
     ]
   }
 }

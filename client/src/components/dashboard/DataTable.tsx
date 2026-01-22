@@ -7,7 +7,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface Column {
@@ -33,19 +32,25 @@ export function DataTable({
   className
 }: DataTableProps) {
   return (
-    <Card className={cn("", className)}>
+    <Card className={cn("border-white/10", className)}>
       {title && (
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+        <CardHeader className="border-b border-white/10">
+          <CardTitle className="text-white">{title}</CardTitle>
         </CardHeader>
       )}
-      <CardContent className={title ? "pt-0" : "pt-6"}>
-        <div className="rounded-md border">
+      <CardContent className={title ? "pt-0 px-0" : "pt-6 px-0"}>
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-white/10 hover:bg-transparent">
                 {columns.map((column) => (
-                  <TableHead key={column.key} className={column.className}>
+                  <TableHead
+                    key={column.key}
+                    className={cn(
+                      "text-xs uppercase tracking-wider text-muted-foreground font-medium",
+                      column.className
+                    )}
+                  >
                     {column.header}
                   </TableHead>
                 ))}
@@ -53,7 +58,7 @@ export function DataTable({
             </TableHeader>
             <TableBody>
               {data.length === 0 ? (
-                <TableRow>
+                <TableRow className="border-white/10">
                   <TableCell
                     colSpan={columns.length}
                     className="h-24 text-center text-muted-foreground"
@@ -63,9 +68,15 @@ export function DataTable({
                 </TableRow>
               ) : (
                 data.map((row, index) => (
-                  <TableRow key={index}>
+                  <TableRow
+                    key={index}
+                    className="border-white/10 hover:bg-white/5 transition-colors"
+                  >
                     {columns.map((column) => (
-                      <TableCell key={column.key} className={column.className}>
+                      <TableCell
+                        key={column.key}
+                        className={cn("text-sm", column.className)}
+                      >
                         {column.render
                           ? column.render(row[column.key], row)
                           : row[column.key] ?? "-"
@@ -83,23 +94,52 @@ export function DataTable({
   );
 }
 
-// Helper component for status badges
+// Helper component for status badges with custom colors
 export function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-    flagged: { variant: "destructive", label: "Flagged" },
-    pending: { variant: "secondary", label: "Pending" },
-    approved: { variant: "default", label: "Approved" },
-    reviewed: { variant: "outline", label: "Reviewed" },
-    high: { variant: "default", label: "High" },
-    medium: { variant: "secondary", label: "Medium" },
-    low: { variant: "outline", label: "Low" },
+  const statusLower = status?.toLowerCase() || "";
+
+  const statusConfig: Record<string, { className: string; label: string }> = {
+    flagged: {
+      className: "bg-red-500/20 text-red-400 border-red-500/30",
+      label: "Flagged"
+    },
+    pending: {
+      className: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      label: "Pending"
+    },
+    approved: {
+      className: "bg-teal-500/20 text-teal-400 border-teal-500/30",
+      label: "Approved"
+    },
+    reviewed: {
+      className: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+      label: "Reviewed"
+    },
+    high: {
+      className: "bg-teal-500/20 text-teal-400 border-teal-500/30",
+      label: "High"
+    },
+    medium: {
+      className: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      label: "Medium"
+    },
+    low: {
+      className: "bg-muted text-muted-foreground border-white/10",
+      label: "Low"
+    },
   };
 
-  const config = statusConfig[status?.toLowerCase()] || { variant: "outline" as const, label: status };
+  const config = statusConfig[statusLower] || {
+    className: "bg-muted text-muted-foreground border-white/10",
+    label: status
+  };
 
   return (
-    <Badge variant={config.variant}>
+    <span className={cn(
+      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+      config.className
+    )}>
       {config.label}
-    </Badge>
+    </span>
   );
 }

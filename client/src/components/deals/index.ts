@@ -1,0 +1,11 @@
+export { DealsDashboard } from "./DealsDashboard";
+export { DealsStatsCards } from "./DealsStatsCards";
+export { DealsTable } from "./DealsTable";
+export type { DealRecord } from "./DealsTable";
+export { RecommendationBadge } from "./RecommendationBadge";
+export { ScoreGauge, ScoreBar } from "./ScoreGauge";
+export { DealDetailModal } from "./DealDetailModal";
+export { DealsPipeline } from "./DealsPipeline";
+export { ScoreDistributionChart } from "./ScoreDistributionChart";
+export { BoroughBreakdown } from "./BoroughBreakdown";
+export { ScoreComponentsRadar } from "./ScoreComponentsRadar";
