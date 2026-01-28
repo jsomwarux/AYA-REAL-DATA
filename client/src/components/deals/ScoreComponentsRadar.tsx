@@ -10,7 +10,7 @@ import {
   Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Target, Shark, Scale, Cog } from "lucide-react";
+import { Target, TrendingUp, Scale, Cog } from "lucide-react";
 import { DealRecord } from "./DealsTable";
 
 interface ScoreComponentsRadarProps {

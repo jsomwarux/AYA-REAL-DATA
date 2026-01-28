@@ -6,7 +6,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard
+  LayoutDashboard,
+  Lock,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ interface NavItem {
   icon: React.ReactNode;
   iconColor: string;
   description?: string;
+  badge?: string;
 }
 
 const mainNavItems: NavItem[] = [
@@ -41,11 +44,11 @@ const mainNavItems: NavItem[] = [
     description: "Dashboard overview",
   },
   {
-    title: "Construction Oversight",
+    title: "Construction Progress",
     href: "/construction",
-    icon: <HardHat className="h-5 w-5" />,
+    icon: <Building2 className="h-5 w-5" />,
     iconColor: "text-blue-400",
-    description: "Monitor contractor invoices",
+    description: "Room-by-room progress tracking",
   },
   {
     title: "Deal Intelligence",
@@ -53,6 +56,7 @@ const mainNavItems: NavItem[] = [
     icon: <Radar className="h-5 w-5" />,
     iconColor: "text-purple-400",
     description: "Score distressed properties",
+    badge: "Protected",
   },
 ];
 
@@ -98,7 +102,15 @@ function NavLink({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean })
         {item.icon}
       </span>
       {!isCollapsed && (
-        <span className="animate-fade-in">{item.title}</span>
+        <div className="flex items-center justify-between flex-1 animate-fade-in">
+          <span>{item.title}</span>
+          {item.badge && (
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+              <Lock className="h-2.5 w-2.5" />
+              {item.badge}
+            </span>
+          )}
+        </div>
       )}
     </Link>
   );
@@ -110,7 +122,14 @@ function NavLink({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean })
           {linkContent}
         </TooltipTrigger>
         <TooltipContent side="right" className="flex flex-col gap-1">
-          <span className="font-medium">{item.title}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{item.title}</span>
+            {item.badge && (
+              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                <Lock className="h-2.5 w-2.5" />
+              </span>
+            )}
+          </div>
           {item.description && (
             <span className="text-xs text-muted-foreground">{item.description}</span>
           )}

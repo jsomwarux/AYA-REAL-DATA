@@ -1,22 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatsCardsSkeleton, ChartSkeleton } from "@/components/ui/loading-skeletons";
-import { ErrorState } from "@/components/ui/error-state";
-import { checkHealth, fetchConstructionData, fetchDealsData } from "@/lib/api";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { checkHealth, fetchConstructionProgressData } from "@/lib/api";
+import {
+  calculateRoomCompletion,
+  calculateTaskCompletion,
+  getUniqueFloors,
+  groupRoomsByFloor,
+  calculateFloorCompletion,
+  getCompletionColor,
+} from "@/components/construction-progress/utils";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess } from "@/hooks/use-toast";
 import {
   AlertTriangle,
-  DollarSign,
-  FileText,
-  Home,
+  Building2,
+  Bath,
+  BedDouble,
+  Layers,
+  CheckCircle2,
+  ArrowRight,
   TrendingUp,
-  CheckCircle,
-  HardHat,
-  Radar,
-  Activity
 } from "lucide-react";
 import {
   BarChart,
@@ -26,10 +34,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
 } from "recharts";
 
 // Chart colors matching design system
@@ -39,23 +43,8 @@ const COLORS = {
   red: "#ef4444",
   purple: "#8b5cf6",
   blue: "#3b82f6",
+  green: "#22c55e",
 };
-
-// Mock data for demonstration - will be replaced by Google Sheets data
-const invoiceStatusData = [
-  { name: "Approved", value: 45, color: COLORS.teal },
-  { name: "Pending", value: 20, color: COLORS.amber },
-  { name: "Flagged", value: 8, color: COLORS.red },
-];
-
-const monthlyDealsData = [
-  { month: "Jan", deals: 4, value: 2.1 },
-  { month: "Feb", deals: 6, value: 3.2 },
-  { month: "Mar", deals: 5, value: 2.8 },
-  { month: "Apr", deals: 8, value: 4.5 },
-  { month: "May", deals: 7, value: 3.9 },
-  { month: "Jun", deals: 10, value: 5.2 },
-];
 
 export default function Overview() {
   useDocumentTitle("Overview");
@@ -65,53 +54,73 @@ export default function Overview() {
     queryFn: checkHealth,
   });
 
-  const constructionQuery = useQuery({
-    queryKey: ["construction"],
-    queryFn: () => fetchConstructionData(),
+  const constructionProgressQuery = useQuery({
+    queryKey: ["construction-progress"],
+    queryFn: () => fetchConstructionProgressData(),
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
-  const dealsQuery = useQuery({
-    queryKey: ["deals"],
-    queryFn: () => fetchDealsData(),
-    retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 
   const handleRefresh = async () => {
-    await Promise.all([constructionQuery.refetch(), dealsQuery.refetch()]);
-    toastSuccess("Data Refreshed", "All dashboard data has been updated.");
+    await constructionProgressQuery.refetch();
+    toastSuccess("Data Refreshed", "Dashboard data has been updated.");
   };
 
-  const isLoading = constructionQuery.isLoading || dealsQuery.isLoading;
+  const isLoading = constructionProgressQuery.isLoading;
   const sheetsConfigured = (healthQuery.data as any)?.sheetsConfigured;
 
-  // Calculate stats from real data
-  const constructionRows = constructionQuery.data?.rows || [];
-  const dealsRows = dealsQuery.data?.rows || [];
+  // Get rooms data
+  const rooms = constructionProgressQuery.data?.rooms?.rows || [];
+  const totalRooms = rooms.length;
 
-  // Helper to get field with case-insensitive lookup
-  const getField = (row: any, ...keys: string[]): any => {
-    for (const key of keys) {
-      if (row[key] !== undefined && row[key] !== null) return row[key];
-      if (row[key.toUpperCase()] !== undefined && row[key.toUpperCase()] !== null) return row[key.toUpperCase()];
-      if (row[key.toLowerCase()] !== undefined && row[key.toLowerCase()] !== null) return row[key.toLowerCase()];
-    }
-    return null;
-  };
+  // Calculate overall stats
+  const roomCompletions = rooms.map((r: any) => calculateRoomCompletion(r));
 
-  const flaggedInvoices = constructionRows.filter((r: any) => {
-    const verdict = getField(r, 'verdict', 'VERDICT', 'status');
-    return verdict && (verdict.toUpperCase() === 'HOLD_FOR_REVIEW' || verdict.toUpperCase() === 'REJECT');
-  }).length;
+  const overallCompletion = totalRooms > 0
+    ? Math.round(roomCompletions.reduce((sum: number, c: any) => sum + c.overall.percentage, 0) / totalRooms)
+    : 0;
 
-  const totalDeals = dealsRows.length;
+  const bathroomCompletion = totalRooms > 0
+    ? Math.round(roomCompletions.reduce((sum: number, c: any) => sum + c.bathroom.percentage, 0) / totalRooms)
+    : 0;
+
+  const bedroomCompletion = totalRooms > 0
+    ? Math.round(roomCompletions.reduce((sum: number, c: any) => sum + c.bedroom.percentage, 0) / totalRooms)
+    : 0;
+
+  const completedUnits = roomCompletions.filter((c: any) => c.overall.percentage === 100).length;
+
+  // Get floor data for chart
+  const floors = getUniqueFloors(rooms);
+  const floorMap = groupRoomsByFloor(rooms);
+
+  const floorChartData = floors.map(floor => {
+    const floorRooms = floorMap.get(floor) || [];
+    const completion = calculateFloorCompletion(floorRooms);
+    return {
+      floor: `F${floor}`,
+      completion: completion.overall,
+      bathroom: completion.bathroom,
+      bedroom: completion.bedroom,
+    };
+  });
+
+  // Calculate task completions
+  const bathroomTasks = calculateTaskCompletion(rooms, 'bathroom');
+  const bedroomTasks = calculateTaskCompletion(rooms, 'bedroom');
+
+  // Find top 5 tasks needing attention (lowest completion)
+  const allTasks = [
+    ...Object.entries(bathroomTasks).map(([name, stats]) => ({ name, ...stats, type: 'Bathroom' })),
+    ...Object.entries(bedroomTasks).map(([name, stats]) => ({ name, ...stats, type: 'Bedroom' })),
+  ].sort((a, b) => a.percentage - b.percentage);
+
+  const tasksNeedingAttention = allTasks.slice(0, 5);
 
   return (
     <DashboardLayout
       title="Dashboard Overview"
-      subtitle="Real-time insights from your automated workflows"
+      subtitle="Construction progress at a glance"
       onRefresh={handleRefresh}
       isLoading={isLoading}
     >
@@ -137,133 +146,139 @@ export default function Overview() {
       {/* Stats Grid */}
       <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Active Projects"
-          value="12"
-          change="+2 this month"
-          changeType="positive"
-          icon={<Home className="h-5 w-5" />}
+          title="Overall Progress"
+          value={`${overallCompletion}%`}
+          change={`${completedUnits}/${totalRooms} complete`}
+          changeType={overallCompletion >= 50 ? "positive" : "neutral"}
+          icon={<Building2 className="h-5 w-5" />}
           accentColor="teal"
         />
         <StatCard
-          title="Flagged Invoices"
-          value={flaggedInvoices}
-          change="Requires review"
-          changeType="negative"
-          icon={<AlertTriangle className="h-5 w-5" />}
-          accentColor="red"
+          title="Bathrooms"
+          value={`${bathroomCompletion}%`}
+          change={`${Object.keys(bathroomTasks).length} tasks tracked`}
+          changeType={bathroomCompletion >= 50 ? "positive" : "neutral"}
+          icon={<Bath className="h-5 w-5" />}
+          accentColor="blue"
         />
         <StatCard
-          title="Deals Analyzed"
-          value={totalDeals}
-          change="+8 this week"
-          changeType="positive"
-          icon={<FileText className="h-5 w-5" />}
+          title="Bedrooms"
+          value={`${bedroomCompletion}%`}
+          change={`${Object.keys(bedroomTasks).length} tasks tracked`}
+          changeType={bedroomCompletion >= 50 ? "positive" : "neutral"}
+          icon={<BedDouble className="h-5 w-5" />}
           accentColor="purple"
         />
         <StatCard
-          title="Portfolio Value"
-          value="$24.5M"
-          change="+12.3% YTD"
-          changeType="positive"
-          icon={<DollarSign className="h-5 w-5" />}
-          accentColor="blue"
+          title="Total Units"
+          value={totalRooms}
+          change={`${floors.length} floors`}
+          changeType="neutral"
+          icon={<Layers className="h-5 w-5" />}
+          accentColor="amber"
         />
       </div>
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Invoice Status Chart */}
+        {/* Floor Progress Chart */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-white">
-              <CheckCircle className="h-5 w-5 text-teal-400" />
-              Invoice Status Distribution
+              <TrendingUp className="h-5 w-5 text-teal-400" />
+              Progress by Floor
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={invoiceStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="transparent"
-                  >
-                    {invoiceStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(217 33% 17%)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "8px",
-                      color: "white"
-                    }}
-                  />
-                  <Legend
-                    formatter={(value) => <span className="text-muted-foreground">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {floorChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={floorChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis
+                      dataKey="floor"
+                      stroke="rgba(255,255,255,0.5)"
+                      fontSize={12}
+                    />
+                    <YAxis
+                      stroke="rgba(255,255,255,0.5)"
+                      fontSize={12}
+                      domain={[0, 100]}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(217 33% 17%)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px",
+                        color: "white"
+                      }}
+                      formatter={(value: number) => [`${value}%`, '']}
+                    />
+                    <Bar
+                      dataKey="completion"
+                      fill={COLORS.teal}
+                      radius={[4, 4, 0, 0]}
+                      name="Overall"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No floor data available
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Monthly Deals Chart */}
+        {/* Tasks Needing Attention */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-white">
-              <TrendingUp className="h-5 w-5 text-purple-400" />
-              Monthly Deal Activity
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+              Tasks Needing Attention
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyDealsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis
-                    dataKey="month"
-                    stroke="rgba(255,255,255,0.5)"
-                    fontSize={12}
-                  />
-                  <YAxis
-                    stroke="rgba(255,255,255,0.5)"
-                    fontSize={12}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(217 33% 17%)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "8px",
-                      color: "white"
-                    }}
-                  />
-                  <Bar
-                    dataKey="deals"
-                    fill={COLORS.purple}
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              {tasksNeedingAttention.length > 0 ? (
+                tasksNeedingAttention.map((task, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">
+                          {task.type}
+                        </span>
+                        <span className="text-white">{task.name}</span>
+                      </div>
+                      <span className={getCompletionColor(task.percentage)}>
+                        {task.completed}/{task.total} ({task.percentage}%)
+                      </span>
+                    </div>
+                    <Progress
+                      value={task.percentage}
+                      className="h-2 bg-white/10"
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+                  No task data available
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Workflow Status */}
+      {/* Quick Actions */}
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Card className="border-white/10 group hover:border-blue-500/30 transition-colors">
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-white">
-              <HardHat className="h-5 w-5 text-blue-400" />
-              Construction Oversight Engine
+              <Building2 className="h-5 w-5 text-blue-400" />
+              Construction Progress
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
@@ -275,47 +290,58 @@ export default function Overview() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-400"></span>
                   </span>
-                  Active
+                  Live
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Last Sync</span>
-                <span className="text-sm font-medium text-white">2 minutes ago</span>
+                <span className="text-sm text-muted-foreground">Overall Progress</span>
+                <span className={`text-sm font-medium ${getCompletionColor(overallCompletion)}`}>
+                  {overallCompletion}%
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Invoices Processed</span>
-                <span className="text-sm font-medium text-white">73</span>
+                <span className="text-sm text-muted-foreground">Units Tracked</span>
+                <span className="text-sm font-medium text-white">{totalRooms}</span>
               </div>
+              <Link href="/construction">
+                <Button className="w-full mt-2" variant="outline">
+                  View Details
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 group hover:border-purple-500/30 transition-colors">
+        <Card className="border-white/10 group hover:border-green-500/30 transition-colors">
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-white">
-              <Radar className="h-5 w-5 text-purple-400" />
-              Deal Intelligence System
+              <CheckCircle2 className="h-5 w-5 text-green-400" />
+              Completion Summary
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Status</span>
-                <span className="flex items-center gap-2 text-sm font-medium text-teal-400">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-400"></span>
-                  </span>
-                  Active
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Bathrooms</span>
+                  <span className={getCompletionColor(bathroomCompletion)}>{bathroomCompletion}%</span>
+                </div>
+                <Progress value={bathroomCompletion} className="h-2 bg-white/10" />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Last Sync</span>
-                <span className="text-sm font-medium text-white">5 minutes ago</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Bedrooms</span>
+                  <span className={getCompletionColor(bedroomCompletion)}>{bedroomCompletion}%</span>
+                </div>
+                <Progress value={bedroomCompletion} className="h-2 bg-white/10" />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Properties Scored</span>
-                <span className="text-sm font-medium text-white">{totalDeals}</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Overall</span>
+                  <span className={getCompletionColor(overallCompletion)}>{overallCompletion}%</span>
+                </div>
+                <Progress value={overallCompletion} className="h-2 bg-white/10" />
               </div>
             </div>
           </CardContent>

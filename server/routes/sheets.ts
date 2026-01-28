@@ -260,4 +260,125 @@ router.post('/batch', async (req, res) => {
   }
 });
 
+// Get Construction Progress data (new sheet with Rooms Progress and RECAP tabs)
+router.get('/construction-progress', async (req, res) => {
+  try {
+    const spreadsheetId = process.env.CONSTRUCTION_PROGRESS_SHEET_ID;
+
+    if (!spreadsheetId) {
+      return res.status(400).json({
+        error: 'Construction Progress sheet ID not configured',
+        message: 'Please set CONSTRUCTION_PROGRESS_SHEET_ID in environment variables'
+      });
+    }
+
+    // Fetch both the Rooms Progress data and RECAP data
+    const roomsRange = "'Rooms Progress'!A3:Z500"; // Row 3 has headers, row 4+ has data
+    const recapRange = "'RECAP'!A:Z";
+
+    const data = await fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]);
+
+    // Process Rooms Progress data
+    const roomsData = data.get(roomsRange);
+    const recapData = data.get(recapRange);
+
+    // Transform rooms data - need special handling for the merged BATHROOM/BEDROOM headers
+    // Row 3 (index 0 in our fetch since we start at A3) contains the actual column headers
+    let processedRooms: GoogleSheetRow[] = [];
+    let roomHeaders: string[] = [];
+
+    if (roomsData && roomsData.rawValues && roomsData.rawValues.length > 0) {
+      // First row of our fetch is the column headers (Row 3 in sheet)
+      roomHeaders = roomsData.rawValues[0] as string[];
+
+      // Data starts from the second row of our fetch (Row 4 in sheet)
+      const dataRows = roomsData.rawValues.slice(1);
+
+      processedRooms = dataRows.map((row) => {
+        const obj: GoogleSheetRow = {};
+        roomHeaders.forEach((header, index) => {
+          const value = row[index];
+          if (header && header.trim() !== '') {
+            // Handle checkbox values (TRUE/FALSE from Google Sheets)
+            // Google Sheets API returns checkbox values as strings "TRUE" or "FALSE"
+            const strValue = String(value);
+            if (strValue === 'TRUE') {
+              obj[header.trim()] = true;
+            } else if (strValue === 'FALSE') {
+              obj[header.trim()] = false;
+            } else if (value !== undefined && value !== '') {
+              // Try to parse numbers, but keep percentages as strings
+              const isPercentage = typeof value === 'string' && value.includes('%');
+              if (!isPercentage) {
+                const num = Number(value);
+                obj[header.trim()] = isNaN(num) ? value : num;
+              } else {
+                obj[header.trim()] = value;
+              }
+            } else {
+              obj[header.trim()] = null;
+            }
+          }
+        });
+        return obj;
+      }).filter(row => {
+        // Filter out empty rows (rows without a room number)
+        const roomNum = row['ROOM #'] || row['Room #'] || row['ROOM'] || row['room'];
+        return roomNum !== null && roomNum !== undefined && roomNum !== '';
+      });
+    }
+
+    // Process RECAP data
+    let processedRecap: GoogleSheetRow[] = [];
+    let recapHeaders: string[] = [];
+
+    if (recapData && recapData.rawValues && recapData.rawValues.length > 0) {
+      recapHeaders = recapData.rawValues[0] as string[];
+      const recapDataRows = recapData.rawValues.slice(1);
+
+      processedRecap = recapDataRows.map((row) => {
+        const obj: GoogleSheetRow = {};
+        recapHeaders.forEach((header, index) => {
+          const value = row[index];
+          if (header && header.trim() !== '') {
+            if (value !== undefined && value !== '') {
+              const num = Number(value);
+              obj[header.trim()] = isNaN(num) ? value : num;
+            } else {
+              obj[header.trim()] = null;
+            }
+          }
+        });
+        return obj;
+      }).filter(row => {
+        // Filter out rows without a date
+        const hasData = Object.values(row).some(v => v !== null && v !== '');
+        return hasData;
+      });
+    }
+
+    // Add timestamps to rooms data
+    const roomsWithTimestamp = await addTimestampsToRows(processedRooms, 'construction-progress');
+
+    res.json({
+      rooms: {
+        headers: roomHeaders.filter(h => h && h.trim() !== ''),
+        rows: roomsWithTimestamp,
+        totalRooms: processedRooms.length,
+      },
+      recap: {
+        headers: recapHeaders.filter(h => h && h.trim() !== ''),
+        rows: processedRecap,
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error fetching construction progress data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch construction progress data',
+      message: error.message
+    });
+  }
+});
+
 export default router;
