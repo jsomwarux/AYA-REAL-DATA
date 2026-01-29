@@ -46,7 +46,7 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
   'Bathroom_Shower Valves': {
     type: 'dropdown',
     completeValues: ['New Parts replaced', 'New 2 way valve', 'New 3 way valve'],
-    naValues: ['no work done yet']
+    naValues: []  // "no work done yet" is an incomplete status, not N/A
   },
   'Bathroom_Soap Niche Built': {
     type: 'dropdown',
