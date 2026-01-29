@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -12,6 +13,12 @@ declare module "http" {
   }
 }
 
+declare module "express-session" {
+  interface SessionData {
+    authenticated: boolean;
+  }
+}
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -21,6 +28,57 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Session middleware for password gate
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "aya-dashboard-secret-key-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false,
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    },
+  }),
+);
+
+// Auth endpoints
+app.post("/api/auth/login", (req: Request, res: Response) => {
+  const { password } = req.body;
+  const gatePassword = process.env.PASSWORD_GATE;
+
+  if (!gatePassword) {
+    // No password configured — allow access
+    req.session.authenticated = true;
+    return res.json({ success: true });
+  }
+
+  if (password === gatePassword) {
+    req.session.authenticated = true;
+    return res.json({ success: true });
+  }
+
+  return res.status(401).json({ message: "Incorrect password" });
+});
+
+app.get("/api/auth/check", (req: Request, res: Response) => {
+  const gatePassword = process.env.PASSWORD_GATE;
+  if (!gatePassword) {
+    // No password configured — always authenticated
+    return res.json({ authenticated: true });
+  }
+  return res.json({ authenticated: !!req.session.authenticated });
+});
+
+app.post("/api/auth/logout", (req: Request, res: Response) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "Failed to logout" });
+    }
+    res.json({ success: true });
+  });
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

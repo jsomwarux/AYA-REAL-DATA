@@ -41,6 +41,7 @@ AYA-REAL-DATA/
 │       │   │   ├── DashboardLayout.tsx   # Shared layout wrapper
 │       │   │   ├── Sidebar.tsx           # Navigation sidebar
 │       │   │   └── StatCard.tsx          # Reusable stat card component
+│       │   ├── PasswordGate.tsx          # Password gate wrapper component
 │       │   ├── timeline/
 │       │   │   ├── TimelineChart.tsx     # Gantt-style calendar grid
 │       │   │   ├── EventModal.tsx        # Add/edit event dialog
@@ -150,12 +151,38 @@ The Timeline page computes rich analytics from the event data:
 - PR & Social Media
 - Website & Digital Performance
 
+## Authentication / Password Gate
+
+The entire app is protected by a simple password gate. Users must enter the correct password before accessing any page.
+
+### How It Works
+1. **Backend** (`server/index.ts`):
+   - Uses `express-session` for session management (7-day cookie)
+   - `POST /api/auth/login` — verifies password against `PASSWORD_GATE` env var
+   - `GET /api/auth/check` — returns `{ authenticated: true/false }`
+   - `POST /api/auth/logout` — destroys the session
+   - If `PASSWORD_GATE` is not set, all requests are treated as authenticated (no gate)
+2. **Frontend** (`client/src/components/PasswordGate.tsx`):
+   - Wraps the entire `<Router />` in `App.tsx`
+   - On load, calls `/api/auth/check` to see if session is valid
+   - If not authenticated, shows a centered password input card (dark themed, matching app style)
+   - On successful login, renders the app children
+3. **Auth state** is managed via React Query (`["auth"]` query key) so it integrates with existing data fetching patterns
+
+### Auth API Endpoints
+- `POST /api/auth/login` — Body: `{ password: string }` → `{ success: true }` or `401`
+- `GET /api/auth/check` → `{ authenticated: boolean }`
+- `POST /api/auth/logout` → `{ success: true }`
+
 ## Environment Variables
+- `PASSWORD_GATE` - Password required to access the dashboard (Replit secret)
+- `SESSION_SECRET` - Express session secret (optional, has fallback)
 - `TIMELINE_SHEET_ID` - Google Spreadsheet ID for timeline data import
 - Google Sheets API credentials (service account)
 - PostgreSQL connection string
 
 ## Key Patterns
+- **Password gate** wrapping the entire app via `PasswordGate` component
 - **React Query** for all data fetching with staleTime caching
 - **useMemo** for computed analytics to avoid re-calculation on every render
 - **Optimistic UI** patterns for CRUD operations

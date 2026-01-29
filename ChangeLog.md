@@ -2,6 +2,19 @@
 
 ## January 29, 2026
 
+### Password Gate
+- **Added app-wide password protection**: The entire dashboard is now gated behind a password screen. Users must enter the correct password (from `PASSWORD_GATE` Replit secret) before accessing any page.
+- **Backend**: Added `express-session` middleware and three auth endpoints (`/api/auth/login`, `/api/auth/check`, `/api/auth/logout`) to `server/index.ts`. Sessions persist for 7 days via cookie.
+- **Frontend**: Created `PasswordGate.tsx` component that wraps the entire router in `App.tsx`. Shows a centered, dark-themed password card on load. Uses React Query for auth state management.
+- **Graceful fallback**: If `PASSWORD_GATE` env var is not set, the gate is bypassed and the app is accessible without a password.
+
+**Files changed:**
+- `server/index.ts` — Added `express-session` import, session middleware, session type declaration, and three auth endpoints (`/api/auth/login`, `/api/auth/check`, `/api/auth/logout`).
+- `client/src/components/PasswordGate.tsx` — New file. Password gate wrapper component with auth check, login form, error handling, and loading state.
+- `client/src/App.tsx` — Wrapped `<Router />` with `<PasswordGate>` and added import.
+
+---
+
 ### Timeline UI Improvements
 - **Clickable milestone items**: Upcoming Milestones and Recent Completions cards now have clickable/expandable items. Clicking a milestone reveals full details including category, date range (with year), and full task name. Only one milestone can be expanded at a time. Added hover styling to indicate interactivity.
 - **Category name tooltips**: Added native `title` attribute to category names in the "Events by Category" card so hovering over truncated names shows the full category name.

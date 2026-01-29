@@ -2,6 +2,7 @@ import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { PasswordGate } from "@/components/PasswordGate";
 import Overview from "@/pages/Overview";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
@@ -28,7 +29,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
-      <Router />
+      <PasswordGate>
+        <Router />
+      </PasswordGate>
     </QueryClientProvider>
   );
 }
