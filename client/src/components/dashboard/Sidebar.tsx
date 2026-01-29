@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import {
   HardHat,
   Radar,
-  Settings,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -76,14 +75,7 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
-const bottomNavItems: NavItem[] = [
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: <Settings className="h-5 w-5" />,
-    iconColor: "text-muted-foreground",
-  },
-];
+const bottomNavItems: NavItem[] = [];
 
 interface SidebarProviderProps {
   children: React.ReactNode;

@@ -1,16 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Sidebar, SidebarProvider, useSidebar } from "./Sidebar";
-import { RefreshCw, Menu, X, Clock, User } from "lucide-react";
+import { RefreshCw, Menu, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -120,35 +111,6 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
           </Button>
         )}
 
-        {/* User avatar dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-              <Avatar className="h-9 w-9 border border-white/10">
-                <AvatarImage src="" alt="User" />
-                <AvatarFallback className="bg-gradient-to-br from-teal-500 to-blue-500 text-white text-sm font-medium">
-                  AY
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">AYA User</p>
-                <p className="text-xs text-muted-foreground">user@aya.capital</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-400">Log out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </header>
   );
