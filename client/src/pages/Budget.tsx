@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { fetchBudgetData, BudgetItem } from "@/lib/api";
+import { BudgetItemModal } from "@/components/budget/BudgetItemModal";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess } from "@/hooks/use-toast";
 import {
@@ -98,6 +99,7 @@ export default function Budget() {
   const [sortField, setSortField] = useState<keyof BudgetItem>("subtotal");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [showAllVendors, setShowAllVendors] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<BudgetItem | null>(null);
 
   const budgetQuery = useQuery({
     queryKey: ["budget"],
@@ -571,7 +573,8 @@ export default function Budget() {
                     filteredItems.map((item) => (
                       <TableRow
                         key={item.id}
-                        className="border-white/10 hover:bg-white/5"
+                        className="border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
+                        onClick={() => setSelectedItem(item)}
                       >
                         <TableCell className="font-medium text-white">
                           {item.category}
@@ -605,6 +608,13 @@ export default function Budget() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Budget Item Detail Modal */}
+      <BudgetItemModal
+        item={selectedItem}
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+      />
     </DashboardLayout>
   );
 }
