@@ -54,34 +54,36 @@ export async function checkHealth() {
 }
 
 // Construction Progress Types
+// Field names match exactly what's in Row 3 of the Google Sheet
 export interface RoomProgress {
   'ROOM #': string | number;
-  // Bathroom fields
-  'Demo Status'?: string;
-  'Electrical Wiring'?: boolean;
-  'Speaker Line'?: boolean;
-  'Waterproofing'?: string;
-  'Sheetrock'?: string;
-  'Wall Patching'?: string;
-  'Repair door opening'?: string;
-  'New Wall Grout'?: boolean;
-  'Shower Valves'?: string;
-  'Soap Niche Built'?: string;
-  'Tile %'?: string;
-  'Linear Drain Installed'?: string;
-  // Bedroom fields
-  'Electric Wiring'?: boolean;
-  'Data Jack Protection'?: boolean;
-  'Curtain Box'?: boolean;
-  'NEW HVAC UNIT'?: boolean;
-  'Wall Plastering'?: boolean;
-  'Sanding'?: boolean;
-  'Corner Sanding'?: boolean;
-  'Prime Paint'?: boolean;
-  'Finish Paint'?: boolean;
-  'Flooring'?: boolean;
+  // Bathroom fields (Columns C-N)
+  'Demo Status'?: string;           // DEMO DONE, CLEAN/REPAIR, Approved Demo
+  'Electrical Wiring'?: boolean;    // Checkbox
+  'Speaker Line'?: boolean;         // Checkbox (Bathroom)
+  'Waterproofing'?: string;         // Completed, Clean and Repair, Not yet
+  'Sheetrock'?: string;             // Ceiling closed, Installed, Not yet (Bathroom is dropdown)
+  'Wall Patching'?: string;         // Done, Not yet
+  'Repair Door Opening'?: string;   // Completed, External Door, Keep Existing, Not yet
+  'New Wall Grout'?: boolean;       // Checkbox
+  'Shower Valves'?: string;         // no work done yet, New Parts replaced, New 2 way valve, New 3 way valve
+  'Soap Niche Built'?: string;      // Not yet, Done, Not required
+  'Tile %'?: string;                // 25%, 50%, 75%, 95%, 100%, blank
+  'Linear Drain Installed'?: string; // Not yet, Done, Not Required
+  // Bedroom fields (Columns O-Z)
+  'Electric Wiring'?: boolean;      // Checkbox
+  'Data Jack Protection'?: boolean; // Checkbox
+  'Curtain Box'?: boolean;          // Checkbox
+  'New HVAC Unit'?: boolean;        // Checkbox
+  'Wall Plastering'?: boolean;      // Checkbox
+  'Sanding'?: boolean;              // Checkbox
+  'Corner Sanding'?: boolean;       // Checkbox
+  'Prime Paint'?: boolean;          // Checkbox
+  'Finish Paint'?: boolean;         // Checkbox
+  'Flooring'?: boolean;             // Checkbox
   // Metadata
   retrieved_at?: string;
+  // Allow dynamic access for case-insensitive lookups
   [key: string]: string | number | boolean | null | undefined;
 }
 

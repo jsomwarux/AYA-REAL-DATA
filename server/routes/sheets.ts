@@ -262,10 +262,13 @@ router.post('/batch', async (req, res) => {
 
 // Get Construction Progress data (new sheet with Rooms Progress and RECAP tabs)
 router.get('/construction-progress', async (req, res) => {
+  console.log('[construction-progress] Endpoint called');
   try {
     const spreadsheetId = process.env.CONSTRUCTION_PROGRESS_SHEET_ID;
+    console.log('[construction-progress] Sheet ID configured:', spreadsheetId ? 'YES' : 'NO');
 
     if (!spreadsheetId) {
+      console.error('[construction-progress] CONSTRUCTION_PROGRESS_SHEET_ID not set');
       return res.status(400).json({
         error: 'Construction Progress sheet ID not configured',
         message: 'Please set CONSTRUCTION_PROGRESS_SHEET_ID in environment variables'
@@ -276,7 +279,9 @@ router.get('/construction-progress', async (req, res) => {
     const roomsRange = "'Rooms Progress'!A3:Z500"; // Row 3 has headers, row 4+ has data
     const recapRange = "'RECAP'!A:Z";
 
+    console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
     const data = await fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]);
+    console.log('[construction-progress] Data fetched successfully');
 
     // Process Rooms Progress data
     const roomsData = data.get(roomsRange);

@@ -1,70 +1,197 @@
 import { RoomProgress } from "@/lib/api";
 
 // Define bathroom fields and their completion criteria
-export const BATHROOM_FIELDS = {
-  'Demo Status': { type: 'dropdown', completeValues: ['DEMO DONE'], naValues: [] },
-  'Electrical Wiring': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Speaker Line': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Waterproofing': { type: 'dropdown', completeValues: ['Completed'], naValues: [] },
-  'Sheetrock': { type: 'dropdown', completeValues: ['Installed', 'Ceiling closed'], naValues: [] },
-  'Wall Patching': { type: 'dropdown', completeValues: ['Done'], naValues: [] },
-  'Repair door opening': { type: 'dropdown', completeValues: ['Completed'], naValues: ['Keep Existing'] },
-  'New Wall Grout': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Shower Valves': { type: 'dropdown', completeValues: ['New 2 Way'], naValues: ['no work done'] },
-  'Soap Niche Built': { type: 'dropdown', completeValues: ['Done'], naValues: ['Not Required'] },
-  'Tile %': { type: 'percentage', completeValues: ['100%'], naValues: [] },
-  'Linear Drain Installed': { type: 'dropdown', completeValues: ['Done'], naValues: ['Not Required', 'Not Requ'] },
-} as const;
+// Column headers exactly as they appear in the Google Sheet Row 3
+export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: string[]; naValues: string[] }> = {
+  'Demo Status': {
+    type: 'dropdown',
+    completeValues: ['DEMO DONE', 'Approved Demo'],
+    naValues: []
+  },
+  'Electrical Wiring': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Speaker Line': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Waterproofing': {
+    type: 'dropdown',
+    completeValues: ['Completed'],
+    naValues: []
+  },
+  'Sheetrock': {
+    type: 'dropdown',
+    completeValues: ['Installed', 'Ceiling closed'],
+    naValues: []
+  },
+  'Wall Patching': {
+    type: 'dropdown',
+    completeValues: ['Done'],
+    naValues: []
+  },
+  'Repair Door Opening': {
+    type: 'dropdown',
+    completeValues: ['Completed'],
+    naValues: ['Keep Existing', 'External Door']
+  },
+  'New Wall Grout': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Shower Valves': {
+    type: 'dropdown',
+    completeValues: ['New Parts replaced', 'New 2 way valve', 'New 3 way valve'],
+    naValues: ['no work done yet']
+  },
+  'Soap Niche Built': {
+    type: 'dropdown',
+    completeValues: ['Done'],
+    naValues: ['Not required', 'Not Required']
+  },
+  'Tile %': {
+    type: 'percentage',
+    completeValues: ['100%', '100'],
+    naValues: []
+  },
+  'Linear Drain Installed': {
+    type: 'dropdown',
+    completeValues: ['Done'],
+    naValues: ['Not required', 'Not Required']
+  },
+};
 
 // Define bedroom fields and their completion criteria
-export const BEDROOM_FIELDS = {
-  'Electric Wiring': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Speaker Line': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Data Jack Protection': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Curtain Box': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'NEW HVAC UNIT': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Sheetrock': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Wall Plastering': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Sanding': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Corner Sanding': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Prime Paint': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Finish Paint': { type: 'checkbox', completeValues: [true], naValues: [] },
-  'Flooring': { type: 'checkbox', completeValues: [true], naValues: [] },
-} as const;
+// Column headers exactly as they appear in the Google Sheet Row 3
+export const BEDROOM_FIELDS: Record<string, { type: string; completeValues: string[]; naValues: string[] }> = {
+  'Electric Wiring': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Speaker Line': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Data Jack Protection': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Curtain Box': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'New HVAC Unit': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Sheetrock': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Wall Plastering': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Sanding': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Corner Sanding': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Prime Paint': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Finish Paint': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+  'Flooring': {
+    type: 'checkbox',
+    completeValues: ['TRUE', 'true'],
+    naValues: []
+  },
+};
 
 // Check if a field is complete
 export function isFieldComplete(
   value: any,
-  fieldConfig: { type: string; completeValues: readonly any[]; naValues: readonly string[] }
+  fieldConfig: { type: string; completeValues: string[]; naValues: string[] }
 ): boolean | 'na' {
+  // Handle null, undefined, or empty values
   if (value === null || value === undefined || value === '') {
     return false;
   }
 
-  // Check for N/A values
-  if (fieldConfig.naValues.some(na =>
-    typeof value === 'string' && value.toLowerCase().includes(na.toLowerCase())
-  )) {
-    return 'na';
+  const strValue = String(value).trim();
+
+  // Check for N/A values first (case-insensitive)
+  for (const na of fieldConfig.naValues) {
+    if (strValue.toLowerCase() === na.toLowerCase()) {
+      return 'na';
+    }
   }
 
-  // Check for completion
+  // Check for completion based on field type
   if (fieldConfig.type === 'checkbox') {
-    return value === true || value === 'TRUE';
+    // Checkboxes come as boolean true/false or string "TRUE"/"FALSE"
+    return value === true || strValue.toUpperCase() === 'TRUE';
   }
 
   if (fieldConfig.type === 'percentage') {
-    const strValue = String(value);
-    return strValue === '100%' || strValue === '100';
+    // Check if it's 100%
+    const numMatch = strValue.match(/(\d+)/);
+    if (numMatch) {
+      return parseInt(numMatch[1], 10) === 100;
+    }
+    return false;
   }
 
-  // Dropdown - check if value matches any complete value
-  return fieldConfig.completeValues.some(cv => {
-    if (typeof value === 'string' && typeof cv === 'string') {
-      return value.toLowerCase().includes(cv.toLowerCase());
+  // Dropdown - check if value matches any complete value (case-insensitive)
+  for (const cv of fieldConfig.completeValues) {
+    if (strValue.toLowerCase() === cv.toLowerCase()) {
+      return true;
     }
-    return value === cv;
-  });
+  }
+
+  return false;
+}
+
+// Get a field value from a room, trying multiple possible key formats
+function getFieldValue(room: RoomProgress, fieldName: string): any {
+  // Try exact match first
+  if (room[fieldName] !== undefined) {
+    return room[fieldName];
+  }
+
+  // Try with different cases
+  const lowerKey = fieldName.toLowerCase();
+  const upperKey = fieldName.toUpperCase();
+
+  for (const key of Object.keys(room)) {
+    if (key.toLowerCase() === lowerKey || key.toUpperCase() === upperKey) {
+      return room[key];
+    }
+  }
+
+  return undefined;
 }
 
 // Calculate completion percentage for a room's bathroom
@@ -73,7 +200,7 @@ export function calculateBathroomCompletion(room: RoomProgress): { completed: nu
   let total = 0;
 
   for (const [fieldName, config] of Object.entries(BATHROOM_FIELDS)) {
-    const value = room[fieldName];
+    const value = getFieldValue(room, fieldName);
     const status = isFieldComplete(value, config);
 
     if (status === 'na') {
@@ -100,8 +227,7 @@ export function calculateBedroomCompletion(room: RoomProgress): { completed: num
   let total = 0;
 
   for (const [fieldName, config] of Object.entries(BEDROOM_FIELDS)) {
-    // Handle field name variations (Bedroom uses "Electric Wiring" not "Electrical Wiring")
-    const value = room[fieldName];
+    const value = getFieldValue(room, fieldName);
     const status = isFieldComplete(value, config);
 
     if (status === 'na') {
@@ -156,7 +282,7 @@ export function calculateTaskCompletion(
     let total = 0;
 
     for (const room of rooms) {
-      const value = room[fieldName];
+      const value = getFieldValue(room, fieldName);
       const status = isFieldComplete(value, config);
 
       if (status === 'na') {
@@ -274,7 +400,18 @@ export function formatFieldValue(value: any, fieldType: string): string {
     return 'Not started';
   }
   if (fieldType === 'checkbox') {
-    return value === true || value === 'TRUE' ? 'Complete' : 'Not started';
+    return value === true || String(value).toUpperCase() === 'TRUE' ? 'Complete' : 'Not started';
   }
   return String(value);
+}
+
+// Get field config for a field name (searches both bathroom and bedroom)
+export function getFieldConfig(fieldName: string): { type: string; completeValues: string[]; naValues: string[] } | null {
+  if (BATHROOM_FIELDS[fieldName]) {
+    return BATHROOM_FIELDS[fieldName];
+  }
+  if (BEDROOM_FIELDS[fieldName]) {
+    return BEDROOM_FIELDS[fieldName];
+  }
+  return null;
 }

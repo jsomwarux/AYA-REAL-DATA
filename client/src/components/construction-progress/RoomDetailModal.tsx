@@ -16,6 +16,24 @@ import {
   getCompletionColor,
   getFloorFromRoom,
 } from "./utils";
+
+// Helper to get field value with case-insensitive lookup
+function getFieldValue(room: RoomProgress, fieldName: string): any {
+  // Try exact match first
+  if (room[fieldName] !== undefined) {
+    return room[fieldName];
+  }
+
+  // Try with different cases
+  const lowerKey = fieldName.toLowerCase();
+  for (const key of Object.keys(room)) {
+    if (key.toLowerCase() === lowerKey) {
+      return room[key];
+    }
+  }
+
+  return undefined;
+}
 import {
   Bath,
   BedDouble,
@@ -125,7 +143,7 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
             />
             <div className="space-y-2">
               {Object.entries(BATHROOM_FIELDS).map(([fieldName, config]) => {
-                const value = room[fieldName];
+                const value = getFieldValue(room, fieldName);
                 return (
                   <div
                     key={fieldName}
@@ -162,7 +180,7 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
             />
             <div className="space-y-2">
               {Object.entries(BEDROOM_FIELDS).map(([fieldName, config]) => {
-                const value = room[fieldName];
+                const value = getFieldValue(room, fieldName);
                 return (
                   <div
                     key={fieldName}
