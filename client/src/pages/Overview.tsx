@@ -38,7 +38,6 @@ import {
   Layers,
   CheckCircle2,
   Clock,
-  ListChecks,
   PieChart,
 } from "lucide-react";
 import {
@@ -188,7 +187,6 @@ export default function Overview() {
   const budgetData = budgetQuery.data;
   const totalBudget = budgetData?.totals?.totalBudget || 0;
   const paidThusFar = budgetData?.totals?.paidThusFar || 0;
-  const costPerRoom = budgetData?.totals?.costPerRoom || 0;
   const budgetItemCount = budgetData?.itemCount || 0;
   const budgetSpentPercent = totalBudget > 0 ? Math.round((paidThusFar / totalBudget) * 100) : 0;
 
@@ -210,35 +208,57 @@ export default function Overview() {
   const totalEvents = timelineData?.events?.length || 0;
   const totalCategories = timelineData?.categories ? Object.keys(timelineData.categories).length : 0;
 
-  // Calculate upcoming events (within next 2 weeks)
   const now = new Date();
-  const twoWeeksFromNow = new Date(now);
-  twoWeeksFromNow.setDate(now.getDate() + 14);
   const nowStr = now.toISOString().split('T')[0];
-  const twoWeeksStr = twoWeeksFromNow.toISOString().split('T')[0];
-
-  const upcomingEvents = (timelineData?.events || [])
-    .filter(e => e.startDate >= nowStr && e.startDate <= twoWeeksStr)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .slice(0, 5);
 
   // Active events (happening now)
   const activeEvents = (timelineData?.events || [])
     .filter(e => e.startDate <= nowStr && e.endDate >= nowStr);
 
-  // Event types distribution for chart
-  const eventTypeCounts: Record<string, { count: number; color: string }> = {};
-  for (const event of (timelineData?.events || [])) {
-    const label = event.label || 'Unlabeled';
-    if (!eventTypeCounts[label]) {
-      eventTypeCounts[label] = { count: 0, color: event.color || '#6b7280' };
+  // Events this week (Sun–Sat)
+  const dayOfWeek = now.getDay();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - dayOfWeek);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
+  const endOfWeekStr = endOfWeek.toISOString().split('T')[0];
+
+  const eventsThisWeek = (timelineData?.events || [])
+    .filter(e => e.startDate <= endOfWeekStr && e.endDate >= startOfWeekStr);
+
+  // Upcoming milestones: next events per category (not yet started)
+  const upcomingByCategory: Record<string, { category: string; event: any; task: any }> = {};
+  for (const event of (timelineData?.events || []).filter(e => e.startDate > nowStr).sort((a, b) => a.startDate.localeCompare(b.startDate))) {
+    const task = timelineData?.tasks.find(t => t.id === event.taskId);
+    const cat = task?.category || 'Uncategorized';
+    if (!upcomingByCategory[cat]) {
+      upcomingByCategory[cat] = { category: cat, event, task };
     }
-    eventTypeCounts[label].count++;
   }
-  const eventTypeData = Object.entries(eventTypeCounts)
-    .map(([name, data]) => ({ name, value: data.count, color: data.color }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
+  const upcomingMilestones = Object.values(upcomingByCategory).slice(0, 5);
+
+  // Category progress: for each category, how many events are completed vs total
+  const categoryProgress: { name: string; completed: number; total: number; active: number }[] = [];
+  if (timelineData?.categories) {
+    for (const [catName, catTasks] of Object.entries(timelineData.categories)) {
+      const catTaskIdSet = new Set(catTasks.map(t => t.id));
+      const catEvents = (timelineData?.events || []).filter(e => catTaskIdSet.has(e.taskId));
+      const completed = catEvents.filter(e => e.endDate < nowStr).length;
+      const active = catEvents.filter(e => e.startDate <= nowStr && e.endDate >= nowStr).length;
+      categoryProgress.push({ name: catName, completed, total: catEvents.length, active });
+    }
+    categoryProgress.sort((a, b) => {
+      const aP = a.total > 0 ? a.completed / a.total : 0;
+      const bP = b.total > 0 ? b.completed / b.total : 0;
+      return aP - bP;
+    });
+  }
+
+  // Overall timeline progress
+  const allEvents = timelineData?.events || [];
+  const completedEvents = allEvents.filter(e => e.endDate < nowStr).length;
+  const timelineProgressPercent = allEvents.length > 0 ? Math.round((completedEvents / allEvents.length) * 100) : 0;
 
   const handleTaskClick = (task: typeof tasksNeedingAttention[0]) => {
     setSelectedTask({
@@ -305,24 +325,24 @@ export default function Overview() {
           accentColor="purple"
         />
         <StatCard
-          title="Cost Per Room"
-          value={formatCurrencyCompact(costPerRoom)}
-          change={`${budgetItemCount} line items`}
-          changeType="neutral"
-          icon={<Layers className="h-5 w-5" />}
+          title="Budget Remaining"
+          value={formatCurrencyCompact(totalBudget - paidThusFar)}
+          change={`${100 - budgetSpentPercent}% of budget available`}
+          changeType={(totalBudget - paidThusFar) < 0 ? "negative" : (100 - budgetSpentPercent) < 20 ? "neutral" : "positive"}
+          icon={<TrendingUp className="h-5 w-5" />}
           accentColor="amber"
         />
       </div>
 
-      {/* ═══ CONSTRUCTION + BUDGET ROW ═══ */}
+      {/* ═══ 1. CONSTRUCTION COMPLETION + 2. TASKS NEEDING ATTENTION ═══ */}
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        {/* Floor Progress Chart */}
+        {/* Construction Completion Summary */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-white">
-                <TrendingUp className="h-5 w-5 text-teal-400" />
-                Progress by Floor
+                <CheckCircle2 className="h-5 w-5 text-green-400" />
+                Construction Completion
               </CardTitle>
               <Link href="/construction">
                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">
@@ -332,28 +352,170 @@ export default function Overview() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[280px]">
-              {floorChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={floorChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="floor" stroke="rgba(255,255,255,0.5)" fontSize={12} />
-                    <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(217 33% 17%)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px",
-                        color: "white"
-                      }}
-                      formatter={(value: number) => [`${value}%`, '']}
-                    />
-                    <Bar dataKey="completion" fill={COLORS.teal} radius={[4, 4, 0, 0]} name="Overall" />
-                  </BarChart>
-                </ResponsiveContainer>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Overall</span>
+                  <span className={getCompletionColor(overallCompletion)}>{overallCompletion}%</span>
+                </div>
+                <Progress value={overallCompletion} className="h-3 bg-white/10" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Bath className="h-4 w-4 text-blue-400" />
+                    <span className="text-muted-foreground">Bathrooms</span>
+                  </div>
+                  <span className={getCompletionColor(bathroomCompletion)}>{bathroomCompletion}%</span>
+                </div>
+                <Progress value={bathroomCompletion} className="h-2 bg-white/10" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <BedDouble className="h-4 w-4 text-purple-400" />
+                    <span className="text-muted-foreground">Bedrooms</span>
+                  </div>
+                  <span className={getCompletionColor(bedroomCompletion)}>{bedroomCompletion}%</span>
+                </div>
+                <Progress value={bedroomCompletion} className="h-2 bg-white/10" />
+              </div>
+
+              {/* Unit stats */}
+              <div className="pt-2 border-t border-white/10 grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-white">{totalRooms}</p>
+                  <p className="text-xs text-muted-foreground">Total Units</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-teal-400">{completedUnits}</p>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-amber-400">{totalRooms - completedUnits}</p>
+                  <p className="text-xs text-muted-foreground">In Progress</p>
+                </div>
+              </div>
+
+              {/* Floors */}
+              <div className="text-xs text-muted-foreground">
+                Tracking {floors.length} floors · {Object.keys(bathroomTasks).length + Object.keys(bedroomTasks).length} task types
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tasks Needing Attention */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="flex items-center gap-2 text-white">
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+              Tasks Needing Attention
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-1">
+              {tasksNeedingAttention.length > 0 ? (
+                tasksNeedingAttention.map((task, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleTaskClick(task)}
+                    className="w-full text-left p-3 rounded-lg hover:bg-white/5 transition-colors group"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">
+                            {task.type}
+                          </span>
+                          <span className="text-white group-hover:text-white/90">{task.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={getCompletionColor(task.percentage)}>
+                            {task.completed}/{task.total} ({task.percentage}%)
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                      <Progress value={task.percentage} className="h-2 bg-white/10" />
+                    </div>
+                  </button>
+                ))
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No floor data available
+                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+                  No task data available
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ═══ 3. BUDGET STATUS + 4. BUDGET BY CATEGORY ═══ */}
+      <div className="grid gap-6 lg:grid-cols-2 mb-6">
+        {/* Budget Status Summary */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-white">
+                <DollarSign className="h-5 w-5 text-blue-400" />
+                Budget Status
+              </CardTitle>
+              <Link href="/budget">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">
+                  View All <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {/* Budget progress bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Budget Spent</span>
+                  <span className={budgetSpentPercent > 90 ? "text-red-400" : budgetSpentPercent > 70 ? "text-amber-400" : "text-teal-400"}>
+                    {formatCurrency(paidThusFar)} / {formatCurrency(totalBudget)}
+                  </span>
+                </div>
+                <Progress value={budgetSpentPercent} className="h-3 bg-white/10" />
+              </div>
+
+              {/* Key budget metrics */}
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Hard Costs</p>
+                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.hardCosts || 0)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Soft Costs</p>
+                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.softCosts || 0)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Contingency</p>
+                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.contingency || 0)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                  <p className="text-sm font-medium text-teal-400">{formatCurrencyCompact(totalBudget - paidThusFar)}</p>
+                </div>
+              </div>
+
+              {/* Status breakdown */}
+              {statusBreakdown.length > 0 && (
+                <div className="pt-2 border-t border-white/10">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">By Status</p>
+                  <div className="space-y-2">
+                    {statusBreakdown.map((s) => (
+                      <div key={s.status} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-blue-400" />
+                          <span className="text-muted-foreground">{s.status}</span>
+                        </div>
+                        <span className="text-white">{s.count} items · {formatCurrencyCompact(s.total)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -426,54 +588,9 @@ export default function Overview() {
         </Card>
       </div>
 
-      {/* ═══ TASKS NEEDING ATTENTION + TIMELINE UPCOMING ═══ */}
+      {/* ═══ 5. TIMELINE ACTIVITY + 6. PROGRESS BY FLOOR ═══ */}
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        {/* Tasks Needing Attention */}
-        <Card className="border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <AlertTriangle className="h-5 w-5 text-amber-400" />
-              Tasks Needing Attention
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="space-y-1">
-              {tasksNeedingAttention.length > 0 ? (
-                tasksNeedingAttention.map((task, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleTaskClick(task)}
-                    className="w-full text-left p-3 rounded-lg hover:bg-white/5 transition-colors group"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">
-                            {task.type}
-                          </span>
-                          <span className="text-white group-hover:text-white/90">{task.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={getCompletionColor(task.percentage)}>
-                            {task.completed}/{task.total} ({task.percentage}%)
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </div>
-                      <Progress value={task.percentage} className="h-2 bg-white/10" />
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-                  No task data available
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Timeline: Upcoming & Active Events */}
+        {/* Timeline Activity — redesigned */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <div className="flex items-center justify-between">
@@ -489,47 +606,44 @@ export default function Overview() {
             </div>
           </CardHeader>
           <CardContent className="pt-4">
-            {/* Active events */}
-            {activeEvents.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Active Now</p>
-                <div className="space-y-2">
-                  {activeEvents.slice(0, 3).map((event) => {
-                    const task = timelineData?.tasks.find(t => t.id === event.taskId);
-                    return (
-                      <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-white/5">
-                        <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: event.color || '#6b7280' }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{event.label || task?.task || 'Unnamed'}</p>
-                          <p className="text-xs text-muted-foreground">{task?.category}</p>
-                        </div>
-                        <span className="text-xs text-teal-400 flex-shrink-0">In Progress</span>
-                      </div>
-                    );
-                  })}
-                  {activeEvents.length > 3 && (
-                    <p className="text-xs text-muted-foreground pl-2">+{activeEvents.length - 3} more active</p>
-                  )}
-                </div>
+            {/* Overall timeline progress */}
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Overall Progress</span>
+                <span className={getCompletionColor(timelineProgressPercent)}>{timelineProgressPercent}%</span>
               </div>
-            )}
+              <Progress value={timelineProgressPercent} className="h-3 bg-white/10" />
+            </div>
 
-            {/* Upcoming events */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Upcoming (Next 2 Weeks)
-              </p>
-              {upcomingEvents.length > 0 ? (
+            {/* Key stats row */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg bg-white/5 p-3 text-center">
+                <p className="text-lg font-semibold text-teal-400">{eventsThisWeek.length}</p>
+                <p className="text-xs text-muted-foreground">This Week</p>
+              </div>
+              <div className="rounded-lg bg-white/5 p-3 text-center">
+                <p className="text-lg font-semibold text-purple-400">{activeEvents.length}</p>
+                <p className="text-xs text-muted-foreground">Active Now</p>
+              </div>
+              <div className="rounded-lg bg-white/5 p-3 text-center">
+                <p className="text-lg font-semibold text-white">{totalCategories}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
+              </div>
+            </div>
+
+            {/* Upcoming milestones — one per category */}
+            {upcomingMilestones.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Upcoming Milestones</p>
                 <div className="space-y-2">
-                  {upcomingEvents.map((event) => {
-                    const task = timelineData?.tasks.find(t => t.id === event.taskId);
-                    const startDate = new Date(event.startDate + 'T00:00:00');
+                  {upcomingMilestones.map((item, idx) => {
+                    const startDate = new Date(item.event.startDate + 'T00:00:00');
                     return (
-                      <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
-                        <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: event.color || '#6b7280' }} />
+                      <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                        <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.event.color || '#6b7280' }} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{event.label || task?.task || 'Unnamed'}</p>
-                          <p className="text-xs text-muted-foreground">{task?.category}</p>
+                          <p className="text-sm text-white truncate">{item.event.label || item.task?.task || 'Unnamed'}</p>
+                          <p className="text-xs text-muted-foreground">{item.category}</p>
                         </div>
                         <span className="text-xs text-muted-foreground flex-shrink-0">
                           {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -538,110 +652,45 @@ export default function Overview() {
                     );
                   })}
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-[100px] text-muted-foreground text-sm">
-                  No upcoming events
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Summary stats */}
-            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-lg font-semibold text-white">{totalCategories}</p>
-                <p className="text-xs text-muted-foreground">Categories</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold text-white">{totalTimelineTasks}</p>
-                <p className="text-xs text-muted-foreground">Tasks</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold text-white">{totalEvents}</p>
-                <p className="text-xs text-muted-foreground">Events</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ═══ BUDGET STATUS + CONSTRUCTION COMPLETION ═══ */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        {/* Budget Status Summary */}
-        <Card className="border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-white">
-                <DollarSign className="h-5 w-5 text-blue-400" />
-                Budget Status
-              </CardTitle>
-              <Link href="/budget">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">
-                  View All <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              {/* Budget progress bar */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Budget Spent</span>
-                  <span className={budgetSpentPercent > 90 ? "text-red-400" : budgetSpentPercent > 70 ? "text-amber-400" : "text-teal-400"}>
-                    {formatCurrency(paidThusFar)} / {formatCurrency(totalBudget)}
-                  </span>
-                </div>
-                <Progress value={budgetSpentPercent} className="h-3 bg-white/10" />
-              </div>
-
-              {/* Key budget metrics */}
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Hard Costs</p>
-                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.hardCosts || 0)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Soft Costs</p>
-                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.softCosts || 0)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Contingency</p>
-                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.contingency || 0)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Remaining</p>
-                  <p className="text-sm font-medium text-teal-400">{formatCurrencyCompact(totalBudget - paidThusFar)}</p>
-                </div>
-              </div>
-
-              {/* Status breakdown */}
-              {statusBreakdown.length > 0 && (
-                <div className="pt-2 border-t border-white/10">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">By Status</p>
-                  <div className="space-y-2">
-                    {statusBreakdown.map((s) => (
-                      <div key={s.status} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-blue-400" />
-                          <span className="text-muted-foreground">{s.status}</span>
+            {/* Category progress bars */}
+            {categoryProgress.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Progress by Category</p>
+                <div className="space-y-2">
+                  {categoryProgress.slice(0, 5).map((cat) => {
+                    const pct = cat.total > 0 ? Math.round((cat.completed / cat.total) * 100) : 0;
+                    return (
+                      <div key={cat.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground truncate mr-2">{cat.name}</span>
+                          <span className={getCompletionColor(pct)}>
+                            {cat.completed}/{cat.total} ({pct}%)
+                            {cat.active > 0 && <span className="text-purple-400 ml-1">· {cat.active} active</span>}
+                          </span>
                         </div>
-                        <span className="text-white">{s.count} items · {formatCurrencyCompact(s.total)}</span>
+                        <Progress value={pct} className="h-1.5 bg-white/10" />
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                  {categoryProgress.length > 5 && (
+                    <p className="text-xs text-muted-foreground">+{categoryProgress.length - 5} more categories</p>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Construction Completion Summary */}
+        {/* Floor Progress Chart */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-white">
-                <CheckCircle2 className="h-5 w-5 text-green-400" />
-                Construction Completion
+                <Layers className="h-5 w-5 text-teal-400" />
+                Progress by Floor
               </CardTitle>
               <Link href="/construction">
                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">
@@ -651,55 +700,30 @@ export default function Overview() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Overall</span>
-                  <span className={getCompletionColor(overallCompletion)}>{overallCompletion}%</span>
+            <div className="h-[280px]">
+              {floorChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={floorChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="floor" stroke="rgba(255,255,255,0.5)" fontSize={12} />
+                    <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(217 33% 17%)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px",
+                        color: "white"
+                      }}
+                      formatter={(value: number) => [`${value}%`, '']}
+                    />
+                    <Bar dataKey="completion" fill={COLORS.teal} radius={[4, 4, 0, 0]} name="Overall" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No floor data available
                 </div>
-                <Progress value={overallCompletion} className="h-3 bg-white/10" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <Bath className="h-4 w-4 text-blue-400" />
-                    <span className="text-muted-foreground">Bathrooms</span>
-                  </div>
-                  <span className={getCompletionColor(bathroomCompletion)}>{bathroomCompletion}%</span>
-                </div>
-                <Progress value={bathroomCompletion} className="h-2 bg-white/10" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <BedDouble className="h-4 w-4 text-purple-400" />
-                    <span className="text-muted-foreground">Bedrooms</span>
-                  </div>
-                  <span className={getCompletionColor(bedroomCompletion)}>{bedroomCompletion}%</span>
-                </div>
-                <Progress value={bedroomCompletion} className="h-2 bg-white/10" />
-              </div>
-
-              {/* Unit stats */}
-              <div className="pt-2 border-t border-white/10 grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-white">{totalRooms}</p>
-                  <p className="text-xs text-muted-foreground">Total Units</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-teal-400">{completedUnits}</p>
-                  <p className="text-xs text-muted-foreground">Completed</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-amber-400">{totalRooms - completedUnits}</p>
-                  <p className="text-xs text-muted-foreground">In Progress</p>
-                </div>
-              </div>
-
-              {/* Floors */}
-              <div className="text-xs text-muted-foreground">
-                Tracking {floors.length} floors · {Object.keys(bathroomTasks).length + Object.keys(bedroomTasks).length} task types
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
