@@ -144,6 +144,8 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
             <div className="space-y-2">
               {Object.entries(BATHROOM_FIELDS).map(([fieldName, config]) => {
                 const value = getFieldValue(room, fieldName);
+                // Remove "Bathroom_" prefix for display
+                const displayName = fieldName.replace(/^Bathroom_/, '');
                 return (
                   <div
                     key={fieldName}
@@ -151,7 +153,7 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
                   >
                     <div className="flex items-center gap-2">
                       {getStatusIcon(value, config)}
-                      <span className="text-sm text-muted-foreground">{fieldName}</span>
+                      <span className="text-sm text-muted-foreground">{displayName}</span>
                     </div>
                     <span className="text-sm text-white font-medium">
                       {getDisplayValue(value, config)}
@@ -181,6 +183,8 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
             <div className="space-y-2">
               {Object.entries(BEDROOM_FIELDS).map(([fieldName, config]) => {
                 const value = getFieldValue(room, fieldName);
+                // Remove "Bedroom_" prefix for display
+                const displayName = fieldName.replace(/^Bedroom_/, '');
                 return (
                   <div
                     key={fieldName}
@@ -188,7 +192,7 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
                   >
                     <div className="flex items-center gap-2">
                       {getStatusIcon(value, config)}
-                      <span className="text-sm text-muted-foreground">{fieldName}</span>
+                      <span className="text-sm text-muted-foreground">{displayName}</span>
                     </div>
                     <span className="text-sm text-white font-medium">
                       {getDisplayValue(value, config)}

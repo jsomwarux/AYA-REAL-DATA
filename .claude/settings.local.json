@@ -16,7 +16,9 @@
       "Bash(npm run db:push:*)",
       "Bash(grep:*)",
       "Bash(cd /Users/jsomwaru/Desktop/PROJECTS/WEB\\\\ APPS/AYA/AYA-REAL-DATA:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(lsof:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

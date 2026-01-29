@@ -35,22 +35,26 @@ export function TaskProgressBars({ rooms }: TaskProgressBarsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
-          {sortedBathroomTasks.map(([taskName, stats]) => (
-            <div key={taskName} className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground truncate max-w-[60%]">
-                  {taskName}
-                </span>
-                <span className={`font-medium ${getCompletionColor(stats.percentage)}`}>
-                  {stats.completed}/{stats.total} ({stats.percentage}%)
-                </span>
+          {sortedBathroomTasks.map(([taskName, stats]) => {
+            // Remove "Bathroom_" prefix for display
+            const displayName = taskName.replace(/^Bathroom_/, '');
+            return (
+              <div key={taskName} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground truncate max-w-[60%]">
+                    {displayName}
+                  </span>
+                  <span className={`font-medium ${getCompletionColor(stats.percentage)}`}>
+                    {stats.completed}/{stats.total} ({stats.percentage}%)
+                  </span>
+                </div>
+                <Progress
+                  value={stats.percentage}
+                  className="h-2 bg-white/10"
+                />
               </div>
-              <Progress
-                value={stats.percentage}
-                className="h-2 bg-white/10"
-              />
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -63,22 +67,26 @@ export function TaskProgressBars({ rooms }: TaskProgressBarsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
-          {sortedBedroomTasks.map(([taskName, stats]) => (
-            <div key={taskName} className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground truncate max-w-[60%]">
-                  {taskName}
-                </span>
-                <span className={`font-medium ${getCompletionColor(stats.percentage)}`}>
-                  {stats.completed}/{stats.total} ({stats.percentage}%)
-                </span>
+          {sortedBedroomTasks.map(([taskName, stats]) => {
+            // Remove "Bedroom_" prefix for display
+            const displayName = taskName.replace(/^Bedroom_/, '');
+            return (
+              <div key={taskName} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground truncate max-w-[60%]">
+                    {displayName}
+                  </span>
+                  <span className={`font-medium ${getCompletionColor(stats.percentage)}`}>
+                    {stats.completed}/{stats.total} ({stats.percentage}%)
+                  </span>
+                </div>
+                <Progress
+                  value={stats.percentage}
+                  className="h-2 bg-white/10"
+                />
               </div>
-              <Progress
-                value={stats.percentage}
-                className="h-2 bg-white/10"
-              />
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
     </div>

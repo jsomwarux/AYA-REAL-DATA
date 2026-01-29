@@ -1,64 +1,64 @@
 import { RoomProgress } from "@/lib/api";
 
 // Define bathroom fields and their completion criteria
-// Column headers exactly as they appear in the Google Sheet Row 3
+// Column headers are prefixed with "Bathroom_" by the backend to avoid conflicts with duplicate names
 export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: string[]; naValues: string[] }> = {
-  'Demo Status': {
+  'Bathroom_Demo Status': {
     type: 'dropdown',
     completeValues: ['DEMO DONE', 'Approved Demo'],
     naValues: []
   },
-  'Electrical Wiring': {
+  'Bathroom_Electrical Wiring': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Speaker Line': {
+  'Bathroom_Speaker Line': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Waterproofing': {
+  'Bathroom_Waterproofing': {
     type: 'dropdown',
     completeValues: ['Completed'],
     naValues: []
   },
-  'Sheetrock': {
+  'Bathroom_Sheetrock': {
     type: 'dropdown',
     completeValues: ['Installed', 'Ceiling closed'],
     naValues: []
   },
-  'Wall Patching': {
+  'Bathroom_Wall Patching': {
     type: 'dropdown',
     completeValues: ['Done'],
     naValues: []
   },
-  'Repair Door Opening': {
+  'Bathroom_Repair Door Opening': {
     type: 'dropdown',
     completeValues: ['Completed'],
     naValues: ['Keep Existing', 'External Door']
   },
-  'New Wall Grout': {
+  'Bathroom_New Wall Grout': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Shower Valves': {
+  'Bathroom_Shower Valves': {
     type: 'dropdown',
     completeValues: ['New Parts replaced', 'New 2 way valve', 'New 3 way valve'],
     naValues: ['no work done yet']
   },
-  'Soap Niche Built': {
+  'Bathroom_Soap Niche Built': {
     type: 'dropdown',
     completeValues: ['Done'],
     naValues: ['Not required', 'Not Required']
   },
-  'Tile %': {
+  'Bathroom_Tile %': {
     type: 'percentage',
     completeValues: ['100%', '100'],
     naValues: []
   },
-  'Linear Drain Installed': {
+  'Bathroom_Linear Drain Installed': {
     type: 'dropdown',
     completeValues: ['Done'],
     naValues: ['Not required', 'Not Required']
@@ -66,64 +66,64 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
 };
 
 // Define bedroom fields and their completion criteria
-// Column headers exactly as they appear in the Google Sheet Row 3
+// Column headers are prefixed with "Bedroom_" by the backend to avoid conflicts with duplicate names
 export const BEDROOM_FIELDS: Record<string, { type: string; completeValues: string[]; naValues: string[] }> = {
-  'Electric Wiring': {
+  'Bedroom_Electric Wiring': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Speaker Line': {
+  'Bedroom_Speaker Line': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Data Jack Protection': {
+  'Bedroom_Data Jack Protection': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Curtain Box': {
+  'Bedroom_Curtain Box': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'New HVAC Unit': {
+  'Bedroom_New HVAC Unit': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Sheetrock': {
+  'Bedroom_Sheetrock': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Wall Plastering': {
+  'Bedroom_Wall Plastering': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Sanding': {
+  'Bedroom_Sanding': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Corner Sanding': {
+  'Bedroom_Corner Sanding': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Prime Paint': {
+  'Bedroom_Prime Paint': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Finish Paint': {
+  'Bedroom_Finish Paint': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Flooring': {
+  'Bedroom_Flooring': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []

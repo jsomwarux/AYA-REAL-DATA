@@ -111,8 +111,18 @@ export default function Overview() {
 
   // Find top 5 tasks needing attention (lowest completion)
   const allTasks = [
-    ...Object.entries(bathroomTasks).map(([name, stats]) => ({ name, ...stats, type: 'Bathroom' })),
-    ...Object.entries(bedroomTasks).map(([name, stats]) => ({ name, ...stats, type: 'Bedroom' })),
+    ...Object.entries(bathroomTasks).map(([name, stats]) => ({
+      // Remove "Bathroom_" prefix for display
+      name: name.replace(/^Bathroom_/, ''),
+      ...stats,
+      type: 'Bathroom'
+    })),
+    ...Object.entries(bedroomTasks).map(([name, stats]) => ({
+      // Remove "Bedroom_" prefix for display
+      name: name.replace(/^Bedroom_/, ''),
+      ...stats,
+      type: 'Bedroom'
+    })),
   ].sort((a, b) => a.percentage - b.percentage);
 
   const tasksNeedingAttention = allTasks.slice(0, 5);

@@ -294,7 +294,50 @@ router.get('/construction-progress', async (req, res) => {
 
     if (roomsData && roomsData.rawValues && roomsData.rawValues.length > 0) {
       // First row of our fetch is the column headers (Row 3 in sheet)
-      roomHeaders = roomsData.rawValues[0] as string[];
+      const rawHeaders = roomsData.rawValues[0] as string[];
+
+      // Column positions (0-indexed based on A3:Z500 range):
+      // A=0 (empty), B=1 (ROOM #), C-N=2-13 (Bathroom, 12 cols), O-Z=14-25 (Bedroom, 12 cols)
+      // Bathroom columns: indices 2-13 (C through N)
+      // Bedroom columns: indices 14-25 (O through Z)
+      const BATHROOM_START = 2;  // Column C
+      const BATHROOM_END = 13;   // Column N
+      const BEDROOM_START = 14;  // Column O
+      const BEDROOM_END = 25;    // Column Z
+
+      // Track column names to detect duplicates and prefix them appropriately
+      const seenHeaders = new Map<string, number>(); // header -> first index seen
+
+      // Process headers, prefixing duplicates based on section
+      roomHeaders = rawHeaders.map((header, index) => {
+        if (!header || header.trim() === '') return '';
+
+        const trimmedHeader = header.trim();
+
+        // Check if this header was seen before
+        if (seenHeaders.has(trimmedHeader)) {
+          // This is a duplicate - prefix based on section
+          if (index >= BEDROOM_START && index <= BEDROOM_END) {
+            return `Bedroom_${trimmedHeader}`;
+          } else if (index >= BATHROOM_START && index <= BATHROOM_END) {
+            return `Bathroom_${trimmedHeader}`;
+          }
+        }
+
+        // Mark this header as seen at this index
+        seenHeaders.set(trimmedHeader, index);
+
+        // First occurrence - prefix based on section for consistency
+        if (index >= BATHROOM_START && index <= BATHROOM_END) {
+          return `Bathroom_${trimmedHeader}`;
+        } else if (index >= BEDROOM_START && index <= BEDROOM_END) {
+          return `Bedroom_${trimmedHeader}`;
+        }
+
+        return trimmedHeader;
+      });
+
+      console.log('[construction-progress] Processed headers:', roomHeaders.filter(h => h));
 
       // Data starts from the second row of our fetch (Row 4 in sheet)
       const dataRows = roomsData.rawValues.slice(1);
