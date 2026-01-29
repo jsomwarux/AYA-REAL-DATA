@@ -326,7 +326,7 @@ export default function Overview() {
         <StatCard
           title="Timeline"
           value={`${eventsThisWeek.length} This Week`}
-          change={`${activeEvents.length} active · ${totalEvents} total events`}
+          change={`${totalEvents - completedEvents} events remaining`}
           changeType={eventsThisWeek.length > 0 ? "positive" : "neutral"}
           icon={<Calendar className="h-5 w-5" />}
           accentColor="purple"
