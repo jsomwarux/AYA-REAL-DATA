@@ -586,7 +586,10 @@ router.get('/budget', async (req, res) => {
 
       // Find column indices
       const categoryIdx = headers.findIndex(h => h?.toLowerCase().includes('category'));
-      const paymentsIdx = headers.findIndex(h => h?.toLowerCase().includes('payment'));
+      const paymentsIdx = headers.findIndex(h => {
+        const lower = h?.toLowerCase() || '';
+        return lower.includes('payment') || lower.includes('vendor') || lower.includes('contractor') || lower.includes('supplier');
+      });
       const projectIdx = headers.findIndex(h => h?.toLowerCase().includes('project'));
       const statusIdx = headers.findIndex(h => h?.toLowerCase().includes('status'));
       const subtotalIdx = headers.findIndex(h => h?.toLowerCase().includes('subtotal'));
