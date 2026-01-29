@@ -126,11 +126,15 @@ export interface BudgetTotals {
   totalBudget: number;
   hardCosts: number;
   softCosts: number;
+  paidThusFar: number;
+  costPerRoom: number;
+  totalRooms: number;
 }
 
 export interface CategoryBreakdown {
   name: string;
   total: number;
+  paid: number;
 }
 
 export interface VendorBreakdown {

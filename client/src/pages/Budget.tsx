@@ -34,6 +34,7 @@ import {
   PieChart,
   ChevronDown,
   ChevronUp,
+  Home,
 } from "lucide-react";
 import {
   BarChart,
@@ -205,12 +206,13 @@ export default function Budget() {
     }));
   }, [data?.categoryBreakdown]);
 
-  // Prepare pie chart data for hard vs soft costs
-  const costTypeData = useMemo(() => {
+  // Prepare pie chart data for paid vs remaining
+  const paidVsRemainingData = useMemo(() => {
     if (!data?.totals) return [];
+    const remaining = data.totals.totalBudget - data.totals.paidThusFar;
     return [
-      { name: 'Hard Costs', value: data.totals.hardCosts, color: '#14b8a6' },
-      { name: 'Soft Costs', value: data.totals.softCosts, color: '#8b5cf6' },
+      { name: 'Paid', value: data.totals.paidThusFar, color: '#22c55e' },
+      { name: 'Remaining', value: remaining > 0 ? remaining : 0, color: '#3b82f6' },
     ];
   }, [data?.totals]);
 
@@ -228,13 +230,21 @@ export default function Budget() {
       isLoading={isLoading}
     >
       {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Total Budget"
           value={formatCurrencyCompact(data?.totals?.totalBudget || 0)}
           change="Including contingency"
           changeType="neutral"
           icon={<DollarSign className="h-5 w-5" />}
+          accentColor="teal"
+        />
+        <StatCard
+          title="Paid Thus Far"
+          value={formatCurrencyCompact(data?.totals?.paidThusFar || 0)}
+          change={data?.totals?.totalBudget ? `${Math.round((data.totals.paidThusFar / data.totals.totalBudget) * 100)}% of budget` : '0%'}
+          changeType="positive"
+          icon={<TrendingUp className="h-5 w-5" />}
           accentColor="teal"
         />
         <StatCard
@@ -254,11 +264,11 @@ export default function Budget() {
           accentColor="purple"
         />
         <StatCard
-          title="Contingency (10%)"
-          value={formatCurrencyCompact(data?.totals?.contingency || 0)}
-          change="Reserved buffer"
+          title="Cost Per Room"
+          value={formatCurrencyCompact(data?.totals?.costPerRoom || 0)}
+          change={`${data?.totals?.totalRooms || 166} rooms`}
           changeType="neutral"
-          icon={<TrendingUp className="h-5 w-5" />}
+          icon={<Home className="h-5 w-5" />}
           accentColor="amber"
         />
       </div>
@@ -320,21 +330,21 @@ export default function Budget() {
           </CardContent>
         </Card>
 
-        {/* Hard vs Soft Costs Pie Chart */}
+        {/* Paid vs Remaining Pie Chart */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <CardTitle className="flex items-center gap-2 text-white">
-              <DollarSign className="h-5 w-5 text-purple-400" />
-              Hard Costs vs Soft Costs
+              <DollarSign className="h-5 w-5 text-green-400" />
+              Paid vs Remaining
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="h-[300px]">
-              {costTypeData.length > 0 && data?.totals?.totalBudget ? (
+              {paidVsRemainingData.length > 0 && data?.totals?.totalBudget ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
                     <Pie
-                      data={costTypeData}
+                      data={paidVsRemainingData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -344,7 +354,7 @@ export default function Budget() {
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
                     >
-                      {costTypeData.map((entry, index) => (
+                      {paidVsRemainingData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -362,7 +372,7 @@ export default function Budget() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No cost data available
+                  No payment data available
                 </div>
               )}
             </div>

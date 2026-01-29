@@ -444,11 +444,14 @@ router.get('/budget', async (req, res) => {
       });
     }
 
-    // Fetch Budget Details data - columns A through G, rows 1-165 (with some buffer)
+    // Fetch both Budget Details and Budget Summary data
     const detailsRange = "'Budget Details'!A:G";
+    const summaryRange = "'Budget Summary'!A:G";
 
     console.log('[budget] Fetching data from sheet:', spreadsheetId);
-    const data = await fetchSheetData(spreadsheetId, detailsRange);
+    const allData = await fetchMultipleRanges(spreadsheetId, [detailsRange, summaryRange]);
+    const data = allData.get(detailsRange);
+    const summaryData = allData.get(summaryRange);
     console.log('[budget] Data fetched successfully');
 
     // Process Budget Details data
@@ -459,10 +462,100 @@ router.get('/budget', async (req, res) => {
       totalBudget: 0,
       hardCosts: 0,
       softCosts: 0,
+      paidThusFar: 0,
+      costPerRoom: 0,
+      totalRooms: 166,
     };
     const categoryTotals: Record<string, number> = {};
+    const categoryPaid: Record<string, number> = {};
     const vendorTotals: Record<string, number> = {};
     const statusCounts: Record<string, { count: number; total: number }> = {};
+
+    // Process Budget Summary to get "Paid Thus Far" totals
+    if (summaryData && summaryData.rawValues && summaryData.rawValues.length > 0) {
+      const summaryHeaders = summaryData.rawValues.find((row: string[]) =>
+        row.some(cell => cell && cell.toString().toLowerCase().includes('summary scope'))
+      );
+
+      // Find the header row index
+      const headerRowIndex = summaryData.rawValues.findIndex((row: string[]) =>
+        row.some(cell => cell && cell.toString().toLowerCase().includes('summary scope'))
+      );
+
+      if (headerRowIndex >= 0) {
+        const headers = summaryData.rawValues[headerRowIndex] as string[];
+        // Find column indices in summary
+        const scopeIdx = headers.findIndex(h => h?.toLowerCase().includes('summary scope') || h?.toLowerCase().includes('scope'));
+        const amountIdx = headers.findIndex(h => h?.toLowerCase().includes('amount'));
+        const paidIdx = headers.findIndex(h => h?.toLowerCase().includes('paid'));
+        const perKeyIdx = headers.findIndex(h => h?.toLowerCase().includes('key'));
+
+        console.log('[budget] Summary column indices:', { scopeIdx, amountIdx, paidIdx, perKeyIdx });
+
+        // Process summary rows
+        const summaryRows = summaryData.rawValues.slice(headerRowIndex + 1);
+        summaryRows.forEach((row: string[]) => {
+          const scope = row[scopeIdx]?.toString().trim() || '';
+          const paidRaw = row[paidIdx];
+
+          // Parse paid amount
+          let paid = 0;
+          if (paidRaw !== undefined && paidRaw !== null && paidRaw !== '' && paidRaw !== '-') {
+            const cleanValue = String(paidRaw).replace(/[$,\s]/g, '');
+            const parsed = parseFloat(cleanValue);
+            if (!isNaN(parsed)) {
+              paid = parsed;
+            }
+          }
+
+          // Map summary scope names to category names and track paid amounts
+          if (scope && paid > 0) {
+            // Extract category name from "Total X" format
+            const categoryMatch = scope.match(/^Total\s+(.+)$/i);
+            if (categoryMatch) {
+              const categoryName = categoryMatch[1].trim();
+              categoryPaid[categoryName] = paid;
+
+              // Also try variations
+              if (categoryName.toLowerCase() === 'exteroir') {
+                categoryPaid['Exterior Work'] = paid;
+              } else if (categoryName.toLowerCase() === 'signage') {
+                categoryPaid['Interior Signage'] = paid;
+              } else if (categoryName.toLowerCase().includes('construction material')) {
+                categoryPaid['Bathrooms'] = (categoryPaid['Bathrooms'] || 0) + paid;
+              } else if (categoryName.toLowerCase().includes('contractor')) {
+                categoryPaid['Bedrooms'] = (categoryPaid['Bedrooms'] || 0) + paid;
+              } else if (categoryName.toLowerCase().includes('ff&e')) {
+                categoryPaid['FF&E'] = paid;
+                categoryPaid['Loose Accesories'] = paid;
+              } else if (categoryName.toLowerCase().includes('boh')) {
+                categoryPaid['BOH'] = paid;
+              } else if (categoryName.toLowerCase() === 'soft cost') {
+                categoryPaid['Soft costs'] = paid;
+              }
+            }
+          }
+
+          // Check for total paid row (last row with totals)
+          if (scope === '' && paid > 0 && totals.paidThusFar === 0) {
+            // This might be the grand total row
+          }
+        });
+
+        // Find the grand total paid (last row usually)
+        const lastRows = summaryData.rawValues.slice(-5);
+        for (const row of lastRows) {
+          const paidRaw = row[paidIdx];
+          if (paidRaw) {
+            const cleanValue = String(paidRaw).replace(/[$,\s]/g, '');
+            const parsed = parseFloat(cleanValue);
+            if (!isNaN(parsed) && parsed > totals.paidThusFar) {
+              totals.paidThusFar = parsed;
+            }
+          }
+        }
+      }
+    }
 
     if (data && data.rawValues && data.rawValues.length > 0) {
       // First row is headers
@@ -569,10 +662,19 @@ router.get('/budget', async (req, res) => {
       totals.totalBudget = totals.total + totals.contingency;
     }
 
-    // Sort category totals by amount (descending)
+    // Calculate cost per room
+    if (totals.totalBudget > 0 && totals.totalRooms > 0) {
+      totals.costPerRoom = Math.round(totals.totalBudget / totals.totalRooms);
+    }
+
+    // Sort category totals by amount (descending) and include paid amounts
     const sortedCategories = Object.entries(categoryTotals)
       .sort((a, b) => b[1] - a[1])
-      .map(([name, total]) => ({ name, total }));
+      .map(([name, total]) => ({
+        name,
+        total,
+        paid: categoryPaid[name] || 0,
+      }));
 
     // Sort vendor totals by amount (descending)
     const sortedVendors = Object.entries(vendorTotals)
