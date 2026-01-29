@@ -10,6 +10,7 @@ import {
   Lock,
   Building2,
   DollarSign,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,13 @@ const mainNavItems: NavItem[] = [
     icon: <DollarSign className="h-5 w-5" />,
     iconColor: "text-green-400",
     description: "Project budget tracking",
+  },
+  {
+    title: "Timeline",
+    href: "/timeline",
+    icon: <Calendar className="h-5 w-5" />,
+    iconColor: "text-amber-400",
+    description: "Project schedule and milestones",
   },
   {
     title: "Deal Intelligence",

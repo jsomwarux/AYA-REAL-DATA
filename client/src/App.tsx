@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Overview from "@/pages/Overview";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
+import Timeline from "@/pages/Timeline";
 import Deals from "@/pages/Deals";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Overview} />
       <Route path="/construction" component={ConstructionProgress} />
       <Route path="/budget" component={Budget} />
+      <Route path="/timeline" component={Timeline} />
       <Route path="/deals" component={Deals} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />

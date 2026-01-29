@@ -163,3 +163,108 @@ export async function fetchBudgetData(): Promise<BudgetData> {
   const response = await fetch(`${API_BASE}/budget`);
   return handleResponse<BudgetData>(response);
 }
+
+// Timeline Types
+export interface TimelineTask {
+  id: number;
+  category: string;
+  task: string;
+  sortOrder: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimelineEvent {
+  id: number;
+  taskId: number;
+  weekDate: string;
+  label: string | null;
+  color: string | null;
+  createdAt: string;
+}
+
+export interface TimelineData {
+  tasks: TimelineTask[];
+  events: TimelineEvent[];
+  eventsByTask: Record<number, TimelineEvent[]>;
+  categories: Record<string, TimelineTask[]>;
+  weekDates: string[];
+  lastUpdated: string;
+}
+
+export interface TimelineImportResult {
+  success: boolean;
+  imported: {
+    tasks: number;
+    events: number;
+  };
+  tasks: TimelineTask[];
+  events: TimelineEvent[];
+  message: string;
+}
+
+const TIMELINE_BASE = '/api/timeline';
+
+// Fetch Timeline data
+export async function fetchTimelineData(): Promise<TimelineData> {
+  const response = await fetch(TIMELINE_BASE);
+  return handleResponse<TimelineData>(response);
+}
+
+// Import timeline from Google Sheet
+export async function importTimelineFromSheet(): Promise<TimelineImportResult> {
+  const response = await fetch(`${TIMELINE_BASE}/import`, { method: 'POST' });
+  return handleResponse<TimelineImportResult>(response);
+}
+
+// Create new task
+export async function createTimelineTask(data: { category: string; task: string; sortOrder?: number }): Promise<TimelineTask> {
+  const response = await fetch(`${TIMELINE_BASE}/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<TimelineTask>(response);
+}
+
+// Update task
+export async function updateTimelineTask(id: number, data: { category?: string; task?: string; sortOrder?: number }): Promise<TimelineTask> {
+  const response = await fetch(`${TIMELINE_BASE}/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<TimelineTask>(response);
+}
+
+// Delete task
+export async function deleteTimelineTask(id: number): Promise<{ success: boolean }> {
+  const response = await fetch(`${TIMELINE_BASE}/tasks/${id}`, { method: 'DELETE' });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// Create new event
+export async function createTimelineEvent(data: { taskId: number; weekDate: string; label?: string; color?: string }): Promise<TimelineEvent> {
+  const response = await fetch(`${TIMELINE_BASE}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<TimelineEvent>(response);
+}
+
+// Update event
+export async function updateTimelineEvent(id: number, data: { weekDate?: string; label?: string; color?: string }): Promise<TimelineEvent> {
+  const response = await fetch(`${TIMELINE_BASE}/events/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<TimelineEvent>(response);
+}
+
+// Delete event
+export async function deleteTimelineEvent(id: number): Promise<{ success: boolean }> {
+  const response = await fetch(`${TIMELINE_BASE}/events/${id}`, { method: 'DELETE' });
+  return handleResponse<{ success: boolean }>(response);
+}
