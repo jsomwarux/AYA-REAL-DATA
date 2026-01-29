@@ -244,6 +244,12 @@ export async function deleteTimelineTask(id: number): Promise<{ success: boolean
   return handleResponse<{ success: boolean }>(response);
 }
 
+// Delete entire category (all tasks + events in it)
+export async function deleteTimelineCategory(categoryName: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${TIMELINE_BASE}/categories/${encodeURIComponent(categoryName)}`, { method: 'DELETE' });
+  return handleResponse<{ success: boolean }>(response);
+}
+
 // Create new event
 export async function createTimelineEvent(data: { taskId: number; startDate: string; endDate?: string; label?: string; color?: string }): Promise<TimelineEvent> {
   const response = await fetch(`${TIMELINE_BASE}/events`, {
@@ -267,5 +273,41 @@ export async function updateTimelineEvent(id: number, data: { startDate?: string
 // Delete event
 export async function deleteTimelineEvent(id: number): Promise<{ success: boolean }> {
   const response = await fetch(`${TIMELINE_BASE}/events/${id}`, { method: 'DELETE' });
+  return handleResponse<{ success: boolean }>(response);
+}
+
+// Custom Event Types
+export interface CustomEventType {
+  id: number;
+  label: string;
+  color: string;
+  createdAt: string;
+}
+
+export async function fetchCustomEventTypes(): Promise<CustomEventType[]> {
+  const response = await fetch(`${TIMELINE_BASE}/event-types`);
+  return handleResponse<CustomEventType[]>(response);
+}
+
+export async function createCustomEventType(data: { label: string; color: string }): Promise<CustomEventType> {
+  const response = await fetch(`${TIMELINE_BASE}/event-types`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<CustomEventType>(response);
+}
+
+export async function updateCustomEventType(id: number, data: { label?: string; color?: string }): Promise<CustomEventType> {
+  const response = await fetch(`${TIMELINE_BASE}/event-types/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<CustomEventType>(response);
+}
+
+export async function deleteCustomEventType(id: number): Promise<{ success: boolean }> {
+  const response = await fetch(`${TIMELINE_BASE}/event-types/${id}`, { method: 'DELETE' });
   return handleResponse<{ success: boolean }>(response);
 }

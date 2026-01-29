@@ -28,6 +28,11 @@ import {
   createTimelineTask,
   updateTimelineTask,
   deleteTimelineTask,
+  deleteTimelineCategory,
+  fetchCustomEventTypes,
+  createCustomEventType,
+  updateCustomEventType,
+  deleteCustomEventType,
   TimelineEvent,
   TimelineTask,
 } from "@/lib/api";
@@ -115,12 +120,55 @@ export default function Timeline() {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
   const timelineQuery = useQuery({
     queryKey: ["timeline"],
     queryFn: fetchTimelineData,
     retry: false,
     staleTime: 1000 * 60 * 2,
+  });
+
+  // Custom event types
+  const customEventTypesQuery = useQuery({
+    queryKey: ["customEventTypes"],
+    queryFn: fetchCustomEventTypes,
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const createEventTypeMutation = useMutation({
+    mutationFn: createCustomEventType,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customEventTypes"] });
+      toastSuccess("Event Type Created", "New event type has been added.");
+    },
+    onError: (error: Error) => {
+      toastError("Failed to Create Event Type", error.message);
+    },
+  });
+
+  const updateEventTypeMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { label?: string; color?: string } }) =>
+      updateCustomEventType(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customEventTypes"] });
+      toastSuccess("Event Type Updated", "Event type has been updated.");
+    },
+    onError: (error: Error) => {
+      toastError("Failed to Update Event Type", error.message);
+    },
+  });
+
+  const deleteEventTypeMutation = useMutation({
+    mutationFn: deleteCustomEventType,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customEventTypes"] });
+      toastSuccess("Event Type Deleted", "Event type has been removed.");
+    },
+    onError: (error: Error) => {
+      toastError("Failed to Delete Event Type", error.message);
+    },
   });
 
   const importMutation = useMutation({
@@ -206,6 +254,19 @@ export default function Timeline() {
     },
     onError: (error: Error) => {
       toastError("Failed to Delete Task", error.message);
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: deleteTimelineCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      toastSuccess("Category Deleted", "Category and all its tasks have been removed.");
+      setCategoryToDelete(null);
+    },
+    onError: (error: Error) => {
+      toastError("Failed to Delete Category", error.message);
+      setCategoryToDelete(null);
     },
   });
 
@@ -962,6 +1023,7 @@ export default function Timeline() {
               onCellClick={handleCellClick}
               onTaskClick={handleTaskClick}
               onCategoryToggle={toggleCategory}
+              onCategoryDelete={(cat) => setCategoryToDelete(cat)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -1025,6 +1087,16 @@ export default function Timeline() {
         onSave={handleEventSave}
         onDelete={handleEventDelete}
         isLoading={createEventMutation.isPending || updateEventMutation.isPending || deleteEventMutation.isPending}
+        customEventTypes={customEventTypesQuery.data || []}
+        onCreateEventType={async (typeData) => {
+          await createEventTypeMutation.mutateAsync(typeData);
+        }}
+        onUpdateEventType={async (id, typeData) => {
+          await updateEventTypeMutation.mutateAsync({ id, data: typeData });
+        }}
+        onDeleteEventType={async (id) => {
+          await deleteEventTypeMutation.mutateAsync(id);
+        }}
       />
 
       {/* Task Modal */}
@@ -1040,6 +1112,38 @@ export default function Timeline() {
         onDelete={handleTaskDelete}
         isLoading={createTaskMutation.isPending || updateTaskMutation.isPending || deleteTaskMutation.isPending}
       />
+
+      {/* Delete Category Confirmation Dialog */}
+      <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => { if (!open) setCategoryToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the category <strong>"{categoryToDelete}"</strong>? This will permanently remove all tasks and events within this category. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (categoryToDelete) {
+                  deleteCategoryMutation.mutate(categoryToDelete);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteCategoryMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Category'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

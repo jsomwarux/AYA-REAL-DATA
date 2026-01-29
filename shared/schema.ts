@@ -79,3 +79,19 @@ export const insertTimelineEventSchema = createInsertSchema(timelineEvents).pick
 
 export type TimelineEvent = typeof timelineEvents.$inferSelect;
 export type InsertTimelineEvent = z.infer<typeof insertTimelineEventSchema>;
+
+// Custom Event Types - user-defined event types for the timeline
+export const customEventTypes = pgTable("custom_event_types", {
+  id: serial("id").primaryKey(),
+  label: varchar("label", { length: 255 }).notNull(),
+  color: varchar("color", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCustomEventTypeSchema = createInsertSchema(customEventTypes).pick({
+  label: true,
+  color: true,
+});
+
+export type CustomEventType = typeof customEventTypes.$inferSelect;
+export type InsertCustomEventType = z.infer<typeof insertCustomEventTypeSchema>;

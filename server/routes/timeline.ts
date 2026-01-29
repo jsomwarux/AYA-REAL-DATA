@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { timelineTasks, timelineEvents } from '@shared/schema';
+import { timelineTasks, timelineEvents, customEventTypes } from '@shared/schema';
 import { eq, asc } from 'drizzle-orm';
 import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
 
@@ -564,6 +564,128 @@ router.delete('/events/:id', async (req, res) => {
       error: 'Failed to delete event',
       message: error.message
     });
+  }
+});
+
+// DELETE /api/timeline/categories/:name - Delete entire category (all tasks + events)
+router.delete('/categories/:name', async (req, res) => {
+  try {
+    const categoryName = decodeURIComponent(req.params.name);
+
+    // Find all tasks in this category
+    const tasks = await db
+      .select()
+      .from(timelineTasks)
+      .where(eq(timelineTasks.category, categoryName));
+
+    if (tasks.length === 0) {
+      return res.status(404).json({
+        error: 'Category not found',
+        message: `No tasks found in category "${categoryName}"`,
+      });
+    }
+
+    // Delete all events for each task in the category
+    for (const task of tasks) {
+      await db.delete(timelineEvents).where(eq(timelineEvents.taskId, task.id));
+    }
+
+    // Delete all tasks in the category
+    await db.delete(timelineTasks).where(eq(timelineTasks.category, categoryName));
+
+    res.json({
+      success: true,
+      deleted: {
+        category: categoryName,
+        tasksRemoved: tasks.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({
+      error: 'Failed to delete category',
+      message: error.message,
+    });
+  }
+});
+
+// ==========================================
+// Custom Event Types CRUD
+// ==========================================
+
+// GET /api/timeline/event-types - Get all custom event types
+router.get('/event-types', async (req, res) => {
+  try {
+    const types = await db
+      .select()
+      .from(customEventTypes)
+      .orderBy(asc(customEventTypes.label));
+    res.json(types);
+  } catch (error: any) {
+    console.error('Error fetching custom event types:', error);
+    res.status(500).json({ error: 'Failed to fetch event types', message: error.message });
+  }
+});
+
+// POST /api/timeline/event-types - Create a new custom event type
+router.post('/event-types', async (req, res) => {
+  try {
+    const { label, color } = req.body;
+    if (!label || !color) {
+      return res.status(400).json({ error: 'label and color are required' });
+    }
+    const [newType] = await db
+      .insert(customEventTypes)
+      .values({ label: label.trim(), color })
+      .returning();
+    res.json(newType);
+  } catch (error: any) {
+    console.error('Error creating custom event type:', error);
+    res.status(500).json({ error: 'Failed to create event type', message: error.message });
+  }
+});
+
+// PUT /api/timeline/event-types/:id - Rename or recolor a custom event type
+router.put('/event-types/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label, color } = req.body;
+    const updateData: any = {};
+    if (label !== undefined) updateData.label = label.trim();
+    if (color !== undefined) updateData.color = color;
+
+    const [updated] = await db
+      .update(customEventTypes)
+      .set(updateData)
+      .where(eq(customEventTypes.id, parseInt(id)))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Event type not found' });
+    }
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating custom event type:', error);
+    res.status(500).json({ error: 'Failed to update event type', message: error.message });
+  }
+});
+
+// DELETE /api/timeline/event-types/:id - Delete a custom event type
+router.delete('/event-types/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [deleted] = await db
+      .delete(customEventTypes)
+      .where(eq(customEventTypes.id, parseInt(id)))
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Event type not found' });
+    }
+    res.json({ success: true, deleted });
+  } catch (error: any) {
+    console.error('Error deleting custom event type:', error);
+    res.status(500).json({ error: 'Failed to delete event type', message: error.message });
   }
 });
 

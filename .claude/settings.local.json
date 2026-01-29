@@ -18,7 +18,8 @@
       "Bash(cd /Users/jsomwaru/Desktop/PROJECTS/WEB\\\\ APPS/AYA/AYA-REAL-DATA:*)",
       "Bash(cd:*)",
       "Bash(lsof:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx drizzle-kit push:*)"
     ]
   }
 }

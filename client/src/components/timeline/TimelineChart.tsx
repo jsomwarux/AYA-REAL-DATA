@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import { TimelineTask, TimelineEvent } from "@/lib/api";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TimelineChartProps {
@@ -13,6 +13,7 @@ interface TimelineChartProps {
   onCellClick: (taskId: number, weekDate: string, existingEvent: TimelineEvent | null) => void;
   onTaskClick: (task: TimelineTask) => void;
   onCategoryToggle: (category: string) => void;
+  onCategoryDelete?: (category: string) => void;
 }
 
 // Format date for header display
@@ -76,6 +77,7 @@ export function TimelineChart({
   onCellClick,
   onTaskClick,
   onCategoryToggle,
+  onCategoryDelete,
 }: TimelineChartProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -159,7 +161,7 @@ export function TimelineChart({
               <div key={category}>
                 {/* Category header row */}
                 <div
-                  className="flex bg-white/5 border-b border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
+                  className="flex bg-white/5 border-b border-white/10 cursor-pointer hover:bg-white/10 transition-colors group"
                   onClick={() => onCategoryToggle(category)}
                 >
                   <div className="sticky left-0 z-10 w-[250px] min-w-[250px] bg-white/5 border-r border-white/10 p-3 flex items-center gap-2">
@@ -174,6 +176,19 @@ export function TimelineChart({
                     <span className="text-xs text-muted-foreground ml-auto">
                       ({categoryTasks.length})
                     </span>
+                    {onCategoryDelete && (
+                      <button
+                        type="button"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 ml-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCategoryDelete(category);
+                        }}
+                        title={`Delete category "${category}"`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                   {/* Empty cells for category row */}
                   {weekDates.map((date) => (
