@@ -310,8 +310,8 @@ export default function Overview() {
         />
         <StatCard
           title="Timeline"
-          value={`${totalCategories} Categories`}
-          change={`${eventsThisWeek.length} events this week · ${totalEvents} total`}
+          value={`${eventsThisWeek.length} This Week`}
+          change={`${activeEvents.length} active · ${totalEvents} total events`}
           changeType={eventsThisWeek.length > 0 ? "positive" : "neutral"}
           icon={<Calendar className="h-5 w-5" />}
           accentColor="purple"
