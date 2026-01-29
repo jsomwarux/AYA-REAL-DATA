@@ -1,5 +1,112 @@
 # Change Log
 
+## Latest Session Changes
+
+### Overview Page Overhaul
+- **Rewrote Overview page** to pull data from **all** data sources (Construction, Budget, Timeline) instead of just Construction
+- Added 4 cross-cutting KPI stat cards: Construction Progress %, Total Budget, Timeline Tasks, Cost Per Room
+- Added Budget Category donut pie chart with color legend
+- Added Timeline Activity card showing active events (happening now) and upcoming events (next 2 weeks) with summary stats
+- Added Budget Status card with spent progress bar, hard/soft costs, contingency, remaining budget, status breakdown
+- Added Construction Completion card with bathroom/bedroom/overall progress bars and unit counts
+- Added quick navigation cards linking to Construction, Budget, and Timeline pages
+- Refresh button now refreshes all 3 data sources in parallel
+
+**Files changed:**
+- `client/src/pages/Overview.tsx` — Full rewrite. Now imports and queries `fetchBudgetData` and `fetchTimelineData` alongside construction data. Added budget pie chart, timeline activity, budget status, and construction completion sections.
+
+---
+
+### Timeline Custom Event Types (Full CRUD)
+- **New DB table** `custom_event_types` in `shared/schema.ts` for user-defined event types
+- **Server CRUD endpoints**: `GET/POST /api/timeline/event-types`, `PUT/DELETE /api/timeline/event-types/:id`
+- **Client API functions**: `fetchCustomEventTypes()`, `createCustomEventType()`, `updateCustomEventType()`, `deleteCustomEventType()`
+- **EventModal integration**: Users can create, rename, recolor, and delete event types inline from the edit event modal
+- Event types persist in the database and appear in the dropdown and Event Types chart
+
+**Files changed:**
+- `shared/schema.ts` — Added `customEventTypes` table and Zod schema
+- `server/routes/timeline.ts` — Added 4 custom event type endpoints (GET, POST, PUT, DELETE)
+- `client/src/lib/api.ts` — Added `CustomEventType` interface and 4 API functions
+- `client/src/components/timeline/EventModal.tsx` — Rewritten with inline event type management
+- `client/src/pages/Timeline.tsx` — Added `customEventTypesQuery` and event type mutations, wired to EventModal
+
+**Migration required:** Run `npx drizzle-kit push` on Replit shell to create the `custom_event_types` table.
+
+---
+
+### Timeline Category Management
+- **Delete category**: Trash icon on category headers (appears on hover), confirmation dialog, cascades deletion of all tasks + events in that category
+- **Rename category**: Pencil icon on category headers (appears on hover), rename dialog with Input pre-filled with current name
+- **Server endpoints**: `PUT /api/timeline/categories/:name` (rename), `DELETE /api/timeline/categories/:name` (delete with cascade)
+- **Client API functions**: `renameTimelineCategory()`, `deleteTimelineCategory()`
+
+**Files changed:**
+- `server/routes/timeline.ts` — Added `PUT /categories/:name` and `DELETE /categories/:name` endpoints
+- `client/src/lib/api.ts` — Added `renameTimelineCategory()` and `deleteTimelineCategory()` functions
+- `client/src/pages/Timeline.tsx` — Added `deleteCategoryMutation`, `renameCategoryMutation`, state for dialogs, AlertDialog UI for both rename and delete
+- `client/src/components/timeline/TimelineChart.tsx` — Added `onCategoryDelete` and `onCategoryRename` props, Pencil and Trash2 icons on category headers with `e.stopPropagation()`
+
+---
+
+### EventModal UX Simplification
+- **Merged** redundant Event Type dropdown and Label field into single source of truth
+- Dropdown selection IS the label — no separate label input needed
+- "Custom Label" text input + color picker only appear when "Custom..." is selected
+- Eliminated confusing behavior where editing a label auto-converted the type to "Custom"
+
+**Files changed:**
+- `client/src/components/timeline/EventModal.tsx` — Removed always-visible Label input and Color picker. Added `selectedType` state (`'__custom__'` for custom). Derives `finalLabel`/`finalColor` from selection.
+
+---
+
+### Deals Password Fix (Server-Side Auth)
+- **Root cause**: `client/src/pages/Deals.tsx` had hardcoded `const DEALS_PASSWORD = "aya2024"` and never read the `DEALS_PASSWORD` environment variable
+- **Fix**: Created server-side auth endpoints: `POST /api/auth/deals-login` validates against `process.env.DEALS_PASSWORD`, `GET /api/auth/deals-check` checks session
+- Extended `express-session` type with `dealsAuthenticated` flag
+
+**Files changed:**
+- `server/index.ts` — Added deals auth endpoints, extended session type declaration
+- `client/src/pages/Deals.tsx` — Removed hardcoded password, replaced with server API calls
+
+---
+
+### Deals Mock Mode
+- **Added** `DEALS_MOCK_MODE=true` environment variable support
+- When enabled, server returns 8 mock deal records instead of fetching from Google Sheets
+- Mock data array defined directly in server route
+
+**Files changed:**
+- `server/routes/sheets.ts` — Added mock data check at top of `/deals` route
+
+---
+
+### Budget Vendor Data Fix
+- **Root cause**: Header matching in `server/routes/sheets.ts` only searched for `"payment"` but the Google Sheet column is named `"Vendors"`
+- **Fix**: Expanded `paymentsIdx` header matching to also check for `"vendor"`, `"contractor"`, `"supplier"`
+
+**Files changed:**
+- `server/routes/sheets.ts` — Updated `paymentsIdx` finder to match multiple column name variants
+
+---
+
+### Removed Settings & Profile UI
+- Removed Settings navigation item from sidebar (not needed for password-only auth model)
+- Removed profile avatar and dropdown menu from header (no individual sign-ins)
+- Cleaned up unused imports (Avatar, DropdownMenu components, User icon)
+
+**Files changed:**
+- `client/src/components/dashboard/Sidebar.tsx` — Set `bottomNavItems` to empty array, removed `Settings` import
+- `client/src/components/dashboard/DashboardLayout.tsx` — Removed entire user avatar DropdownMenu block and unused imports
+
+---
+
+### Documentation
+- Created `PROJECT_CONTEXT.md` — Full project architecture, tech stack, file structure, all API endpoints, DB schema, environment variables, key design decisions
+- Updated `CHANGELOG.md` — Added all changes from this session
+
+---
+
 ## January 29, 2026
 
 ### Password Gate
