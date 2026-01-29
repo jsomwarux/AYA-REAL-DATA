@@ -32,12 +32,12 @@ import {
   BedDouble,
   DollarSign,
   Calendar,
-  TrendingUp,
   ChevronRight,
   ArrowRight,
   Layers,
   CheckCircle2,
   Clock,
+  ListChecks,
   PieChart,
 } from "lucide-react";
 import {
@@ -187,7 +187,6 @@ export default function Overview() {
   const budgetData = budgetQuery.data;
   const totalBudget = budgetData?.totals?.totalBudget || 0;
   const paidThusFar = budgetData?.totals?.paidThusFar || 0;
-  const budgetItemCount = budgetData?.itemCount || 0;
   const budgetSpentPercent = totalBudget > 0 ? Math.round((paidThusFar / totalBudget) * 100) : 0;
 
   // Top categories by spend for pie chart
@@ -202,6 +201,15 @@ export default function Overview() {
   // Status breakdown
   const statusBreakdown = budgetData?.statusBreakdown || [];
 
+  // Top vendor by spend
+  const vendors = budgetData?.vendorBreakdown || [];
+  const topVendorRaw = vendors.length > 0 ? vendors[0] : null;
+  // Count items for top vendor
+  const topVendorItemCount = topVendorRaw
+    ? (budgetData?.items || []).filter(item => item.vendor === topVendorRaw.name).length
+    : 0;
+  const topVendor = topVendorRaw ? { name: topVendorRaw.name, total: topVendorRaw.total, count: topVendorItemCount } : null;
+
   // ── Timeline Data ──
   const timelineData = timelineQuery.data;
   const totalTimelineTasks = timelineData?.tasks?.length || 0;
@@ -209,7 +217,8 @@ export default function Overview() {
   const totalCategories = timelineData?.categories ? Object.keys(timelineData.categories).length : 0;
 
   const now = new Date();
-  const nowStr = now.toISOString().split('T')[0];
+  // Use local date to avoid UTC timezone mismatch
+  const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   // Active events (happening now)
   const activeEvents = (timelineData?.events || [])
@@ -221,8 +230,8 @@ export default function Overview() {
   startOfWeek.setDate(now.getDate() - dayOfWeek);
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6);
-  const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
-  const endOfWeekStr = endOfWeek.toISOString().split('T')[0];
+  const startOfWeekStr = `${startOfWeek.getFullYear()}-${String(startOfWeek.getMonth() + 1).padStart(2, '0')}-${String(startOfWeek.getDate()).padStart(2, '0')}`;
+  const endOfWeekStr = `${endOfWeek.getFullYear()}-${String(endOfWeek.getMonth() + 1).padStart(2, '0')}-${String(endOfWeek.getDate()).padStart(2, '0')}`;
 
   const eventsThisWeek = (timelineData?.events || [])
     .filter(e => e.startDate <= endOfWeekStr && e.endDate >= startOfWeekStr);
@@ -237,23 +246,6 @@ export default function Overview() {
     }
   }
   const upcomingMilestones = Object.values(upcomingByCategory).slice(0, 5);
-
-  // Category progress: for each category, how many events are completed vs total
-  const categoryProgress: { name: string; completed: number; total: number; active: number }[] = [];
-  if (timelineData?.categories) {
-    for (const [catName, catTasks] of Object.entries(timelineData.categories)) {
-      const catTaskIdSet = new Set(catTasks.map(t => t.id));
-      const catEvents = (timelineData?.events || []).filter(e => catTaskIdSet.has(e.taskId));
-      const completed = catEvents.filter(e => e.endDate < nowStr).length;
-      const active = catEvents.filter(e => e.startDate <= nowStr && e.endDate >= nowStr).length;
-      categoryProgress.push({ name: catName, completed, total: catEvents.length, active });
-    }
-    categoryProgress.sort((a, b) => {
-      const aP = a.total > 0 ? a.completed / a.total : 0;
-      const bP = b.total > 0 ? b.completed / b.total : 0;
-      return aP - bP;
-    });
-  }
 
   // Overall timeline progress
   const allEvents = timelineData?.events || [];
@@ -309,27 +301,27 @@ export default function Overview() {
           accentColor="teal"
         />
         <StatCard
-          title="Total Budget"
+          title="Budget"
           value={formatCurrencyCompact(totalBudget)}
-          change={`${budgetSpentPercent}% spent (${formatCurrencyCompact(paidThusFar)})`}
+          change={`${formatCurrencyCompact(totalBudget - paidThusFar)} remaining (${100 - budgetSpentPercent}%)`}
           changeType={budgetSpentPercent > 90 ? "negative" : budgetSpentPercent > 70 ? "neutral" : "positive"}
           icon={<DollarSign className="h-5 w-5" />}
           accentColor="blue"
         />
         <StatCard
-          title="Timeline Tasks"
-          value={totalTimelineTasks}
-          change={`${activeEvents.length} active · ${totalEvents} total events`}
-          changeType="neutral"
+          title="Timeline"
+          value={`${totalCategories} Categories`}
+          change={`${eventsThisWeek.length} events this week · ${totalEvents} total`}
+          changeType={eventsThisWeek.length > 0 ? "positive" : "neutral"}
           icon={<Calendar className="h-5 w-5" />}
           accentColor="purple"
         />
         <StatCard
-          title="Budget Remaining"
-          value={formatCurrencyCompact(totalBudget - paidThusFar)}
-          change={`${100 - budgetSpentPercent}% of budget available`}
-          changeType={(totalBudget - paidThusFar) < 0 ? "negative" : (100 - budgetSpentPercent) < 20 ? "neutral" : "positive"}
-          icon={<TrendingUp className="h-5 w-5" />}
+          title="Top Vendor"
+          value={topVendor?.name ? (topVendor.name.length > 14 ? topVendor.name.slice(0, 14) + '…' : topVendor.name) : '—'}
+          change={topVendor ? `${formatCurrencyCompact(topVendor.total)} across ${topVendor.count} items` : 'No vendor data'}
+          changeType="neutral"
+          icon={<ListChecks className="h-5 w-5" />}
           accentColor="amber"
         />
       </div>
@@ -631,12 +623,12 @@ export default function Overview() {
               </div>
             </div>
 
-            {/* Upcoming milestones — one per category */}
-            {upcomingMilestones.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Upcoming Milestones</p>
+            {/* Upcoming milestones — one per category, max 3 */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Upcoming Milestones</p>
+              {upcomingMilestones.length > 0 ? (
                 <div className="space-y-2">
-                  {upcomingMilestones.map((item, idx) => {
+                  {upcomingMilestones.slice(0, 3).map((item, idx) => {
                     const startDate = new Date(item.event.startDate + 'T00:00:00');
                     return (
                       <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
@@ -652,35 +644,10 @@ export default function Overview() {
                     );
                   })}
                 </div>
-              </div>
-            )}
-
-            {/* Category progress bars */}
-            {categoryProgress.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Progress by Category</p>
-                <div className="space-y-2">
-                  {categoryProgress.slice(0, 5).map((cat) => {
-                    const pct = cat.total > 0 ? Math.round((cat.completed / cat.total) * 100) : 0;
-                    return (
-                      <div key={cat.name} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground truncate mr-2">{cat.name}</span>
-                          <span className={getCompletionColor(pct)}>
-                            {cat.completed}/{cat.total} ({pct}%)
-                            {cat.active > 0 && <span className="text-purple-400 ml-1">· {cat.active} active</span>}
-                          </span>
-                        </div>
-                        <Progress value={pct} className="h-1.5 bg-white/10" />
-                      </div>
-                    );
-                  })}
-                  {categoryProgress.length > 5 && (
-                    <p className="text-xs text-muted-foreground">+{categoryProgress.length - 5} more categories</p>
-                  )}
-                </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">No upcoming milestones</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
