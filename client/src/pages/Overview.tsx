@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -5,7 +6,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { checkHealth, fetchConstructionProgressData } from "@/lib/api";
+import { checkHealth, fetchConstructionProgressData, RoomProgress } from "@/lib/api";
 import {
   calculateRoomCompletion,
   calculateTaskCompletion,
@@ -14,6 +15,8 @@ import {
   calculateFloorCompletion,
   getCompletionColor,
 } from "@/components/construction-progress/utils";
+import { TaskDetailModal } from "@/components/construction-progress/TaskDetailModal";
+import { RoomDetailModal } from "@/components/construction-progress/RoomDetailModal";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess } from "@/hooks/use-toast";
 import {
@@ -25,6 +28,7 @@ import {
   CheckCircle2,
   ArrowRight,
   TrendingUp,
+  ChevronRight,
 } from "lucide-react";
 import {
   BarChart,
@@ -46,8 +50,17 @@ const COLORS = {
   green: "#22c55e",
 };
 
+interface SelectedTask {
+  taskKey: string;
+  displayName: string;
+  type: "bathroom" | "bedroom";
+}
+
 export default function Overview() {
   useDocumentTitle("Overview");
+
+  const [selectedTask, setSelectedTask] = useState<SelectedTask | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<RoomProgress | null>(null);
 
   const healthQuery = useQuery({
     queryKey: ["health"],
@@ -111,21 +124,33 @@ export default function Overview() {
 
   // Find top 5 tasks needing attention (lowest completion)
   const allTasks = [
-    ...Object.entries(bathroomTasks).map(([name, stats]) => ({
-      // Remove "Bathroom_" prefix for display
-      name: name.replace(/^Bathroom_/, ''),
+    ...Object.entries(bathroomTasks).map(([key, stats]) => ({
+      key, // Keep the full key with prefix
+      name: key.replace(/^Bathroom_/, ''), // Display name without prefix
       ...stats,
-      type: 'Bathroom'
+      type: 'Bathroom' as const
     })),
-    ...Object.entries(bedroomTasks).map(([name, stats]) => ({
-      // Remove "Bedroom_" prefix for display
-      name: name.replace(/^Bedroom_/, ''),
+    ...Object.entries(bedroomTasks).map(([key, stats]) => ({
+      key, // Keep the full key with prefix
+      name: key.replace(/^Bedroom_/, ''), // Display name without prefix
       ...stats,
-      type: 'Bedroom'
+      type: 'Bedroom' as const
     })),
   ].sort((a, b) => a.percentage - b.percentage);
 
   const tasksNeedingAttention = allTasks.slice(0, 5);
+
+  const handleTaskClick = (task: typeof tasksNeedingAttention[0]) => {
+    setSelectedTask({
+      taskKey: task.key,
+      displayName: task.name,
+      type: task.type === 'Bathroom' ? 'bathroom' : 'bedroom',
+    });
+  };
+
+  const handleRoomClick = (room: RoomProgress) => {
+    setSelectedRoom(room);
+  };
 
   return (
     <DashboardLayout
@@ -250,27 +275,36 @@ export default function Overview() {
               Tasks Needing Attention
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
+          <CardContent className="pt-4">
+            <div className="space-y-1">
               {tasksNeedingAttention.length > 0 ? (
                 tasksNeedingAttention.map((task, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">
-                          {task.type}
-                        </span>
-                        <span className="text-white">{task.name}</span>
+                  <button
+                    key={index}
+                    onClick={() => handleTaskClick(task)}
+                    className="w-full text-left p-3 rounded-lg hover:bg-white/5 transition-colors group"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">
+                            {task.type}
+                          </span>
+                          <span className="text-white group-hover:text-white/90">{task.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={getCompletionColor(task.percentage)}>
+                            {task.completed}/{task.total} ({task.percentage}%)
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                       </div>
-                      <span className={getCompletionColor(task.percentage)}>
-                        {task.completed}/{task.total} ({task.percentage}%)
-                      </span>
+                      <Progress
+                        value={task.percentage}
+                        className="h-2 bg-white/10"
+                      />
                     </div>
-                    <Progress
-                      value={task.percentage}
-                      className="h-2 bg-white/10"
-                    />
-                  </div>
+                  </button>
                 ))
               ) : (
                 <div className="flex items-center justify-center h-[200px] text-muted-foreground">
@@ -357,6 +391,28 @@ export default function Overview() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Task Detail Modal */}
+      {selectedTask && (
+        <TaskDetailModal
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          taskName={selectedTask.displayName}
+          taskKey={selectedTask.taskKey}
+          taskType={selectedTask.type}
+          rooms={rooms}
+          onRoomClick={handleRoomClick}
+        />
+      )}
+
+      {/* Room Detail Modal */}
+      {selectedRoom && (
+        <RoomDetailModal
+          room={selectedRoom}
+          isOpen={!!selectedRoom}
+          onClose={() => setSelectedRoom(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }

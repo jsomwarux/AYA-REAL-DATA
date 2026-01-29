@@ -394,6 +394,9 @@ export function getCompletionBgColor(percentage: number): string {
   return 'bg-red-500';
 }
 
+// Values that should display as "Not started"
+const NOT_STARTED_VALUES = ['no work done yet'];
+
 // Format field value for display
 export function formatFieldValue(value: any, fieldType: string): string {
   if (value === null || value === undefined || value === '') {
@@ -401,6 +404,11 @@ export function formatFieldValue(value: any, fieldType: string): string {
   }
   if (fieldType === 'checkbox') {
     return value === true || String(value).toUpperCase() === 'TRUE' ? 'Complete' : 'Not started';
+  }
+  // Check if value should be displayed as "Not started"
+  const strValue = String(value).toLowerCase().trim();
+  if (NOT_STARTED_VALUES.includes(strValue)) {
+    return 'Not started';
   }
   return String(value);
 }
