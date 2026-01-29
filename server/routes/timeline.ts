@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { timelineTasks, timelineEvents } from '@shared/schema';
-import { eq, asc, min, max } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
 
 const router = Router();
@@ -18,6 +18,7 @@ function getEventColor(label: string): string {
 }
 
 // Generate fallback week dates dynamically (Nov 14 to May 8, spanning current project year)
+// Used only when there are no events in the database yet
 function getFallbackWeekDates(): string[] {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -25,22 +26,15 @@ function getFallbackWeekDates(): string[] {
   // If currently Nov/Dec, start year is this year; otherwise last year
   const startYear = currentMonth >= 11 ? currentYear : currentYear - 1;
   const endYear = startYear + 1;
-  return generateWeekDates(`${startYear}-11-14`, `${endYear}-05-08`);
+  return generateWeeklyDates(`${startYear}-11-14`, `${endYear}-05-08`);
 }
 const WEEK_DATES = getFallbackWeekDates();
 
-// Helper to generate weekly dates between two dates (Thursdays, matching original pattern)
-function generateWeekDates(startDateStr: string, endDateStr: string): string[] {
+// Helper to generate weekly dates between two dates (every 7 days from start date)
+function generateWeeklyDates(startDateStr: string, endDateStr: string): string[] {
   const dates: string[] = [];
-  const start = new Date(startDateStr + 'T00:00:00');
+  const current = new Date(startDateStr + 'T00:00:00');
   const end = new Date(endDateStr + 'T00:00:00');
-
-  // Find the first Thursday on or before the start date
-  const current = new Date(start);
-  const dayOfWeek = current.getDay();
-  // Adjust to previous Thursday (day 4)
-  const daysToThursday = (dayOfWeek >= 4) ? (dayOfWeek - 4) : (dayOfWeek + 3);
-  current.setDate(current.getDate() - daysToThursday);
 
   while (current <= end) {
     const year = current.getFullYear();
@@ -48,19 +42,6 @@ function generateWeekDates(startDateStr: string, endDateStr: string): string[] {
     const day = String(current.getDate()).padStart(2, '0');
     dates.push(`${year}-${month}-${day}`);
     current.setDate(current.getDate() + 7);
-  }
-
-  // Ensure the end date's week is included
-  if (dates.length > 0) {
-    const lastDate = dates[dates.length - 1];
-    if (lastDate < endDateStr) {
-      const next = new Date(lastDate + 'T00:00:00');
-      next.setDate(next.getDate() + 7);
-      const year = next.getFullYear();
-      const month = String(next.getMonth() + 1).padStart(2, '0');
-      const day = String(next.getDate()).padStart(2, '0');
-      dates.push(`${year}-${month}-${day}`);
-    }
   }
 
   return dates;
@@ -81,19 +62,19 @@ router.get('/', async (req, res) => {
       .from(timelineEvents)
       .orderBy(asc(timelineEvents.startDate));
 
-    // Derive week dates from actual event data instead of using hardcoded dates
+    // Derive week dates from actual event data instead of using hardcoded dates.
+    // We collect all unique startDate and endDate values from events — these are the
+    // exact week column dates that were parsed from the Google Sheet headers during import.
     let weekDates: string[] = WEEK_DATES; // fallback
     if (events.length > 0) {
-      // Find min startDate and max endDate from all events
-      const dateRange = await db
-        .select({
-          minDate: min(timelineEvents.startDate),
-          maxDate: max(timelineEvents.endDate),
-        })
-        .from(timelineEvents);
-
-      if (dateRange[0]?.minDate && dateRange[0]?.maxDate) {
-        weekDates = generateWeekDates(dateRange[0].minDate, dateRange[0].maxDate);
+      const dateSet = new Set<string>();
+      for (const event of events) {
+        dateSet.add(event.startDate);
+        dateSet.add(event.endDate);
+      }
+      const sortedDates = Array.from(dateSet).sort();
+      if (sortedDates.length > 0) {
+        weekDates = sortedDates;
       }
     }
 
