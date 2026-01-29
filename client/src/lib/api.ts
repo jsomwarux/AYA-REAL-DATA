@@ -244,6 +244,16 @@ export async function deleteTimelineTask(id: number): Promise<{ success: boolean
   return handleResponse<{ success: boolean }>(response);
 }
 
+// Rename a category
+export async function renameTimelineCategory(oldName: string, newName: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${TIMELINE_BASE}/categories/${encodeURIComponent(oldName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newName }),
+  });
+  return handleResponse<{ success: boolean }>(response);
+}
+
 // Delete entire category (all tasks + events in it)
 export async function deleteTimelineCategory(categoryName: string): Promise<{ success: boolean }> {
   const response = await fetch(`${TIMELINE_BASE}/categories/${encodeURIComponent(categoryName)}`, { method: 'DELETE' });

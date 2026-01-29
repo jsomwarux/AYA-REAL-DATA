@@ -567,6 +567,48 @@ router.delete('/events/:id', async (req, res) => {
   }
 });
 
+// PUT /api/timeline/categories/:name - Rename a category
+router.put('/categories/:name', async (req, res) => {
+  try {
+    const oldName = decodeURIComponent(req.params.name);
+    const { newName } = req.body;
+
+    if (!newName || !newName.trim()) {
+      return res.status(400).json({ error: 'newName is required' });
+    }
+
+    // Find all tasks in the old category
+    const tasks = await db
+      .select()
+      .from(timelineTasks)
+      .where(eq(timelineTasks.category, oldName));
+
+    if (tasks.length === 0) {
+      return res.status(404).json({
+        error: 'Category not found',
+        message: `No tasks found in category "${oldName}"`,
+      });
+    }
+
+    // Update all tasks to the new category name
+    await db
+      .update(timelineTasks)
+      .set({ category: newName.trim(), updatedAt: new Date() })
+      .where(eq(timelineTasks.category, oldName));
+
+    res.json({
+      success: true,
+      renamed: { from: oldName, to: newName.trim(), tasksUpdated: tasks.length },
+    });
+  } catch (error: any) {
+    console.error('Error renaming category:', error);
+    res.status(500).json({
+      error: 'Failed to rename category',
+      message: error.message,
+    });
+  }
+});
+
 // DELETE /api/timeline/categories/:name - Delete entire category (all tasks + events)
 router.delete('/categories/:name', async (req, res) => {
   try {

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import { TimelineTask, TimelineEvent } from "@/lib/api";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TimelineChartProps {
@@ -14,6 +14,7 @@ interface TimelineChartProps {
   onTaskClick: (task: TimelineTask) => void;
   onCategoryToggle: (category: string) => void;
   onCategoryDelete?: (category: string) => void;
+  onCategoryRename?: (category: string) => void;
 }
 
 // Format date for header display
@@ -78,6 +79,7 @@ export function TimelineChart({
   onTaskClick,
   onCategoryToggle,
   onCategoryDelete,
+  onCategoryRename,
 }: TimelineChartProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -176,10 +178,23 @@ export function TimelineChart({
                     <span className="text-xs text-muted-foreground ml-auto">
                       ({categoryTasks.length})
                     </span>
+                    {onCategoryRename && (
+                      <button
+                        type="button"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white ml-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCategoryRename(category);
+                        }}
+                        title={`Rename category "${category}"`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     {onCategoryDelete && (
                       <button
                         type="button"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 ml-1"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400"
                         onClick={(e) => {
                           e.stopPropagation();
                           onCategoryDelete(category);

@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -29,6 +30,7 @@ import {
   updateTimelineTask,
   deleteTimelineTask,
   deleteTimelineCategory,
+  renameTimelineCategory,
   fetchCustomEventTypes,
   createCustomEventType,
   updateCustomEventType,
@@ -121,6 +123,8 @@ export default function Timeline() {
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const timelineQuery = useQuery({
     queryKey: ["timeline"],
@@ -267,6 +271,20 @@ export default function Timeline() {
     onError: (error: Error) => {
       toastError("Failed to Delete Category", error.message);
       setCategoryToDelete(null);
+    },
+  });
+
+  const renameCategoryMutation = useMutation({
+    mutationFn: ({ oldName, newName }: { oldName: string; newName: string }) =>
+      renameTimelineCategory(oldName, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      toastSuccess("Category Renamed", "Category has been renamed successfully.");
+      setCategoryToRename(null);
+      setNewCategoryName('');
+    },
+    onError: (error: Error) => {
+      toastError("Failed to Rename Category", error.message);
     },
   });
 
@@ -1024,6 +1042,7 @@ export default function Timeline() {
               onTaskClick={handleTaskClick}
               onCategoryToggle={toggleCategory}
               onCategoryDelete={(cat) => setCategoryToDelete(cat)}
+              onCategoryRename={(cat) => { setCategoryToRename(cat); setNewCategoryName(cat); }}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -1112,6 +1131,47 @@ export default function Timeline() {
         onDelete={handleTaskDelete}
         isLoading={createTaskMutation.isPending || updateTaskMutation.isPending || deleteTaskMutation.isPending}
       />
+
+      {/* Rename Category Dialog */}
+      <AlertDialog open={!!categoryToRename} onOpenChange={(open) => { if (!open) { setCategoryToRename(null); setNewCategoryName(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rename Category</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Enter a new name for the category <strong>"{categoryToRename}"</strong>.</p>
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category name..."
+                  className="bg-white/5 border-white/10"
+                  autoFocus
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (categoryToRename && newCategoryName.trim() && newCategoryName.trim() !== categoryToRename) {
+                  renameCategoryMutation.mutate({ oldName: categoryToRename, newName: newCategoryName.trim() });
+                }
+              }}
+              disabled={!newCategoryName.trim() || newCategoryName.trim() === categoryToRename}
+            >
+              {renameCategoryMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Renaming...
+                </>
+              ) : (
+                'Rename'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Category Confirmation Dialog */}
       <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => { if (!open) setCategoryToDelete(null); }}>

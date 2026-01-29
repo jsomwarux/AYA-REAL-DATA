@@ -82,9 +82,12 @@ export function EventModal({
   onUpdateEventType,
   onDeleteEventType,
 }: EventModalProps) {
-  const [label, setLabel] = useState('');
-  const [color, setColor] = useState('#d1d5db');
-  const [presetValue, setPresetValue] = useState('__custom__');
+  // The selected event type value in the dropdown.
+  // For built-in/custom types this is the label string.
+  // For freeform custom it's '__custom__'.
+  const [selectedType, setSelectedType] = useState('__custom__');
+  const [customLabel, setCustomLabel] = useState('');
+  const [customColor, setCustomColor] = useState('#d1d5db');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -99,11 +102,17 @@ export function EventModal({
   const [editingTypeColor, setEditingTypeColor] = useState('');
   const [isManagingTypes, setIsManagingTypes] = useState(false);
 
-  // Build the combined list of all event types: built-in + custom
+  // All known types for lookup
   const allEventTypes = [
-    ...BUILTIN_PRESETS.map(p => ({ ...p, id: null as number | null, isBuiltin: true })),
-    ...customEventTypes.map(c => ({ label: c.label, color: c.color, id: c.id as number | null, isBuiltin: false })),
+    ...BUILTIN_PRESETS,
+    ...customEventTypes.map(c => ({ label: c.label, color: c.color })),
   ];
+
+  const isCustom = selectedType === '__custom__';
+
+  // Derive the final label and color that will be saved
+  const finalLabel = isCustom ? customLabel.trim() : selectedType;
+  const finalColor = isCustom ? customColor : (allEventTypes.find(t => t.label === selectedType)?.color || '#d1d5db');
 
   // Reset form when modal opens
   useEffect(() => {
@@ -113,38 +122,34 @@ export function EventModal({
       setEditingTypeId(null);
 
       if (event) {
-        setLabel(event.label || '');
-        setColor(event.color || '#d1d5db');
         setStartDate(event.startDate);
         setEndDate(event.endDate);
-        // Try to match a preset or custom type
-        const match = allEventTypes.find(p => p.label === event.label);
-        setPresetValue(match ? match.label : '__custom__');
+        // Try to match the event label to a known type
+        const match = allEventTypes.find(t => t.label === event.label);
+        if (match) {
+          setSelectedType(match.label);
+          setCustomLabel('');
+          setCustomColor('#d1d5db');
+        } else {
+          setSelectedType('__custom__');
+          setCustomLabel(event.label || '');
+          setCustomColor(event.color || '#d1d5db');
+        }
       } else {
-        setLabel('');
-        setColor('#d1d5db');
-        setPresetValue('__custom__');
+        setSelectedType('__custom__');
+        setCustomLabel('');
+        setCustomColor('#d1d5db');
         setStartDate(weekDate);
         setEndDate(weekDate);
       }
     }
   }, [isOpen, event, weekDate]);
 
-  const handlePresetChange = (value: string) => {
-    setPresetValue(value);
-    if (value === '__custom__') return;
-    const match = allEventTypes.find(p => p.label === value);
-    if (match) {
-      setLabel(match.label);
-      setColor(match.color);
-    }
-  };
-
   const handleSave = () => {
-    if (!label.trim()) return;
+    if (!finalLabel) return;
     onSave({
-      label: label.trim(),
-      color,
+      label: finalLabel,
+      color: finalColor,
       startDate,
       endDate: endDate || startDate,
     });
@@ -153,10 +158,8 @@ export function EventModal({
   const handleAddNewType = async () => {
     if (!newTypeName.trim()) return;
     await onCreateEventType({ label: newTypeName.trim(), color: newTypeColor });
-    // Select the newly created type
-    setLabel(newTypeName.trim());
-    setColor(newTypeColor);
-    setPresetValue(newTypeName.trim());
+    // Auto-select the newly created type
+    setSelectedType(newTypeName.trim());
     setIsAddingType(false);
     setNewTypeName('');
     setNewTypeColor('#fca5a5');
@@ -170,12 +173,22 @@ export function EventModal({
 
   const handleSaveEditType = async () => {
     if (editingTypeId === null || !editingTypeName.trim()) return;
+    const oldType = customEventTypes.find(t => t.id === editingTypeId);
     await onUpdateEventType(editingTypeId, { label: editingTypeName.trim(), color: editingTypeColor });
+    // If the currently selected type was the one we just renamed, update selection
+    if (oldType && selectedType === oldType.label) {
+      setSelectedType(editingTypeName.trim());
+    }
     setEditingTypeId(null);
   };
 
   const handleDeleteType = async (id: number) => {
+    const deletedType = customEventTypes.find(t => t.id === id);
     await onDeleteEventType(id);
+    // If the deleted type was selected, reset to custom
+    if (deletedType && selectedType === deletedType.label) {
+      setSelectedType('__custom__');
+    }
     setEditingTypeId(null);
   };
 
@@ -238,10 +251,10 @@ export function EventModal({
             </p>
           )}
 
-          {/* Event Type selector */}
+          {/* Event Type selector — this IS the label */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="preset">Event Type</Label>
+              <Label>Event Type</Label>
               <div className="flex gap-1">
                 {customEventTypes.length > 0 && (
                   <Button
@@ -249,7 +262,7 @@ export function EventModal({
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-xs text-muted-foreground hover:text-white"
-                    onClick={() => setIsManagingTypes(!isManagingTypes)}
+                    onClick={() => { setIsManagingTypes(!isManagingTypes); setIsAddingType(false); }}
                   >
                     <Pencil className="h-3 w-3 mr-1" />
                     {isManagingTypes ? 'Done' : 'Manage'}
@@ -260,10 +273,7 @@ export function EventModal({
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs text-muted-foreground hover:text-white"
-                  onClick={() => {
-                    setIsAddingType(!isAddingType);
-                    setIsManagingTypes(false);
-                  }}
+                  onClick={() => { setIsAddingType(!isAddingType); setIsManagingTypes(false); }}
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   New Type
@@ -334,7 +344,7 @@ export function EventModal({
                             const next = COLOR_PALETTE[(idx + 1) % COLOR_PALETTE.length];
                             setEditingTypeColor(next);
                           }}
-                          title="Click to change color"
+                          title="Click to cycle color"
                         />
                         <Input
                           value={editingTypeName}
@@ -390,7 +400,7 @@ export function EventModal({
             )}
 
             {/* Event type dropdown */}
-            <Select value={presetValue} onValueChange={handlePresetChange}>
+            <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="bg-white/5 border-white/10">
                 <SelectValue />
               </SelectTrigger>
@@ -399,15 +409,12 @@ export function EventModal({
                 {BUILTIN_PRESETS.map((preset) => (
                   <SelectItem key={`builtin-${preset.label}`} value={preset.label}>
                     <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded"
-                        style={{ backgroundColor: preset.color }}
-                      />
+                      <span className="w-3 h-3 rounded" style={{ backgroundColor: preset.color }} />
                       {preset.label}
                     </div>
                   </SelectItem>
                 ))}
-                {/* Custom types separator + items */}
+                {/* Custom types */}
                 {customEventTypes.length > 0 && (
                   <SelectItem value="__separator__" disabled>
                     <span className="text-xs text-muted-foreground">── Custom Types ──</span>
@@ -416,60 +423,55 @@ export function EventModal({
                 {customEventTypes.map((ct) => (
                   <SelectItem key={`custom-${ct.id}`} value={ct.label}>
                     <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded"
-                        style={{ backgroundColor: ct.color }}
-                      />
+                      <span className="w-3 h-3 rounded" style={{ backgroundColor: ct.color }} />
                       {ct.label}
                     </div>
                   </SelectItem>
                 ))}
-                {/* Custom (freeform) option */}
+                {/* Freeform custom option */}
                 <SelectItem value="__custom__">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded" style={{ backgroundColor: '#d1d5db' }} />
-                    Custom
+                    Custom...
                   </div>
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Label input */}
-          <div className="space-y-2">
-            <Label htmlFor="label">Label</Label>
-            <Input
-              id="label"
-              value={label}
-              onChange={(e) => {
-                setLabel(e.target.value);
-                if (presetValue !== '__custom__') {
-                  const match = allEventTypes.find(p => p.label === e.target.value);
-                  if (!match) setPresetValue('__custom__');
-                }
-              }}
-              placeholder="Event label..."
-              className="bg-white/5 border-white/10"
-            />
-          </div>
-
-          {/* Color picker */}
-          <div className="space-y-2">
-            <Label>Color</Label>
-            <div className="flex flex-wrap gap-2">
-              {COLOR_PALETTE.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`w-8 h-8 rounded-md transition-transform hover:scale-110 ${
-                    color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-background' : ''
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
+          {/* Custom label + color — only shown when "Custom..." is selected */}
+          {isCustom && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="customLabel">Custom Label</Label>
+                <Input
+                  id="customLabel"
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  placeholder="Enter event label..."
+                  className="bg-white/5 border-white/10"
+                  autoFocus
                 />
-              ))}
-            </div>
-          </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`w-8 h-8 rounded-md transition-transform hover:scale-110 ${
+                        customColor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-background' : ''
+                      }`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setCustomColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Preview */}
           <div className="space-y-2">
@@ -478,11 +480,11 @@ export function EventModal({
               <span
                 className="px-3 py-1.5 rounded text-sm font-medium"
                 style={{
-                  backgroundColor: color,
+                  backgroundColor: finalColor,
                   color: 'rgba(0,0,0,0.8)',
                 }}
               >
-                {label || 'Event Label'}
+                {finalLabel || 'Event Label'}
               </span>
             </div>
           </div>
@@ -506,7 +508,7 @@ export function EventModal({
             <Button variant="outline" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isLoading || !label.trim()}>
+            <Button onClick={handleSave} disabled={isLoading || !finalLabel}>
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEditing ? 'Update' : 'Create'}
             </Button>
