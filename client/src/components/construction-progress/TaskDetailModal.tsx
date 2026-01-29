@@ -67,8 +67,18 @@ export function TaskDetailModal({
 
     return rooms.map((room) => {
       const value = getFieldValue(room, taskKey);
-      const status = isFieldComplete(value, fieldConfig);
+      const completionResult = isFieldComplete(value, fieldConfig);
       const displayValue = formatFieldValue(value, fieldConfig.type);
+
+      // Convert boolean | 'na' to RoomTaskStatus
+      let status: RoomTaskStatus;
+      if (completionResult === 'na') {
+        status = 'na';
+      } else if (completionResult === true) {
+        status = 'complete';
+      } else {
+        status = 'incomplete';
+      }
 
       return {
         room,
