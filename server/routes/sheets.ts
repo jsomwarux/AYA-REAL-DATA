@@ -429,4 +429,177 @@ router.get('/construction-progress', async (req, res) => {
   }
 });
 
+// Get Budget data
+router.get('/budget', async (req, res) => {
+  console.log('[budget] Endpoint called');
+  try {
+    const spreadsheetId = process.env.BUDGET_SHEET_ID;
+    console.log('[budget] Sheet ID configured:', spreadsheetId ? 'YES' : 'NO');
+
+    if (!spreadsheetId) {
+      console.error('[budget] BUDGET_SHEET_ID not set');
+      return res.status(400).json({
+        error: 'Budget sheet ID not configured',
+        message: 'Please set BUDGET_SHEET_ID in environment variables'
+      });
+    }
+
+    // Fetch Budget Details data - columns A through G, rows 1-165 (with some buffer)
+    const detailsRange = "'Budget Details'!A:G";
+
+    console.log('[budget] Fetching data from sheet:', spreadsheetId);
+    const data = await fetchSheetData(spreadsheetId, detailsRange);
+    console.log('[budget] Data fetched successfully');
+
+    // Process Budget Details data
+    let budgetItems: GoogleSheetRow[] = [];
+    let totals = {
+      total: 0,
+      contingency: 0,
+      totalBudget: 0,
+      hardCosts: 0,
+      softCosts: 0,
+    };
+    const categoryTotals: Record<string, number> = {};
+    const vendorTotals: Record<string, number> = {};
+    const statusCounts: Record<string, { count: number; total: number }> = {};
+
+    if (data && data.rawValues && data.rawValues.length > 0) {
+      // First row is headers
+      const headers = data.rawValues[0] as string[];
+      const dataRows = data.rawValues.slice(1);
+
+      // Find column indices
+      const categoryIdx = headers.findIndex(h => h?.toLowerCase().includes('category'));
+      const paymentsIdx = headers.findIndex(h => h?.toLowerCase().includes('payment'));
+      const projectIdx = headers.findIndex(h => h?.toLowerCase().includes('project'));
+      const statusIdx = headers.findIndex(h => h?.toLowerCase().includes('status'));
+      const subtotalIdx = headers.findIndex(h => h?.toLowerCase().includes('subtotal'));
+
+      console.log('[budget] Column indices:', { categoryIdx, paymentsIdx, projectIdx, statusIdx, subtotalIdx });
+
+      // Process each row
+      dataRows.forEach((row, rowIndex) => {
+        const category = row[categoryIdx]?.toString().trim() || '';
+        const payments = row[paymentsIdx]?.toString().trim() || '';
+        const project = row[projectIdx]?.toString().trim() || '';
+        const status = row[statusIdx]?.toString().trim() || '';
+        const subtotalRaw = row[subtotalIdx];
+
+        // Parse subtotal - handle currency formatting, dashes, and empty values
+        let subtotal = 0;
+        if (subtotalRaw !== undefined && subtotalRaw !== null && subtotalRaw !== '' && subtotalRaw !== '-') {
+          // Remove currency symbols, commas, and spaces
+          const cleanValue = String(subtotalRaw).replace(/[$,\s]/g, '');
+          const parsed = parseFloat(cleanValue);
+          if (!isNaN(parsed)) {
+            subtotal = parsed;
+          }
+        }
+
+        // Check for total rows (these have "Total" in project column)
+        const isTotal = project.toLowerCase().includes('total');
+        const isCategoryTotal = isTotal && !project.toLowerCase().includes('hard cost') &&
+                               !project.toLowerCase().includes('contingency') &&
+                               !project.toLowerCase().includes('budget');
+
+        // Check for grand totals
+        if (project.toLowerCase() === 'total' || project.toLowerCase() === 'total hard cost') {
+          totals.total = subtotal;
+        } else if (project.toLowerCase() === 'contingency') {
+          totals.contingency = subtotal;
+        } else if (project.toLowerCase() === 'total budget') {
+          totals.totalBudget = subtotal;
+        }
+
+        // Skip total rows for line items, but include regular items
+        if (!isTotal && category && project) {
+          const item: GoogleSheetRow = {
+            id: rowIndex + 2, // Excel row number (1-indexed, +1 for header)
+            category,
+            vendor: payments,
+            project,
+            status: status || 'Not Set',
+            subtotal,
+          };
+          budgetItems.push(item);
+
+          // Aggregate by category
+          if (category) {
+            if (!categoryTotals[category]) {
+              categoryTotals[category] = 0;
+            }
+            categoryTotals[category] += subtotal;
+
+            // Track hard vs soft costs
+            if (category.toLowerCase() === 'soft costs') {
+              totals.softCosts += subtotal;
+            } else {
+              totals.hardCosts += subtotal;
+            }
+          }
+
+          // Aggregate by vendor
+          if (payments) {
+            if (!vendorTotals[payments]) {
+              vendorTotals[payments] = 0;
+            }
+            vendorTotals[payments] += subtotal;
+          }
+
+          // Aggregate by status
+          const statusKey = status || 'Not Set';
+          if (!statusCounts[statusKey]) {
+            statusCounts[statusKey] = { count: 0, total: 0 };
+          }
+          statusCounts[statusKey].count += 1;
+          statusCounts[statusKey].total += subtotal;
+        }
+      });
+    }
+
+    // If totals weren't found in the sheet, calculate them
+    if (totals.total === 0) {
+      totals.total = totals.hardCosts + totals.softCosts;
+    }
+    if (totals.contingency === 0) {
+      totals.contingency = totals.total * 0.1;
+    }
+    if (totals.totalBudget === 0) {
+      totals.totalBudget = totals.total + totals.contingency;
+    }
+
+    // Sort category totals by amount (descending)
+    const sortedCategories = Object.entries(categoryTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, total]) => ({ name, total }));
+
+    // Sort vendor totals by amount (descending)
+    const sortedVendors = Object.entries(vendorTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, total]) => ({ name, total }));
+
+    // Format status breakdown
+    const statusBreakdown = Object.entries(statusCounts)
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([status, data]) => ({ status, ...data }));
+
+    res.json({
+      items: budgetItems,
+      totals,
+      categoryBreakdown: sortedCategories,
+      vendorBreakdown: sortedVendors,
+      statusBreakdown,
+      itemCount: budgetItems.length,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error fetching budget data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch budget data',
+      message: error.message
+    });
+  }
+});
+
 export default router;

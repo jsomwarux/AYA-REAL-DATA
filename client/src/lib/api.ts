@@ -109,3 +109,53 @@ export async function fetchConstructionProgressData(): Promise<ConstructionProgr
   const response = await fetch(`${API_BASE}/construction-progress`);
   return handleResponse<ConstructionProgressData>(response);
 }
+
+// Budget Types
+export interface BudgetItem {
+  id: number;
+  category: string;
+  vendor: string;
+  project: string;
+  status: string;
+  subtotal: number;
+}
+
+export interface BudgetTotals {
+  total: number;
+  contingency: number;
+  totalBudget: number;
+  hardCosts: number;
+  softCosts: number;
+}
+
+export interface CategoryBreakdown {
+  name: string;
+  total: number;
+}
+
+export interface VendorBreakdown {
+  name: string;
+  total: number;
+}
+
+export interface StatusBreakdown {
+  status: string;
+  count: number;
+  total: number;
+}
+
+export interface BudgetData {
+  items: BudgetItem[];
+  totals: BudgetTotals;
+  categoryBreakdown: CategoryBreakdown[];
+  vendorBreakdown: VendorBreakdown[];
+  statusBreakdown: StatusBreakdown[];
+  itemCount: number;
+  lastUpdated: string;
+}
+
+// Fetch Budget data
+export async function fetchBudgetData(): Promise<BudgetData> {
+  const response = await fetch(`${API_BASE}/budget`);
+  return handleResponse<BudgetData>(response);
+}

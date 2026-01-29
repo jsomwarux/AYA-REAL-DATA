@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Lock,
   Building2,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,13 @@ const mainNavItems: NavItem[] = [
     icon: <Building2 className="h-5 w-5" />,
     iconColor: "text-blue-400",
     description: "Room-by-room progress tracking",
+  },
+  {
+    title: "Budget",
+    href: "/budget",
+    icon: <DollarSign className="h-5 w-5" />,
+    iconColor: "text-green-400",
+    description: "Project budget tracking",
   },
   {
     title: "Deal Intelligence",
