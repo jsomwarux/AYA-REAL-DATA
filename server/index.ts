@@ -16,6 +16,7 @@ declare module "http" {
 declare module "express-session" {
   interface SessionData {
     authenticated: boolean;
+    dealsAuthenticated: boolean;
   }
 }
 
@@ -69,6 +70,33 @@ app.get("/api/auth/check", (req: Request, res: Response) => {
     return res.json({ authenticated: true });
   }
   return res.json({ authenticated: !!req.session.authenticated });
+});
+
+// Deals-specific auth endpoints
+app.post("/api/auth/deals-login", (req: Request, res: Response) => {
+  const { password } = req.body;
+  const dealsPassword = process.env.DEALS_PASSWORD;
+
+  if (!dealsPassword) {
+    // No password configured — allow access
+    req.session.dealsAuthenticated = true;
+    return res.json({ success: true });
+  }
+
+  if (password === dealsPassword) {
+    req.session.dealsAuthenticated = true;
+    return res.json({ success: true });
+  }
+
+  return res.status(401).json({ message: "Incorrect password" });
+});
+
+app.get("/api/auth/deals-check", (req: Request, res: Response) => {
+  const dealsPassword = process.env.DEALS_PASSWORD;
+  if (!dealsPassword) {
+    return res.json({ authenticated: true });
+  }
+  return res.json({ authenticated: !!req.session.dealsAuthenticated });
 });
 
 app.post("/api/auth/logout", (req: Request, res: Response) => {

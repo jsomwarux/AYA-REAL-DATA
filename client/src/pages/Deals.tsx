@@ -11,9 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Lock, Shield } from "lucide-react";
 
-// Password for accessing Deal Intelligence (stored client-side for demo - in production use server-side auth)
-const DEALS_PASSWORD = "aya2024"; // Change this to your preferred password
-
 // Helper to get value from row with case-insensitive key lookup
 function getField(row: any, ...keys: string[]): any {
   for (const key of keys) {
@@ -67,27 +64,42 @@ export default function Deals() {
   useDocumentTitle("Deal Intelligence");
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  // Check if already authenticated in this session
+  // Check if already authenticated via server session
   useEffect(() => {
-    const authenticated = sessionStorage.getItem("deals_authenticated");
-    if (authenticated === "true") {
-      setIsAuthenticated(true);
-    }
+    fetch("/api/auth/deals-check")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated) {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsCheckingAuth(false));
   }, []);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === DEALS_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem("deals_authenticated", "true");
-      setError("");
-      toastSuccess("Access Granted", "Welcome to Deal Intelligence.");
-    } else {
-      setError("Incorrect password. Please try again.");
-      toastError("Access Denied", "Incorrect password.");
+    try {
+      const res = await fetch("/api/auth/deals-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        setError("");
+        toastSuccess("Access Granted", "Welcome to Deal Intelligence.");
+      } else {
+        setError("Incorrect password. Please try again.");
+        toastError("Access Denied", "Incorrect password.");
+      }
+    } catch {
+      setError("Failed to verify password. Please try again.");
+      toastError("Error", "Failed to verify password.");
     }
   };
 
@@ -124,6 +136,19 @@ export default function Deals() {
     : [];
 
   // Show password gate if not authenticated
+  if (isCheckingAuth) {
+    return (
+      <DashboardLayout
+        title="Deal Intelligence"
+        subtitle="Checking authentication..."
+      >
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-pulse text-muted-foreground">Verifying access...</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <DashboardLayout
