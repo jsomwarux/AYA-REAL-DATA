@@ -225,12 +225,13 @@ export default function Timeline() {
         totalCategories: 0,
         timespan: '',
         completedEvents: 0,
+        activeEvents: 0,
         upcomingEvents: 0,
-        currentWeekEvents: 0,
         progressPercent: 0,
+        isProjectComplete: false,
         categoryBreakdown: [] as { name: string; tasks: number; events: number; color: string }[],
-        upcomingMilestones: [] as { task: string; category: string; event: TimelineEvent; daysUntil: number }[],
-        recentMilestones: [] as { task: string; category: string; event: TimelineEvent; daysAgo: number }[],
+        upcomingMilestones: [] as { task: string; category: string; event: TimelineEvent; dateLabel: string }[],
+        recentMilestones: [] as { task: string; category: string; event: TimelineEvent; dateLabel: string }[],
         eventTypeBreakdown: [] as { name: string; count: number; color: string }[],
         weeklyActivity: [] as { week: string; events: number }[],
       };
@@ -240,17 +241,15 @@ export default function Timeline() {
     now.setHours(0, 0, 0, 0);
     const categories = Object.keys(data.categories || {});
 
-    // Calculate current week boundaries
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    // Determine if the project timeline is complete (all dates in the past)
+    const firstDate = new Date(data.weekDates[0] + 'T00:00:00');
+    const lastDate = new Date(data.weekDates[data.weekDates.length - 1] + 'T00:00:00');
+    const isProjectComplete = now > lastDate;
 
     // Calculate event timing stats
     let completedEvents = 0;
+    let activeEvents = 0;
     let upcomingEvents = 0;
-    let currentWeekEvents = 0;
     const eventTypeCounts: Record<string, { count: number; color: string }> = {};
 
     for (const event of data.events) {
@@ -261,12 +260,9 @@ export default function Timeline() {
         completedEvents++;
       } else if (startDate > now) {
         upcomingEvents++;
-      }
-
-      // Check if the event's date range overlaps with the current week
-      // (event starts before end of week AND event ends on or after start of week)
-      if (startDate < endOfWeek && endDate >= startOfWeek) {
-        currentWeekEvents++;
+      } else {
+        // Event is currently active (startDate <= now <= endDate)
+        activeEvents++;
       }
 
       // Track event types
@@ -277,12 +273,13 @@ export default function Timeline() {
       eventTypeCounts[label].count++;
     }
 
-    // Calculate overall progress (based on timeline position)
-    const firstDate = new Date(data.weekDates[0] + 'T00:00:00');
-    const lastDate = new Date(data.weekDates[data.weekDates.length - 1] + 'T00:00:00');
+    // Calculate overall progress based on event completion ratio
+    // This gives a meaningful percentage even when the project is in the past
     const totalDuration = lastDate.getTime() - firstDate.getTime();
-    const elapsed = Math.max(0, now.getTime() - firstDate.getTime());
-    const progressPercent = Math.min(100, Math.round((elapsed / totalDuration) * 100));
+    const elapsed = Math.max(0, Math.min(now.getTime(), lastDate.getTime()) - firstDate.getTime());
+    const progressPercent = totalDuration > 0
+      ? Math.min(100, Math.round((elapsed / totalDuration) * 100))
+      : 0;
 
     // Category breakdown
     const categoryBreakdown = categories.map((cat, index) => {
@@ -304,51 +301,107 @@ export default function Timeline() {
       taskLookup[task.id] = task;
     }
 
-    // Upcoming milestones (next 2 weeks)
-    const twoWeeksFromNow = new Date(now);
-    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+    // Upcoming milestones / Final milestones
+    // If the project is still active, show events starting in the next 2 weeks
+    // If the project is complete, show the last 5 events on the timeline (the final milestones)
+    let upcomingMilestones: { task: string; category: string; event: TimelineEvent; dateLabel: string }[] = [];
 
-    const upcomingMilestones = data.events
-      .filter(e => {
-        const startDate = new Date(e.startDate + 'T00:00:00');
-        return startDate >= now && startDate <= twoWeeksFromNow;
-      })
-      .map(e => {
-        const task = taskLookup[e.taskId];
-        const startDate = new Date(e.startDate + 'T00:00:00');
-        const daysUntil = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        return {
-          task: task?.task || 'Unknown',
-          category: task?.category || 'Unknown',
-          event: e,
-          daysUntil,
-        };
-      })
-      .sort((a, b) => a.daysUntil - b.daysUntil)
-      .slice(0, 5);
+    if (isProjectComplete) {
+      // Show the final milestones (events with the latest end dates)
+      upcomingMilestones = [...data.events]
+        .sort((a, b) => b.endDate.localeCompare(a.endDate))
+        .slice(0, 5)
+        .map(e => {
+          const task = taskLookup[e.taskId];
+          return {
+            task: task?.task || 'Unknown',
+            category: task?.category || 'Unknown',
+            event: e,
+            dateLabel: formatDate(e.endDate),
+          };
+        });
+    } else {
+      const twoWeeksFromNow = new Date(now);
+      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
 
-    // Recent milestones (past 2 weeks)
-    const twoWeeksAgo = new Date(now);
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      upcomingMilestones = data.events
+        .filter(e => {
+          const startDate = new Date(e.startDate + 'T00:00:00');
+          return startDate >= now && startDate <= twoWeeksFromNow;
+        })
+        .map(e => {
+          const task = taskLookup[e.taskId];
+          const startDate = new Date(e.startDate + 'T00:00:00');
+          const daysUntil = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            task: task?.task || 'Unknown',
+            category: task?.category || 'Unknown',
+            event: e,
+            dateLabel: daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil} days`,
+          };
+        })
+        .sort((a, b) => a.dateLabel.localeCompare(b.dateLabel))
+        .slice(0, 5);
+    }
 
-    const recentMilestones = data.events
-      .filter(e => {
-        const endDate = new Date(e.endDate + 'T00:00:00');
-        return endDate < now && endDate >= twoWeeksAgo;
-      })
-      .map(e => {
-        const task = taskLookup[e.taskId];
-        const endDate = new Date(e.endDate + 'T00:00:00');
-        const daysAgo = Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
-        return {
-          task: task?.task || 'Unknown',
-          category: task?.category || 'Unknown',
-          event: e,
-          daysAgo,
-        };
-      })
-      .sort((a, b) => a.daysAgo - b.daysAgo)
-      .slice(0, 5);
+    // Recent completions
+    // If the project is complete, show the last 5 completed events
+    // If active, show events completed in the past 2 weeks
+    let recentMilestones: { task: string; category: string; event: TimelineEvent; dateLabel: string }[] = [];
+
+    if (isProjectComplete) {
+      // Show the most recently completed events
+      recentMilestones = [...data.events]
+        .sort((a, b) => b.endDate.localeCompare(a.endDate))
+        // Skip the ones shown as "final milestones" — use a different slice
+        .slice(5, 10)
+        .map(e => {
+          const task = taskLookup[e.taskId];
+          return {
+            task: task?.task || 'Unknown',
+            category: task?.category || 'Unknown',
+            event: e,
+            dateLabel: formatDate(e.endDate),
+          };
+        });
+      // If not enough events to fill both cards differently, just show latest
+      if (recentMilestones.length === 0) {
+        recentMilestones = [...data.events]
+          .sort((a, b) => b.endDate.localeCompare(a.endDate))
+          .slice(0, 5)
+          .map(e => {
+            const task = taskLookup[e.taskId];
+            return {
+              task: task?.task || 'Unknown',
+              category: task?.category || 'Unknown',
+              event: e,
+              dateLabel: formatDate(e.endDate),
+            };
+          });
+      }
+    } else {
+      const twoWeeksAgo = new Date(now);
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+      recentMilestones = data.events
+        .filter(e => {
+          const endDate = new Date(e.endDate + 'T00:00:00');
+          return endDate < now && endDate >= twoWeeksAgo;
+        })
+        .map(e => {
+          const task = taskLookup[e.taskId];
+          const endDate = new Date(e.endDate + 'T00:00:00');
+          const daysAgo = Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            task: task?.task || 'Unknown',
+            category: task?.category || 'Unknown',
+            event: e,
+            dateLabel: daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`,
+          };
+        })
+        .sort((a, b) => a.dateLabel.localeCompare(b.dateLabel))
+        .slice(0, 5);
+    }
 
     // Event type breakdown for pie chart
     const eventTypeBreakdown = Object.entries(eventTypeCounts)
@@ -378,9 +431,10 @@ export default function Timeline() {
       totalCategories: categories.length,
       timespan,
       completedEvents,
+      activeEvents,
       upcomingEvents,
-      currentWeekEvents,
       progressPercent,
+      isProjectComplete,
       categoryBreakdown,
       upcomingMilestones,
       recentMilestones,
@@ -524,15 +578,15 @@ export default function Timeline() {
         <StatCard
           title="Completed"
           value={analytics.completedEvents.toString()}
-          change={`${analytics.totalEvents > 0 ? Math.round((analytics.completedEvents / analytics.totalEvents) * 100) : 0}% done`}
+          change={`${analytics.totalEvents > 0 ? Math.round((analytics.completedEvents / analytics.totalEvents) * 100) : 0}% of events`}
           changeType="positive"
           icon={<CheckCircle2 className="h-5 w-5" />}
           accentColor="teal"
         />
         <StatCard
-          title="This Week"
-          value={analytics.currentWeekEvents.toString()}
-          change="Active events"
+          title="Active"
+          value={analytics.activeEvents.toString()}
+          change="In progress now"
           changeType="neutral"
           icon={<PlayCircle className="h-5 w-5" />}
           accentColor="amber"
@@ -555,6 +609,11 @@ export default function Timeline() {
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-teal-400" />
                 <span className="text-sm font-medium text-white">Project Timeline Progress</span>
+                {analytics.isProjectComplete && (
+                  <Badge variant="outline" className="text-green-400 border-green-400/30 text-[10px]">
+                    Complete
+                  </Badge>
+                )}
               </div>
               <span className="text-sm text-muted-foreground">
                 {formatDateLong(data.weekDates[0])} → {formatDateLong(data.weekDates[data.weekDates.length - 1])}
@@ -562,9 +621,14 @@ export default function Timeline() {
             </div>
             <Progress value={analytics.progressPercent} className="h-3 bg-white/10" />
             <div className="flex justify-between mt-2">
-              <span className="text-xs text-muted-foreground">Start</span>
-              <span className="text-xs text-teal-400 font-medium">{analytics.progressPercent}% through timeline</span>
-              <span className="text-xs text-muted-foreground">End</span>
+              <span className="text-xs text-muted-foreground">{formatDate(data.weekDates[0])}</span>
+              <span className="text-xs text-teal-400 font-medium">
+                {analytics.isProjectComplete
+                  ? `Timeline complete — ${analytics.completedEvents} of ${analytics.totalEvents} events finished`
+                  : `${analytics.progressPercent}% through timeline`
+                }
+              </span>
+              <span className="text-xs text-muted-foreground">{formatDate(data.weekDates[data.weekDates.length - 1])}</span>
             </div>
           </CardContent>
         </Card>
@@ -607,12 +671,12 @@ export default function Timeline() {
           </CardContent>
         </Card>
 
-        {/* Upcoming Milestones */}
+        {/* Upcoming / Final Milestones */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10 pb-3">
             <CardTitle className="flex items-center gap-2 text-white text-base">
               <AlertCircle className="h-4 w-4 text-amber-400" />
-              Upcoming Milestones
+              {analytics.isProjectComplete ? 'Final Milestones' : 'Upcoming Milestones'}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
@@ -631,9 +695,7 @@ export default function Timeline() {
                           {milestone.event.label}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          {milestone.daysUntil === 0 ? 'Today' :
-                           milestone.daysUntil === 1 ? 'Tomorrow' :
-                           `In ${milestone.daysUntil} days`}
+                          {milestone.dateLabel}
                         </span>
                       </div>
                     </div>
@@ -641,7 +703,9 @@ export default function Timeline() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No upcoming milestones</p>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {analytics.isProjectComplete ? 'No milestones recorded' : 'No upcoming milestones'}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -651,7 +715,7 @@ export default function Timeline() {
           <CardHeader className="border-b border-white/10 pb-3">
             <CardTitle className="flex items-center gap-2 text-white text-base">
               <CheckCircle2 className="h-4 w-4 text-green-400" />
-              Recent Completions
+              {analytics.isProjectComplete ? 'Latest Completions' : 'Recent Completions'}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
@@ -670,9 +734,7 @@ export default function Timeline() {
                           {milestone.event.label}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          {milestone.daysAgo === 0 ? 'Today' :
-                           milestone.daysAgo === 1 ? 'Yesterday' :
-                           `${milestone.daysAgo} days ago`}
+                          {milestone.dateLabel}
                         </span>
                       </div>
                     </div>
@@ -680,7 +742,9 @@ export default function Timeline() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No recent completions</p>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {analytics.isProjectComplete ? 'No completions recorded' : 'No recent completions'}
+              </p>
             )}
           </CardContent>
         </Card>

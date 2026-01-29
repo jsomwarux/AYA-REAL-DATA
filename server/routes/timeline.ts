@@ -17,16 +17,17 @@ function getEventColor(label: string): string {
   return '#d1d5db';
 }
 
-// Week dates from Nov 14 to May 8
-const WEEK_DATES = [
-  '2024-11-14', '2024-11-21', '2024-11-28', '2024-12-05',
-  '2024-12-12', '2024-12-19', '2024-12-26', '2025-01-02',
-  '2025-01-09', '2025-01-16', '2025-01-23', '2025-01-30',
-  '2025-02-06', '2025-02-13', '2025-02-20', '2025-02-27',
-  '2025-03-06', '2025-03-13', '2025-03-20', '2025-03-27',
-  '2025-04-03', '2025-04-10', '2025-04-17', '2025-04-24',
-  '2025-05-01', '2025-05-08',
-];
+// Generate fallback week dates dynamically (Nov 14 to May 8, spanning current project year)
+function getFallbackWeekDates(): string[] {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  // If currently Nov/Dec, start year is this year; otherwise last year
+  const startYear = currentMonth >= 11 ? currentYear : currentYear - 1;
+  const endYear = startYear + 1;
+  return generateWeekDates(`${startYear}-11-14`, `${endYear}-05-08`);
+}
+const WEEK_DATES = getFallbackWeekDates();
 
 // Helper to generate weekly dates between two dates (Thursdays, matching original pattern)
 function generateWeekDates(startDateStr: string, endDateStr: string): string[] {
@@ -329,38 +330,61 @@ router.post('/import', async (req, res) => {
 });
 
 // Helper function to parse date headers
+// The sheet headers only have month+day (e.g., "Nov 14"), so we infer the year.
+// The timeline starts in Nov/Dec of one year and continues Jan-May of the next.
+// We use the current date to determine the correct academic/project year.
 function parseDateHeader(dateStr: string): string | null {
   const str = dateStr.toString().trim();
 
-  // Format: "Nov 14" or "Dec 5" etc.
   const monthNames: Record<string, string> = {
     'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
     'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
     'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
   };
 
+  let monthNum: number | null = null;
+  let day: string | null = null;
+  let month: string | null = null;
+
+  // Format: "Nov 14" or "Dec 5" etc.
   const match = str.match(/^(\w+)\s+(\d+)$/i);
   if (match) {
     const monthAbbr = match[1].toLowerCase().substring(0, 3);
-    const day = match[2].padStart(2, '0');
-    const month = monthNames[monthAbbr];
-    if (month) {
-      // Determine year based on month
-      const year = parseInt(month) >= 11 ? '2024' : '2025';
-      return `${year}-${month}-${day}`;
-    }
+    day = match[2].padStart(2, '0');
+    month = monthNames[monthAbbr];
+    if (month) monthNum = parseInt(month);
   }
 
   // Format: "11/14" or "12/5" etc.
-  const slashMatch = str.match(/^(\d+)\/(\d+)$/);
-  if (slashMatch) {
-    const month = slashMatch[1].padStart(2, '0');
-    const day = slashMatch[2].padStart(2, '0');
-    const year = parseInt(month) >= 11 ? '2024' : '2025';
-    return `${year}-${month}-${day}`;
+  if (!monthNum) {
+    const slashMatch = str.match(/^(\d+)\/(\d+)$/);
+    if (slashMatch) {
+      month = slashMatch[1].padStart(2, '0');
+      day = slashMatch[2].padStart(2, '0');
+      monthNum = parseInt(month);
+    }
   }
 
-  return null;
+  if (!monthNum || !month || !day) return null;
+
+  // Dynamically determine the year:
+  // The timeline spans Nov/Dec of year N and Jan-Oct of year N+1.
+  // If we're currently in months Jan-Oct, then Nov/Dec belong to last year and Jan-Oct to this year.
+  // If we're currently in Nov/Dec, then Nov/Dec belong to this year and Jan-Oct to next year.
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+
+  let year: number;
+  if (monthNum >= 11) {
+    // Nov/Dec: belongs to the "start" year
+    year = currentMonth >= 11 ? currentYear : currentYear - 1;
+  } else {
+    // Jan-Oct: belongs to the "end" year
+    year = currentMonth >= 11 ? currentYear + 1 : currentYear;
+  }
+
+  return `${year}-${month}-${day}`;
 }
 
 // POST /api/timeline/tasks - Create new task
