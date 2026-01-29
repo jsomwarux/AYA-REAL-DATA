@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { timelineTasks, timelineEvents } from '@shared/schema';
 import { eq, asc } from 'drizzle-orm';
-import { fetchSheetData } from '../services/googleSheets';
+import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
 
 const router = Router();
 
@@ -90,8 +90,28 @@ router.post('/import', async (req, res) => {
       });
     }
 
+    // First, get the spreadsheet info to find the correct sheet name
+    console.log('[timeline-import] Getting spreadsheet info...');
+    const spreadsheetInfo = await getSpreadsheetInfo(spreadsheetId);
+    console.log('[timeline-import] Available sheets:', spreadsheetInfo.sheets?.map(s => s.title));
+
+    // Find the timeline sheet - try common names
+    const timelineSheetNames = ['Summary - High Level', 'Timeline', 'timeline', 'TIMELINE', 'Gantt', 'Schedule', 'Project Timeline'];
+    let sheetName = spreadsheetInfo.sheets?.[0]?.title || 'Sheet1'; // Default to first sheet
+
+    for (const name of timelineSheetNames) {
+      const found = spreadsheetInfo.sheets?.find(s => s.title?.toLowerCase() === name.toLowerCase());
+      if (found) {
+        sheetName = found.title || sheetName;
+        break;
+      }
+    }
+
+    // If no timeline-specific sheet found, use the first sheet
+    console.log('[timeline-import] Using sheet:', sheetName);
+
     // Fetch the timeline sheet data
-    const range = "'Timeline'!A:AB";
+    const range = `'${sheetName}'!A:AB`;
     const data = await fetchSheetData(spreadsheetId, range);
 
     if (!data || !data.rawValues || data.rawValues.length < 2) {
