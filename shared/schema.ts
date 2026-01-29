@@ -54,21 +54,25 @@ export type TimelineTask = typeof timelineTasks.$inferSelect;
 export type InsertTimelineTask = z.infer<typeof insertTimelineTaskSchema>;
 
 // Timeline Events Table - milestones/phases for each task
+// Supports multi-week events with startDate and endDate
 export const timelineEvents = pgTable("timeline_events", {
   id: serial("id").primaryKey(),
   taskId: integer("task_id").notNull(),
-  weekDate: date("week_date").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(), // Same as startDate for single-day events
   label: varchar("label", { length: 255 }),
   color: varchar("color", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("timeline_events_task_idx").on(table.taskId),
-  index("timeline_events_date_idx").on(table.weekDate),
+  index("timeline_events_start_idx").on(table.startDate),
+  index("timeline_events_end_idx").on(table.endDate),
 ]);
 
 export const insertTimelineEventSchema = createInsertSchema(timelineEvents).pick({
   taskId: true,
-  weekDate: true,
+  startDate: true,
+  endDate: true,
   label: true,
   color: true,
 });

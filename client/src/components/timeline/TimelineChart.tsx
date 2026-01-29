@@ -43,6 +43,29 @@ function isPastWeek(dateStr: string): boolean {
   return date < startOfWeek;
 }
 
+// Check if a date falls within an event's range
+function isDateInEventRange(dateStr: string, event: TimelineEvent): boolean {
+  return dateStr >= event.startDate && dateStr <= event.endDate;
+}
+
+// Check if a date is the start of an event
+function isEventStart(dateStr: string, event: TimelineEvent): boolean {
+  return dateStr === event.startDate;
+}
+
+// Check if a date is the end of an event
+function isEventEnd(dateStr: string, event: TimelineEvent): boolean {
+  return dateStr === event.endDate;
+}
+
+// Calculate how many weeks an event spans from a given date
+function getEventSpanFromDate(dateStr: string, event: TimelineEvent, weekDates: string[]): number {
+  const startIndex = weekDates.indexOf(dateStr);
+  const endIndex = weekDates.indexOf(event.endDate);
+  if (startIndex === -1 || endIndex === -1) return 1;
+  return endIndex - startIndex + 1;
+}
+
 export function TimelineChart({
   tasks,
   events,
@@ -57,15 +80,25 @@ export function TimelineChart({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
 
-  // Build event lookup map
-  const eventMap = useMemo(() => {
-    const map: Record<string, TimelineEvent> = {};
+  // Build event lookup - for each task+date, find the event that covers it
+  const eventLookup = useMemo(() => {
+    const lookup: Record<string, { event: TimelineEvent; isStart: boolean; isEnd: boolean; span: number }> = {};
+
     for (const event of events) {
-      const key = `${event.taskId}-${event.weekDate}`;
-      map[key] = event;
+      // For each date in the range, mark it
+      for (const date of weekDates) {
+        if (isDateInEventRange(date, event)) {
+          const key = `${event.taskId}-${date}`;
+          const isStart = isEventStart(date, event);
+          const isEnd = isEventEnd(date, event);
+          const span = isStart ? getEventSpanFromDate(date, event, weekDates) : 0;
+          lookup[key] = { event, isStart, isEnd, span };
+        }
+      }
     }
-    return map;
-  }, [events]);
+
+    return lookup;
+  }, [events, weekDates]);
 
   // Scroll to current week on mount
   useEffect(() => {
@@ -90,7 +123,7 @@ export function TimelineChart({
       {/* Scrollable container */}
       <div
         ref={scrollContainerRef}
-        className="overflow-x-auto"
+        className="overflow-x-auto overflow-y-auto"
         style={{ maxHeight: 'calc(100vh - 400px)' }}
       >
         <div className="min-w-max">
@@ -156,7 +189,7 @@ export function TimelineChart({
 
                 {/* Task rows (if not collapsed) */}
                 {!isCollapsed && categoryTasks.map((task) => (
-                  <div key={task.id} className="flex border-b border-white/5 hover:bg-white/[0.02]">
+                  <div key={task.id} className="flex border-b border-white/5 hover:bg-white/[0.02] relative">
                     {/* Task name */}
                     <div
                       className="sticky left-0 z-10 w-[250px] min-w-[250px] bg-background border-r border-white/10 p-3 pl-9 cursor-pointer hover:bg-white/5 transition-colors"
@@ -167,31 +200,41 @@ export function TimelineChart({
                       </span>
                     </div>
                     {/* Event cells */}
-                    {weekDates.map((date) => {
+                    {weekDates.map((date, dateIndex) => {
                       const eventKey = `${task.id}-${date}`;
-                      const event = eventMap[eventKey];
+                      const eventInfo = eventLookup[eventKey];
+                      const event = eventInfo?.event;
+                      const isStart = eventInfo?.isStart;
+                      const isEnd = eventInfo?.isEnd;
+                      const span = eventInfo?.span || 0;
+
+                      // For multi-week events, only render the bar at the start
+                      const isMultiWeek = event && event.startDate !== event.endDate;
 
                       return (
                         <div
                           key={date}
                           className={cn(
-                            "w-20 min-w-[80px] border-r border-white/5 cursor-pointer transition-colors",
+                            "w-20 min-w-[80px] border-r border-white/5 cursor-pointer transition-colors relative h-10",
                             isCurrentWeek(date) && "bg-teal-500/5",
                             !event && "hover:bg-white/5"
                           )}
                           onClick={() => onCellClick(task.id, date, event || null)}
                         >
-                          {event && (
+                          {/* Render event bar at start of multi-week event */}
+                          {event && isStart && (
                             <div
-                              className="h-full p-1 flex items-center justify-center"
-                              style={{ backgroundColor: event.color ? `${event.color}30` : undefined }}
+                              className="absolute top-1 bottom-1 left-0 flex items-center justify-center overflow-hidden rounded"
+                              style={{
+                                width: isMultiWeek ? `calc(${span * 80}px - 4px)` : 'calc(100% - 4px)',
+                                marginLeft: '2px',
+                                backgroundColor: event.color || '#d1d5db',
+                                zIndex: 5,
+                              }}
                             >
                               <span
-                                className="text-[10px] font-medium truncate px-1 py-0.5 rounded"
-                                style={{
-                                  backgroundColor: event.color || '#d1d5db',
-                                  color: 'rgba(0,0,0,0.8)',
-                                }}
+                                className="text-[10px] font-medium truncate px-2"
+                                style={{ color: 'rgba(0,0,0,0.8)' }}
                               >
                                 {event.label || ''}
                               </span>

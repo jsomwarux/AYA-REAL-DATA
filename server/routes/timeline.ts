@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
     const events = await db
       .select()
       .from(timelineEvents)
-      .orderBy(asc(timelineEvents.weekDate));
+      .orderBy(asc(timelineEvents.startDate));
 
     // Group events by taskId
     const eventsByTask: Record<number, typeof events> = {};
@@ -147,39 +147,108 @@ router.post('/import', async (req, res) => {
     // Process data rows (starting from row 2)
     const dataRows = data.rawValues.slice(1);
     let sortOrder = 0;
+    let currentCategory = '';
 
     for (const row of dataRows) {
-      const category = (row[0] || '').toString().trim();
-      const task = (row[1] || '').toString().trim();
+      const categoryCol = (row[0] || '').toString().trim();
+      const taskCol = (row[1] || '').toString().trim();
 
-      // Skip empty rows
-      if (!category && !task) continue;
+      // Skip completely empty rows
+      if (!categoryCol && !taskCol) {
+        // Check if any date columns have values - if so, this might be a continuation row
+        const hasDateValues = weekDateColumns.some(({ index }) => (row[index] || '').toString().trim());
+        if (!hasDateValues) continue;
+      }
 
-      // Skip category header rows (rows with only category, no task)
-      if (category && !task) continue;
+      // Update current category if provided
+      if (categoryCol) {
+        currentCategory = categoryCol;
+      }
+
+      // Determine task name:
+      // - If task column has value, use it
+      // - If only category column has value AND there are date values, treat category as the task name
+      //   (handles rows like "FINISHES" and "OPENING" where category IS the task)
+      let taskName = taskCol;
+      let taskCategory = currentCategory;
+
+      if (!taskCol && categoryCol) {
+        // Check if this row has any date values
+        const hasDateValues = weekDateColumns.some(({ index }) => (row[index] || '').toString().trim());
+        if (hasDateValues) {
+          // This is a category-as-task row (like FINISHES, OPENING)
+          taskName = categoryCol;
+          taskCategory = categoryCol;
+        } else {
+          // This is just a category header row with no data - skip it
+          continue;
+        }
+      }
+
+      // Skip if we still don't have a task name
+      if (!taskName) continue;
 
       // Insert the task
       const [insertedTask] = await db
         .insert(timelineTasks)
         .values({
-          category: category || 'Uncategorized',
-          task,
+          category: taskCategory || 'Uncategorized',
+          task: taskName,
           sortOrder: sortOrder++,
         })
         .returning();
 
-      // Process events for this task
-      for (const { index, date } of weekDateColumns) {
+      // Process events for this task - merge consecutive cells with same label into multi-week events
+      let currentEvent: { label: string; color: string; startDate: string; endDate: string } | null = null;
+
+      for (let i = 0; i < weekDateColumns.length; i++) {
+        const { index, date } = weekDateColumns[i];
         const cellValue = (row[index] || '').toString().trim();
+
         if (cellValue) {
           const color = getEventColor(cellValue);
-          await db.insert(timelineEvents).values({
-            taskId: insertedTask.id,
-            weekDate: date,
-            label: cellValue,
-            color,
-          });
+
+          if (currentEvent && currentEvent.label === cellValue) {
+            // Extend the current event
+            currentEvent.endDate = date;
+          } else {
+            // Save previous event if exists
+            if (currentEvent) {
+              await db.insert(timelineEvents).values({
+                taskId: insertedTask.id,
+                startDate: currentEvent.startDate,
+                endDate: currentEvent.endDate,
+                label: currentEvent.label,
+                color: currentEvent.color,
+              });
+            }
+            // Start a new event
+            currentEvent = { label: cellValue, color, startDate: date, endDate: date };
+          }
+        } else {
+          // Empty cell - save current event if exists
+          if (currentEvent) {
+            await db.insert(timelineEvents).values({
+              taskId: insertedTask.id,
+              startDate: currentEvent.startDate,
+              endDate: currentEvent.endDate,
+              label: currentEvent.label,
+              color: currentEvent.color,
+            });
+            currentEvent = null;
+          }
         }
+      }
+
+      // Don't forget to save the last event
+      if (currentEvent) {
+        await db.insert(timelineEvents).values({
+          taskId: insertedTask.id,
+          startDate: currentEvent.startDate,
+          endDate: currentEvent.endDate,
+          label: currentEvent.label,
+          color: currentEvent.color,
+        });
       }
     }
 
@@ -337,12 +406,12 @@ router.delete('/tasks/:id', async (req, res) => {
 // POST /api/timeline/events - Add event to task
 router.post('/events', async (req, res) => {
   try {
-    const { taskId, weekDate, label, color } = req.body;
+    const { taskId, startDate, endDate, label, color } = req.body;
 
-    if (!taskId || !weekDate) {
+    if (!taskId || !startDate) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'taskId and weekDate are required'
+        message: 'taskId and startDate are required'
       });
     }
 
@@ -359,7 +428,13 @@ router.post('/events', async (req, res) => {
 
     const [newEvent] = await db
       .insert(timelineEvents)
-      .values({ taskId, weekDate, label, color: eventColor })
+      .values({
+        taskId,
+        startDate,
+        endDate: endDate || startDate, // Default endDate to startDate for single-day events
+        label,
+        color: eventColor,
+      })
       .returning();
 
     res.json(newEvent);
@@ -376,13 +451,17 @@ router.post('/events', async (req, res) => {
 router.put('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { weekDate, label, color } = req.body;
+    const { startDate, endDate, label, color } = req.body;
 
     const eventColor = color || getEventColor(label || '');
 
+    const updateData: any = { label, color: eventColor };
+    if (startDate) updateData.startDate = startDate;
+    if (endDate) updateData.endDate = endDate;
+
     const [updatedEvent] = await db
       .update(timelineEvents)
-      .set({ weekDate, label, color: eventColor })
+      .set(updateData)
       .where(eq(timelineEvents.id, parseInt(id)))
       .returning();
 

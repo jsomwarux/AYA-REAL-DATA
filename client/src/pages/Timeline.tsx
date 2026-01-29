@@ -5,6 +5,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,13 +41,65 @@ import {
   Loader2,
   Clock,
   Plus,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  PlayCircle,
+  Target,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart as RechartsPieChart,
+  Pie,
+  Legend,
+} from "recharts";
 
 // Format date for display
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T00:00:00');
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
+
+// Format date for longer display
+function formatDateLong(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Check if a date is in the past
+function isPastDate(dateStr: string): boolean {
+  const date = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
+// Check if a date is today or this week
+function isCurrentWeek(dateStr: string): boolean {
+  const date = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 7);
+  return date >= startOfWeek && date < endOfWeek;
+}
+
+// Chart colors
+const CHART_COLORS = [
+  '#14b8a6', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444',
+  '#22c55e', '#ec4899', '#06b6d4', '#f97316', '#6366f1',
+];
 
 export default function Timeline() {
   useDocumentTitle("Timeline");
@@ -163,21 +216,168 @@ export default function Timeline() {
   const isLoading = timelineQuery.isLoading;
   const data = timelineQuery.data;
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    if (!data) return { tasks: 0, events: 0, categories: 0, timespan: '' };
+  // Calculate comprehensive stats and analytics
+  const analytics = useMemo(() => {
+    if (!data || !data.tasks || !data.events || !data.weekDates) {
+      return {
+        totalTasks: 0,
+        totalEvents: 0,
+        totalCategories: 0,
+        timespan: '',
+        completedEvents: 0,
+        upcomingEvents: 0,
+        currentWeekEvents: 0,
+        progressPercent: 0,
+        categoryBreakdown: [] as { name: string; tasks: number; events: number; color: string }[],
+        upcomingMilestones: [] as { task: string; category: string; event: TimelineEvent; daysUntil: number }[],
+        recentMilestones: [] as { task: string; category: string; event: TimelineEvent; daysAgo: number }[],
+        eventTypeBreakdown: [] as { name: string; count: number; color: string }[],
+        weeklyActivity: [] as { week: string; events: number }[],
+      };
+    }
 
-    const categories = Object.keys(data.categories || {}).length;
-    const tasks = data.tasks?.length || 0;
-    const events = data.events?.length || 0;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const categories = Object.keys(data.categories || {});
+
+    // Calculate event timing stats
+    let completedEvents = 0;
+    let upcomingEvents = 0;
+    let currentWeekEvents = 0;
+    const eventTypeCounts: Record<string, { count: number; color: string }> = {};
+
+    for (const event of data.events) {
+      const endDate = new Date(event.endDate + 'T00:00:00');
+      const startDate = new Date(event.startDate + 'T00:00:00');
+
+      if (endDate < now) {
+        completedEvents++;
+      } else if (startDate > now) {
+        upcomingEvents++;
+      }
+
+      if (isCurrentWeek(event.startDate) || isCurrentWeek(event.endDate)) {
+        currentWeekEvents++;
+      }
+
+      // Track event types
+      const label = event.label || 'Other';
+      if (!eventTypeCounts[label]) {
+        eventTypeCounts[label] = { count: 0, color: event.color || '#d1d5db' };
+      }
+      eventTypeCounts[label].count++;
+    }
+
+    // Calculate overall progress (based on timeline position)
+    const firstDate = new Date(data.weekDates[0] + 'T00:00:00');
+    const lastDate = new Date(data.weekDates[data.weekDates.length - 1] + 'T00:00:00');
+    const totalDuration = lastDate.getTime() - firstDate.getTime();
+    const elapsed = Math.max(0, now.getTime() - firstDate.getTime());
+    const progressPercent = Math.min(100, Math.round((elapsed / totalDuration) * 100));
+
+    // Category breakdown
+    const categoryBreakdown = categories.map((cat, index) => {
+      const catTasks = data.categories[cat] || [];
+      const catEvents = data.events.filter(e =>
+        catTasks.some(t => t.id === e.taskId)
+      );
+      return {
+        name: cat,
+        tasks: catTasks.length,
+        events: catEvents.length,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      };
+    }).sort((a, b) => b.events - a.events);
+
+    // Get task lookup
+    const taskLookup: Record<number, TimelineTask> = {};
+    for (const task of data.tasks) {
+      taskLookup[task.id] = task;
+    }
+
+    // Upcoming milestones (next 2 weeks)
+    const twoWeeksFromNow = new Date(now);
+    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+
+    const upcomingMilestones = data.events
+      .filter(e => {
+        const startDate = new Date(e.startDate + 'T00:00:00');
+        return startDate >= now && startDate <= twoWeeksFromNow;
+      })
+      .map(e => {
+        const task = taskLookup[e.taskId];
+        const startDate = new Date(e.startDate + 'T00:00:00');
+        const daysUntil = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          task: task?.task || 'Unknown',
+          category: task?.category || 'Unknown',
+          event: e,
+          daysUntil,
+        };
+      })
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+      .slice(0, 5);
+
+    // Recent milestones (past 2 weeks)
+    const twoWeeksAgo = new Date(now);
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+    const recentMilestones = data.events
+      .filter(e => {
+        const endDate = new Date(e.endDate + 'T00:00:00');
+        return endDate < now && endDate >= twoWeeksAgo;
+      })
+      .map(e => {
+        const task = taskLookup[e.taskId];
+        const endDate = new Date(e.endDate + 'T00:00:00');
+        const daysAgo = Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          task: task?.task || 'Unknown',
+          category: task?.category || 'Unknown',
+          event: e,
+          daysAgo,
+        };
+      })
+      .sort((a, b) => a.daysAgo - b.daysAgo)
+      .slice(0, 5);
+
+    // Event type breakdown for pie chart
+    const eventTypeBreakdown = Object.entries(eventTypeCounts)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // Weekly activity (events per week)
+    const weeklyActivity = data.weekDates.map(weekDate => {
+      const eventsThisWeek = data.events.filter(e =>
+        e.startDate <= weekDate && e.endDate >= weekDate
+      ).length;
+      return {
+        week: formatDate(weekDate),
+        events: eventsThisWeek,
+      };
+    });
 
     // Calculate timespan
-    const dates = data.weekDates || [];
-    const timespan = dates.length > 0
-      ? `${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`
+    const timespan = data.weekDates.length > 0
+      ? `${formatDate(data.weekDates[0])} - ${formatDate(data.weekDates[data.weekDates.length - 1])}`
       : 'No dates';
 
-    return { tasks, events, categories, timespan };
+    return {
+      totalTasks: data.tasks.length,
+      totalEvents: data.events.length,
+      totalCategories: categories.length,
+      timespan,
+      completedEvents,
+      upcomingEvents,
+      currentWeekEvents,
+      progressPercent,
+      categoryBreakdown,
+      upcomingMilestones,
+      recentMilestones,
+      eventTypeBreakdown,
+      weeklyActivity,
+    };
   }, [data]);
 
   // Handle cell click (add/edit event)
@@ -204,7 +404,7 @@ export default function Timeline() {
   };
 
   // Handle event save
-  const handleEventSave = (eventData: { label: string; color: string }) => {
+  const handleEventSave = (eventData: { label: string; color: string; startDate: string; endDate: string }) => {
     if (!selectedEvent) return;
 
     if (selectedEvent.event) {
@@ -214,13 +414,16 @@ export default function Timeline() {
         data: {
           label: eventData.label,
           color: eventData.color,
+          startDate: eventData.startDate,
+          endDate: eventData.endDate,
         },
       });
     } else {
       // Create new
       createEventMutation.mutate({
         taskId: selectedEvent.taskId,
-        weekDate: selectedEvent.weekDate,
+        startDate: eventData.startDate,
+        endDate: eventData.endDate,
         label: eventData.label,
         color: eventData.color,
       });
@@ -292,39 +495,286 @@ export default function Timeline() {
       </div>
 
       {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Total Tasks"
-          value={stats.tasks.toString()}
-          change="Project milestones"
+          value={analytics.totalTasks.toString()}
+          change={`${analytics.totalCategories} categories`}
           changeType="neutral"
           icon={<ListChecks className="h-5 w-5" />}
           accentColor="teal"
         />
         <StatCard
-          title="Events"
-          value={stats.events.toString()}
-          change="Timeline markers"
+          title="Total Events"
+          value={analytics.totalEvents.toString()}
+          change="Milestones & phases"
           changeType="neutral"
           icon={<Calendar className="h-5 w-5" />}
           accentColor="blue"
         />
         <StatCard
-          title="Categories"
-          value={stats.categories.toString()}
-          change="Work streams"
-          changeType="neutral"
-          icon={<Tags className="h-5 w-5" />}
-          accentColor="purple"
+          title="Completed"
+          value={analytics.completedEvents.toString()}
+          change={`${analytics.totalEvents > 0 ? Math.round((analytics.completedEvents / analytics.totalEvents) * 100) : 0}% done`}
+          changeType="positive"
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          accentColor="teal"
         />
         <StatCard
-          title="Timeline Span"
-          value={stats.timespan}
-          change="Project duration"
+          title="This Week"
+          value={analytics.currentWeekEvents.toString()}
+          change="Active events"
           changeType="neutral"
-          icon={<Clock className="h-5 w-5" />}
+          icon={<PlayCircle className="h-5 w-5" />}
           accentColor="amber"
         />
+        <StatCard
+          title="Upcoming"
+          value={analytics.upcomingEvents.toString()}
+          change="Future events"
+          changeType="neutral"
+          icon={<Target className="h-5 w-5" />}
+          accentColor="purple"
+        />
+      </div>
+
+      {/* Timeline Progress Bar */}
+      {data && data.weekDates?.length > 0 && (
+        <Card className="border-white/10 mb-8">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-teal-400" />
+                <span className="text-sm font-medium text-white">Project Timeline Progress</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {formatDateLong(data.weekDates[0])} → {formatDateLong(data.weekDates[data.weekDates.length - 1])}
+              </span>
+            </div>
+            <Progress value={analytics.progressPercent} className="h-3 bg-white/10" />
+            <div className="flex justify-between mt-2">
+              <span className="text-xs text-muted-foreground">Start</span>
+              <span className="text-xs text-teal-400 font-medium">{analytics.progressPercent}% through timeline</span>
+              <span className="text-xs text-muted-foreground">End</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Charts and Milestones Row */}
+      <div className="grid gap-6 lg:grid-cols-3 mb-8">
+        {/* Category Breakdown */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <Tags className="h-4 w-4 text-teal-400" />
+              Events by Category
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {analytics.categoryBreakdown.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.categoryBreakdown.slice(0, 6).map((cat, index) => (
+                  <div key={cat.name} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground truncate max-w-[150px]">{cat.name}</span>
+                      <span className="text-white font-medium">{cat.events} events</span>
+                    </div>
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${analytics.totalEvents > 0 ? (cat.events / analytics.totalEvents) * 100 : 0}%`,
+                          backgroundColor: cat.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No data available</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Upcoming Milestones */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <AlertCircle className="h-4 w-4 text-amber-400" />
+              Upcoming Milestones
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {analytics.upcomingMilestones.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.upcomingMilestones.map((milestone, index) => (
+                  <div key={index} className="flex items-start gap-3 p-2 rounded-lg bg-white/5">
+                    <div
+                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ backgroundColor: milestone.event.color || '#d1d5db' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{milestone.task}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {milestone.event.label}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {milestone.daysUntil === 0 ? 'Today' :
+                           milestone.daysUntil === 1 ? 'Tomorrow' :
+                           `In ${milestone.daysUntil} days`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No upcoming milestones</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Completions */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <CheckCircle2 className="h-4 w-4 text-green-400" />
+              Recent Completions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {analytics.recentMilestones.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.recentMilestones.map((milestone, index) => (
+                  <div key={index} className="flex items-start gap-3 p-2 rounded-lg bg-white/5">
+                    <div
+                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ backgroundColor: milestone.event.color || '#d1d5db' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{milestone.task}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {milestone.event.label}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {milestone.daysAgo === 0 ? 'Today' :
+                           milestone.daysAgo === 1 ? 'Yesterday' :
+                           `${milestone.daysAgo} days ago`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No recent completions</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Weekly Activity Chart and Event Types */}
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+        {/* Weekly Activity Chart */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <TrendingUp className="h-4 w-4 text-blue-400" />
+              Weekly Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="h-[200px]">
+              {analytics.weeklyActivity.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.weeklyActivity}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis
+                      dataKey="week"
+                      stroke="rgba(255,255,255,0.5)"
+                      fontSize={10}
+                      interval={3}
+                    />
+                    <YAxis
+                      stroke="rgba(255,255,255,0.5)"
+                      fontSize={10}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(217 33% 17%)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px",
+                        color: "white"
+                      }}
+                      formatter={(value: number) => [`${value} events`, 'Active']}
+                    />
+                    <Bar dataKey="events" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No activity data
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Event Type Breakdown */}
+        <Card className="border-white/10">
+          <CardHeader className="border-b border-white/10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-white text-base">
+              <Calendar className="h-4 w-4 text-purple-400" />
+              Event Types
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="h-[200px]">
+              {analytics.eventTypeBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={analytics.eventTypeBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      dataKey="count"
+                    >
+                      {analytics.eventTypeBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(217 33% 17%)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px",
+                        color: "white"
+                      }}
+                      formatter={(value: number, name: string) => [`${value} events`, name]}
+                    />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      wrapperStyle={{ fontSize: '11px' }}
+                    />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No event type data
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Timeline Chart */}
@@ -430,6 +880,7 @@ export default function Timeline() {
         onClose={() => setSelectedEvent(null)}
         event={selectedEvent?.event || null}
         weekDate={selectedEvent?.weekDate || ''}
+        weekDates={data?.weekDates || []}
         onSave={handleEventSave}
         onDelete={handleEventDelete}
         isLoading={createEventMutation.isPending || updateEventMutation.isPending || deleteEventMutation.isPending}

@@ -24,7 +24,8 @@ interface EventModalProps {
   onClose: () => void;
   event: TimelineEvent | null;
   weekDate: string;
-  onSave: (data: { label: string; color: string }) => void;
+  weekDates: string[];
+  onSave: (data: { label: string; color: string; startDate: string; endDate: string }) => void;
   onDelete: () => void;
   isLoading?: boolean;
 }
@@ -59,10 +60,8 @@ function formatDateForDisplay(dateStr: string): string {
   if (!dateStr) return '';
   const date = new Date(dateStr + 'T00:00:00');
   return date.toLocaleDateString('en-US', {
-    weekday: 'short',
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
   });
 }
 
@@ -71,6 +70,7 @@ export function EventModal({
   onClose,
   event,
   weekDate,
+  weekDates,
   onSave,
   onDelete,
   isLoading,
@@ -78,6 +78,8 @@ export function EventModal({
   const [label, setLabel] = useState('');
   const [color, setColor] = useState('#d1d5db');
   const [presetValue, setPresetValue] = useState('Custom');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Reset form when modal opens
   useEffect(() => {
@@ -85,6 +87,8 @@ export function EventModal({
       if (event) {
         setLabel(event.label || '');
         setColor(event.color || '#d1d5db');
+        setStartDate(event.startDate);
+        setEndDate(event.endDate);
         // Try to match preset
         const preset = EVENT_PRESETS.find(p => p.label === event.label);
         setPresetValue(preset ? preset.label : 'Custom');
@@ -92,9 +96,11 @@ export function EventModal({
         setLabel('');
         setColor('#d1d5db');
         setPresetValue('Custom');
+        setStartDate(weekDate);
+        setEndDate(weekDate);
       }
     }
-  }, [isOpen, event]);
+  }, [isOpen, event, weekDate]);
 
   const handlePresetChange = (value: string) => {
     setPresetValue(value);
@@ -107,10 +113,19 @@ export function EventModal({
 
   const handleSave = () => {
     if (!label.trim()) return;
-    onSave({ label: label.trim(), color });
+    onSave({
+      label: label.trim(),
+      color,
+      startDate,
+      endDate: endDate || startDate,
+    });
   };
 
+  // Get available dates for dropdowns (filter based on selection)
+  const availableEndDates = weekDates.filter(d => d >= startDate);
+
   const isEditing = !!event;
+  const isMultiWeek = startDate !== endDate;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -119,12 +134,53 @@ export function EventModal({
           <DialogTitle className="text-white">
             {isEditing ? 'Edit Event' : 'Add Event'}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Week of {formatDateForDisplay(weekDate)}
-          </p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Week</Label>
+              <Select value={startDate} onValueChange={(v) => {
+                setStartDate(v);
+                // Reset end date if it's before the new start date
+                if (endDate < v) setEndDate(v);
+              }}>
+                <SelectTrigger className="bg-white/5 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {weekDates.map((date) => (
+                    <SelectItem key={date} value={date}>
+                      {formatDateForDisplay(date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>End Week</Label>
+              <Select value={endDate} onValueChange={setEndDate}>
+                <SelectTrigger className="bg-white/5 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEndDates.map((date) => (
+                    <SelectItem key={date} value={date}>
+                      {formatDateForDisplay(date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {isMultiWeek && (
+            <p className="text-xs text-muted-foreground">
+              This event spans {weekDates.indexOf(endDate) - weekDates.indexOf(startDate) + 1} weeks
+            </p>
+          )}
+
           {/* Preset selector */}
           <div className="space-y-2">
             <Label htmlFor="preset">Event Type</Label>

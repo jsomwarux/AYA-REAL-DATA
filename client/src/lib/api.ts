@@ -177,7 +177,8 @@ export interface TimelineTask {
 export interface TimelineEvent {
   id: number;
   taskId: number;
-  weekDate: string;
+  startDate: string;
+  endDate: string;
   label: string | null;
   color: string | null;
   createdAt: string;
@@ -244,7 +245,7 @@ export async function deleteTimelineTask(id: number): Promise<{ success: boolean
 }
 
 // Create new event
-export async function createTimelineEvent(data: { taskId: number; weekDate: string; label?: string; color?: string }): Promise<TimelineEvent> {
+export async function createTimelineEvent(data: { taskId: number; startDate: string; endDate?: string; label?: string; color?: string }): Promise<TimelineEvent> {
   const response = await fetch(`${TIMELINE_BASE}/events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -254,7 +255,7 @@ export async function createTimelineEvent(data: { taskId: number; weekDate: stri
 }
 
 // Update event
-export async function updateTimelineEvent(id: number, data: { weekDate?: string; label?: string; color?: string }): Promise<TimelineEvent> {
+export async function updateTimelineEvent(id: number, data: { startDate?: string; endDate?: string; label?: string; color?: string }): Promise<TimelineEvent> {
   const response = await fetch(`${TIMELINE_BASE}/events/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
