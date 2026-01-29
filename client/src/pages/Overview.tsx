@@ -221,8 +221,17 @@ export default function Overview() {
   const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   // Active events (happening now)
+  // Event dates represent week columns — an event with endDate '2026-01-23' covers the week of Jan 23–29.
+  // So we add 6 days to endDate for a more accurate "active" check.
   const activeEvents = (timelineData?.events || [])
-    .filter(e => e.startDate <= nowStr && e.endDate >= nowStr);
+    .filter(e => {
+      if (e.startDate > nowStr) return false;
+      // Extend endDate by 6 days since it represents start-of-week
+      const endDateObj = new Date(e.endDate + 'T00:00:00');
+      endDateObj.setDate(endDateObj.getDate() + 6);
+      const endDateExtStr = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+      return endDateExtStr >= nowStr;
+    });
 
   // Events this week (Sun–Sat)
   const dayOfWeek = now.getDay();
@@ -248,8 +257,14 @@ export default function Overview() {
   const upcomingMilestones = Object.values(upcomingByCategory).slice(0, 5);
 
   // Overall timeline progress
+  // Account for week-based dates: endDate + 6 days = actual end of that week
   const allEvents = timelineData?.events || [];
-  const completedEvents = allEvents.filter(e => e.endDate < nowStr).length;
+  const completedEvents = allEvents.filter(e => {
+    const endDateObj = new Date(e.endDate + 'T00:00:00');
+    endDateObj.setDate(endDateObj.getDate() + 6);
+    const endDateExtStr = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+    return endDateExtStr < nowStr;
+  }).length;
   const timelineProgressPercent = allEvents.length > 0 ? Math.round((completedEvents / allEvents.length) * 100) : 0;
 
   const handleTaskClick = (task: typeof tasksNeedingAttention[0]) => {
