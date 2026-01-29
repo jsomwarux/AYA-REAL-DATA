@@ -114,6 +114,7 @@ export default function Timeline() {
   const [selectedTask, setSelectedTask] = useState<TimelineTask | null>(null);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null);
 
   const timelineQuery = useQuery({
     queryKey: ["timeline"],
@@ -225,7 +226,7 @@ export default function Timeline() {
         totalCategories: 0,
         timespan: '',
         completedEvents: 0,
-        activeEvents: 0,
+        thisWeekEvents: 0,
         upcomingEvents: 0,
         progressPercent: 0,
         isProjectComplete: false,
@@ -246,9 +247,16 @@ export default function Timeline() {
     const lastDate = new Date(data.weekDates[data.weekDates.length - 1] + 'T00:00:00');
     const isProjectComplete = now > lastDate;
 
+    // Calculate current week boundaries (Sun to Sat)
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
     // Calculate event timing stats
     let completedEvents = 0;
-    let activeEvents = 0;
+    let thisWeekEvents = 0;
     let upcomingEvents = 0;
     const eventTypeCounts: Record<string, { count: number; color: string }> = {};
 
@@ -260,9 +268,11 @@ export default function Timeline() {
         completedEvents++;
       } else if (startDate > now) {
         upcomingEvents++;
-      } else {
-        // Event is currently active (startDate <= now <= endDate)
-        activeEvents++;
+      }
+
+      // Check if event overlaps with this week (start before week ends AND end on or after week starts)
+      if (startDate < endOfWeek && endDate >= startOfWeek) {
+        thisWeekEvents++;
       }
 
       // Track event types
@@ -431,7 +441,7 @@ export default function Timeline() {
       totalCategories: categories.length,
       timespan,
       completedEvents,
-      activeEvents,
+      thisWeekEvents,
       upcomingEvents,
       progressPercent,
       isProjectComplete,
@@ -584,9 +594,9 @@ export default function Timeline() {
           accentColor="teal"
         />
         <StatCard
-          title="Active"
-          value={analytics.activeEvents.toString()}
-          change="In progress now"
+          title="This Week"
+          value={analytics.thisWeekEvents.toString()}
+          change="Events this week"
           changeType="neutral"
           icon={<PlayCircle className="h-5 w-5" />}
           accentColor="amber"
@@ -650,7 +660,7 @@ export default function Timeline() {
                 {analytics.categoryBreakdown.slice(0, 6).map((cat, index) => (
                   <div key={cat.name} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground truncate max-w-[150px]">{cat.name}</span>
+                      <span className="text-muted-foreground truncate max-w-[150px]" title={cat.name}>{cat.name}</span>
                       <span className="text-white font-medium">{cat.events} events</span>
                     </div>
                     <div className="h-2 bg-white/10 rounded-full overflow-hidden">
@@ -682,25 +692,54 @@ export default function Timeline() {
           <CardContent className="pt-4">
             {analytics.upcomingMilestones.length > 0 ? (
               <div className="space-y-3">
-                {analytics.upcomingMilestones.map((milestone, index) => (
-                  <div key={index} className="flex items-start gap-3 p-2 rounded-lg bg-white/5">
+                {analytics.upcomingMilestones.map((milestone, index) => {
+                  const milestoneKey = `upcoming-${index}`;
+                  const isExpanded = expandedMilestone === milestoneKey;
+                  return (
                     <div
-                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                      style={{ backgroundColor: milestone.event.color || '#d1d5db' }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{milestone.task}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {milestone.event.label}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {milestone.dateLabel}
-                        </span>
+                      key={index}
+                      className="rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                      onClick={() => setExpandedMilestone(isExpanded ? null : milestoneKey)}
+                    >
+                      <div className="flex items-start gap-3 p-2">
+                        <div
+                          className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                          style={{ backgroundColor: milestone.event.color || '#d1d5db' }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm text-white ${isExpanded ? '' : 'truncate'}`}>{milestone.task}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {milestone.event.label}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {milestone.dateLabel}
+                            </span>
+                          </div>
+                        </div>
                       </div>
+                      {isExpanded && (
+                        <div className="px-7 pb-3 pt-1 space-y-1.5 border-t border-white/5 mt-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">Category:</span>
+                            <span className="text-[11px] text-white">{milestone.category}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">Date Range:</span>
+                            <span className="text-[11px] text-white">
+                              {formatDateLong(milestone.event.startDate)}
+                              {milestone.event.startDate !== milestone.event.endDate && ` — ${formatDateLong(milestone.event.endDate)}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">Task:</span>
+                            <span className="text-[11px] text-white">{milestone.task}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
@@ -721,25 +760,54 @@ export default function Timeline() {
           <CardContent className="pt-4">
             {analytics.recentMilestones.length > 0 ? (
               <div className="space-y-3">
-                {analytics.recentMilestones.map((milestone, index) => (
-                  <div key={index} className="flex items-start gap-3 p-2 rounded-lg bg-white/5">
+                {analytics.recentMilestones.map((milestone, index) => {
+                  const milestoneKey = `recent-${index}`;
+                  const isExpanded = expandedMilestone === milestoneKey;
+                  return (
                     <div
-                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                      style={{ backgroundColor: milestone.event.color || '#d1d5db' }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{milestone.task}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {milestone.event.label}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {milestone.dateLabel}
-                        </span>
+                      key={index}
+                      className="rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                      onClick={() => setExpandedMilestone(isExpanded ? null : milestoneKey)}
+                    >
+                      <div className="flex items-start gap-3 p-2">
+                        <div
+                          className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                          style={{ backgroundColor: milestone.event.color || '#d1d5db' }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm text-white ${isExpanded ? '' : 'truncate'}`}>{milestone.task}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {milestone.event.label}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {milestone.dateLabel}
+                            </span>
+                          </div>
+                        </div>
                       </div>
+                      {isExpanded && (
+                        <div className="px-7 pb-3 pt-1 space-y-1.5 border-t border-white/5 mt-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">Category:</span>
+                            <span className="text-[11px] text-white">{milestone.category}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">Date Range:</span>
+                            <span className="text-[11px] text-white">
+                              {formatDateLong(milestone.event.startDate)}
+                              {milestone.event.startDate !== milestone.event.endDate && ` — ${formatDateLong(milestone.event.endDate)}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground">Task:</span>
+                            <span className="text-[11px] text-white">{milestone.task}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
