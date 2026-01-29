@@ -240,6 +240,13 @@ export default function Timeline() {
     now.setHours(0, 0, 0, 0);
     const categories = Object.keys(data.categories || {});
 
+    // Calculate current week boundaries
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
     // Calculate event timing stats
     let completedEvents = 0;
     let upcomingEvents = 0;
@@ -256,7 +263,9 @@ export default function Timeline() {
         upcomingEvents++;
       }
 
-      if (isCurrentWeek(event.startDate) || isCurrentWeek(event.endDate)) {
+      // Check if the event's date range overlaps with the current week
+      // (event starts before end of week AND event ends on or after start of week)
+      if (startDate < endOfWeek && endDate >= startOfWeek) {
         currentWeekEvents++;
       }
 

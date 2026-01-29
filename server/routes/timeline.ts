@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { timelineTasks, timelineEvents } from '@shared/schema';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, min, max } from 'drizzle-orm';
 import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
 
 const router = Router();
@@ -28,6 +28,43 @@ const WEEK_DATES = [
   '2025-05-01', '2025-05-08',
 ];
 
+// Helper to generate weekly dates between two dates (Thursdays, matching original pattern)
+function generateWeekDates(startDateStr: string, endDateStr: string): string[] {
+  const dates: string[] = [];
+  const start = new Date(startDateStr + 'T00:00:00');
+  const end = new Date(endDateStr + 'T00:00:00');
+
+  // Find the first Thursday on or before the start date
+  const current = new Date(start);
+  const dayOfWeek = current.getDay();
+  // Adjust to previous Thursday (day 4)
+  const daysToThursday = (dayOfWeek >= 4) ? (dayOfWeek - 4) : (dayOfWeek + 3);
+  current.setDate(current.getDate() - daysToThursday);
+
+  while (current <= end) {
+    const year = current.getFullYear();
+    const month = String(current.getMonth() + 1).padStart(2, '0');
+    const day = String(current.getDate()).padStart(2, '0');
+    dates.push(`${year}-${month}-${day}`);
+    current.setDate(current.getDate() + 7);
+  }
+
+  // Ensure the end date's week is included
+  if (dates.length > 0) {
+    const lastDate = dates[dates.length - 1];
+    if (lastDate < endDateStr) {
+      const next = new Date(lastDate + 'T00:00:00');
+      next.setDate(next.getDate() + 7);
+      const year = next.getFullYear();
+      const month = String(next.getMonth() + 1).padStart(2, '0');
+      const day = String(next.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+    }
+  }
+
+  return dates;
+}
+
 // GET /api/timeline - Get all timeline data (tasks + events)
 router.get('/', async (req, res) => {
   try {
@@ -42,6 +79,22 @@ router.get('/', async (req, res) => {
       .select()
       .from(timelineEvents)
       .orderBy(asc(timelineEvents.startDate));
+
+    // Derive week dates from actual event data instead of using hardcoded dates
+    let weekDates: string[] = WEEK_DATES; // fallback
+    if (events.length > 0) {
+      // Find min startDate and max endDate from all events
+      const dateRange = await db
+        .select({
+          minDate: min(timelineEvents.startDate),
+          maxDate: max(timelineEvents.endDate),
+        })
+        .from(timelineEvents);
+
+      if (dateRange[0]?.minDate && dateRange[0]?.maxDate) {
+        weekDates = generateWeekDates(dateRange[0].minDate, dateRange[0].maxDate);
+      }
+    }
 
     // Group events by taskId
     const eventsByTask: Record<number, typeof events> = {};
@@ -66,7 +119,7 @@ router.get('/', async (req, res) => {
       events,
       eventsByTask,
       categories,
-      weekDates: WEEK_DATES,
+      weekDates,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {
