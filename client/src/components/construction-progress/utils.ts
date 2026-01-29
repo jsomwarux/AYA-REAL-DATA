@@ -175,7 +175,7 @@ export function isFieldComplete(
 }
 
 // Get a field value from a room, trying multiple possible key formats
-function getFieldValue(room: RoomProgress, fieldName: string): any {
+export function getFieldValue(room: RoomProgress, fieldName: string): any {
   // Try exact match first
   if (room[fieldName] !== undefined) {
     return room[fieldName];
