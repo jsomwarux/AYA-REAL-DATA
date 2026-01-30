@@ -5,7 +5,7 @@ import { RoomProgress } from "@/lib/api";
 export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: string[]; naValues: string[] }> = {
   'Bathroom_Demo Status': {
     type: 'dropdown',
-    completeValues: ['DEMO DONE', 'Approved Demo'],
+    completeValues: ['DEMO DONE'],
     naValues: []
   },
   'Bathroom_Electrical Wiring': {
@@ -35,8 +35,8 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
   },
   'Bathroom_Repair Door Opening': {
     type: 'dropdown',
-    completeValues: ['Completed'],
-    naValues: ['Keep Existing', 'External Door']
+    completeValues: ['Completed', 'Keep Existing', 'External Door'],
+    naValues: []
   },
   'Bathroom_New Wall Grout': {
     type: 'checkbox',
@@ -50,8 +50,8 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
   },
   'Bathroom_Soap Niche Built': {
     type: 'dropdown',
-    completeValues: ['Done'],
-    naValues: ['Not required', 'Not Required']
+    completeValues: ['Done', 'Not required', 'Not Required'],
+    naValues: []
   },
   'Bathroom_Tile %': {
     type: 'percentage',
@@ -60,8 +60,8 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
   },
   'Bathroom_Linear Drain Installed': {
     type: 'dropdown',
-    completeValues: ['Done'],
-    naValues: ['Not required', 'Not Required']
+    completeValues: ['Done', 'Not required', 'Not Required'],
+    naValues: []
   },
 };
 
