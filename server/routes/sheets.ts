@@ -371,10 +371,11 @@ router.get('/construction-progress', async (req, res) => {
           if (header && header.trim() !== '') {
             // Handle checkbox values (TRUE/FALSE from Google Sheets)
             // Google Sheets API returns checkbox values as strings "TRUE" or "FALSE"
-            const strValue = String(value);
-            if (strValue === 'TRUE') {
+            // Also handle "1"/"0" which some sheet configurations use for checkboxes
+            const strValue = String(value).trim();
+            if (strValue === 'TRUE' || strValue === '1') {
               obj[header.trim()] = true;
-            } else if (strValue === 'FALSE') {
+            } else if (strValue === 'FALSE' || strValue === '0') {
               obj[header.trim()] = false;
             } else if (value !== undefined && value !== '') {
               // Try to parse numbers, but keep percentages as strings
@@ -396,6 +397,35 @@ router.get('/construction-progress', async (req, res) => {
         const roomNum = row['ROOM #'] || row['Room #'] || row['ROOM'] || row['room'];
         return roomNum !== null && roomNum !== undefined && roomNum !== '';
       });
+
+      // Deduplicate rooms by ROOM # — keep the last occurrence (most recent data)
+      const beforeDedup = processedRooms.length;
+      const roomMap = new Map<string, GoogleSheetRow>();
+      for (const room of processedRooms) {
+        const roomNum = String(room['ROOM #'] || room['Room #'] || room['ROOM'] || room['room']);
+        roomMap.set(roomNum, room);
+      }
+      processedRooms = Array.from(roomMap.values());
+      const afterDedup = processedRooms.length;
+      if (beforeDedup !== afterDedup) {
+        console.log(`[construction-progress] Deduplicated rooms: ${beforeDedup} → ${afterDedup} (removed ${beforeDedup - afterDedup} duplicates)`);
+      }
+
+      // Log field completion counts for debugging data accuracy
+      const checkboxFields = roomHeaders.filter(h => h.includes('Bathroom_') || h.includes('Bedroom_'));
+      for (const field of checkboxFields) {
+        let trueCount = 0, falseCount = 0, nullCount = 0, otherCount = 0;
+        for (const room of processedRooms) {
+          const val = room[field];
+          if (val === true) trueCount++;
+          else if (val === false) falseCount++;
+          else if (val === null || val === undefined) nullCount++;
+          else otherCount++;
+        }
+        if (otherCount > 0 || trueCount + falseCount + nullCount !== processedRooms.length) {
+          console.log(`[construction-progress] Field "${field}": true=${trueCount}, false=${falseCount}, null=${nullCount}, other=${otherCount} (total rooms: ${processedRooms.length})`);
+        }
+      }
     }
 
     // Process RECAP data
@@ -426,6 +456,8 @@ router.get('/construction-progress', async (req, res) => {
         return hasData;
       });
     }
+
+    console.log(`[construction-progress] Returning ${processedRooms.length} unique rooms`);
 
     // Add timestamps to rooms data
     const roomsWithTimestamp = await addTimestampsToRows(processedRooms, 'construction-progress');

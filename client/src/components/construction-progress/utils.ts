@@ -151,8 +151,8 @@ export function isFieldComplete(
 
   // Check for completion based on field type
   if (fieldConfig.type === 'checkbox') {
-    // Checkboxes come as boolean true/false or string "TRUE"/"FALSE"
-    return value === true || strValue.toUpperCase() === 'TRUE';
+    // Checkboxes come as boolean true/false, string "TRUE"/"FALSE", or numeric 1/0
+    return value === true || value === 1 || strValue.toUpperCase() === 'TRUE' || strValue === '1';
   }
 
   if (fieldConfig.type === 'percentage') {
@@ -403,7 +403,7 @@ export function formatFieldValue(value: any, fieldType: string): string {
     return 'Not started';
   }
   if (fieldType === 'checkbox') {
-    return value === true || String(value).toUpperCase() === 'TRUE' ? 'Complete' : 'Not started';
+    return value === true || value === 1 || String(value).toUpperCase() === 'TRUE' || String(value) === '1' ? 'Complete' : 'Not started';
   }
   // Check if value should be displayed as "Not started"
   const strValue = String(value).toLowerCase().trim();
