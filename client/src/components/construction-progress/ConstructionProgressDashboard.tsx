@@ -1,21 +1,24 @@
 import { useState } from "react";
-import { RoomProgress } from "@/lib/api";
+import { RoomProgress, RecapSection } from "@/lib/api";
 import { ProgressStatsCards } from "./ProgressStatsCards";
 import { TaskProgressBars } from "./TaskProgressBars";
 import { FloorOverview } from "./FloorOverview";
 import { FloorDetailView } from "./FloorDetailView";
 import { RoomsTable } from "./RoomsTable";
 import { RoomDetailModal } from "./RoomDetailModal";
+import { RecapTracker } from "./RecapTracker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building, Layers, TableIcon } from "lucide-react";
+import { Building, Layers, TableIcon, TrendingUp } from "lucide-react";
 
 interface ConstructionProgressDashboardProps {
   rooms: RoomProgress[];
+  recapSections?: RecapSection[];
   isLoading: boolean;
 }
 
 export function ConstructionProgressDashboard({
   rooms,
+  recapSections = [],
   isLoading,
 }: ConstructionProgressDashboardProps) {
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
@@ -94,6 +97,11 @@ export function ConstructionProgressDashboard({
             <span className="hidden sm:inline">Room List</span>
             <span className="sm:hidden">Rooms</span>
           </TabsTrigger>
+          <TabsTrigger value="recap" className="data-[state=active]:bg-white/10 text-xs sm:text-sm">
+            <TrendingUp className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Progress Recap</span>
+            <span className="sm:hidden">Recap</span>
+          </TabsTrigger>
           {selectedFloor !== null && (
             <TabsTrigger value="floor" className="data-[state=active]:bg-white/10 text-xs sm:text-sm">
               <Building className="h-4 w-4 sm:mr-2" />
@@ -120,6 +128,11 @@ export function ConstructionProgressDashboard({
         {/* Table Tab */}
         <TabsContent value="table" className="mt-6">
           <RoomsTable rooms={rooms} onRoomClick={handleRoomClick} />
+        </TabsContent>
+
+        {/* Recap Tab */}
+        <TabsContent value="recap" className="mt-6">
+          <RecapTracker sections={recapSections} />
         </TabsContent>
 
         {/* Floor Detail Tab */}

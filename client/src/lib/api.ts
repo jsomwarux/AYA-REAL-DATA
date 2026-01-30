@@ -88,7 +88,15 @@ export interface RoomProgress {
 }
 
 export interface RecapRow {
+  _section: string;
+  DATE: string;
   [key: string]: string | number | null;
+}
+
+export interface RecapSection {
+  section: string;
+  headers: string[];
+  rows: RecapRow[];
 }
 
 export interface ConstructionProgressData {
@@ -99,7 +107,7 @@ export interface ConstructionProgressData {
   };
   recap: {
     headers: string[];
-    rows: RecapRow[];
+    sections: RecapSection[];
   };
   lastUpdated: string;
 }

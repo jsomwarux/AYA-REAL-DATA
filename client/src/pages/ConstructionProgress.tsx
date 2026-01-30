@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ConstructionProgressDashboard } from "@/components/construction-progress/ConstructionProgressDashboard";
-import { fetchConstructionProgressData, RoomProgress } from "@/lib/api";
+import { fetchConstructionProgressData, RoomProgress, RecapSection } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { AlertCircle } from "lucide-react";
@@ -28,6 +28,7 @@ export default function ConstructionProgress() {
 
   // Transform API data to match RoomProgress structure
   const rooms: RoomProgress[] = data?.rooms?.rows || [];
+  const recapSections: RecapSection[] = data?.recap?.sections || [];
 
   // Get last updated time
   const lastUpdated = data?.lastUpdated
@@ -65,6 +66,7 @@ export default function ConstructionProgress() {
       {/* Dashboard */}
       <ConstructionProgressDashboard
         rooms={rooms}
+        recapSections={recapSections}
         isLoading={isLoading}
       />
     </DashboardLayout>

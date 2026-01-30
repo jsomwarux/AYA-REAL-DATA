@@ -428,33 +428,86 @@ router.get('/construction-progress', async (req, res) => {
       }
     }
 
-    // Process RECAP data
-    let processedRecap: GoogleSheetRow[] = [];
+    // Process RECAP data — supports multiple sections (e.g., BEDROOM, BATHROOM)
+    // Sheet structure: Row 1 = section header (e.g., "BEDROOM"), Row 2 = column headers (DATE, WIRING, ...),
+    // Row 3+ = data. Additional sections may follow with the same pattern.
+    interface RecapSection {
+      section: string;
+      headers: string[];
+      rows: GoogleSheetRow[];
+    }
+    let recapSections: RecapSection[] = [];
     let recapHeaders: string[] = [];
 
     if (recapData && recapData.rawValues && recapData.rawValues.length > 0) {
-      recapHeaders = recapData.rawValues[0] as string[];
-      const recapDataRows = recapData.rawValues.slice(1);
+      const allRows = recapData.rawValues;
+      let currentSection = '';
+      let currentHeaders: string[] = [];
+      let currentDataRows: GoogleSheetRow[] = [];
 
-      processedRecap = recapDataRows.map((row) => {
-        const obj: GoogleSheetRow = {};
-        recapHeaders.forEach((header, index) => {
-          const value = row[index];
-          if (header && header.trim() !== '') {
-            if (value !== undefined && value !== '') {
-              const num = Number(value);
-              obj[header.trim()] = isNaN(num) ? value : num;
-            } else {
-              obj[header.trim()] = null;
-            }
+      for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i] as string[];
+
+        // Detect section header: a row where only the first (or second) cell has a value
+        // and the value looks like a section name (all uppercase, no numbers)
+        const nonEmptyCells = row.filter(c => c && String(c).trim() !== '');
+        const firstCell = (row[0] || '').trim();
+
+        if (nonEmptyCells.length === 1 && firstCell && /^[A-Z\s]+$/.test(firstCell) && firstCell.length > 2) {
+          // Save previous section if exists
+          if (currentSection && currentHeaders.length > 0) {
+            recapSections.push({
+              section: currentSection,
+              headers: currentHeaders,
+              rows: currentDataRows,
+            });
           }
+          currentSection = firstCell;
+          currentHeaders = [];
+          currentDataRows = [];
+          continue;
+        }
+
+        // Detect column header row: contains "DATE" in first column
+        if (firstCell.toUpperCase() === 'DATE' && currentSection) {
+          currentHeaders = row.map(h => (h || '').trim()).filter(h => h !== '');
+          recapHeaders = [...new Set([...recapHeaders, ...currentHeaders])];
+          continue;
+        }
+
+        // Data row: has a date value in column A and belongs to a section
+        if (currentSection && currentHeaders.length > 0 && firstCell) {
+          const obj: GoogleSheetRow = { _section: currentSection };
+          currentHeaders.forEach((header, index) => {
+            const value = row[index];
+            if (header && header.trim() !== '') {
+              if (value !== undefined && value !== null && String(value).trim() !== '') {
+                const strVal = String(value).trim();
+                const num = Number(strVal);
+                obj[header.trim()] = isNaN(num) ? strVal : num;
+              } else {
+                obj[header.trim()] = null;
+              }
+            }
+          });
+          // Only include rows with at least one non-null data value (beyond section and date)
+          const dataValues = Object.entries(obj).filter(([k]) => k !== '_section' && k !== 'DATE');
+          if (dataValues.some(([, v]) => v !== null)) {
+            currentDataRows.push(obj);
+          }
+        }
+      }
+
+      // Save last section
+      if (currentSection && currentHeaders.length > 0) {
+        recapSections.push({
+          section: currentSection,
+          headers: currentHeaders,
+          rows: currentDataRows,
         });
-        return obj;
-      }).filter(row => {
-        // Filter out rows without a date
-        const hasData = Object.values(row).some(v => v !== null && v !== '');
-        return hasData;
-      });
+      }
+
+      console.log(`[construction-progress] RECAP sections found: ${recapSections.map(s => `${s.section} (${s.rows.length} rows)`).join(', ')}`);
     }
 
     console.log(`[construction-progress] Returning ${processedRooms.length} unique rooms`);
@@ -470,7 +523,7 @@ router.get('/construction-progress', async (req, res) => {
       },
       recap: {
         headers: recapHeaders.filter(h => h && h.trim() !== ''),
-        rows: processedRecap,
+        sections: recapSections,
       },
       lastUpdated: new Date().toISOString(),
     });
