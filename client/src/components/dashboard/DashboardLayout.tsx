@@ -1,9 +1,11 @@
 import { ReactNode, useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Sidebar, SidebarProvider, useSidebar } from "./Sidebar";
-import { RefreshCw, Menu, X, Clock } from "lucide-react";
+import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Radar, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useUserRole } from "@/components/PasswordGate";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -12,6 +14,22 @@ interface DashboardLayoutProps {
   onRefresh?: () => void;
   isLoading?: boolean;
 }
+
+interface MobileNavItem {
+  title: string;
+  href: string;
+  icon: ReactNode;
+  iconColor: string;
+  managementOnly?: boolean;
+}
+
+const mobileNavItems: MobileNavItem[] = [
+  { title: "Overview", href: "/", icon: <LayoutDashboard className="h-5 w-5" />, iconColor: "text-teal-400" },
+  { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400" },
+  { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true },
+  { title: "Timeline", href: "/timeline", icon: <Calendar className="h-5 w-5" />, iconColor: "text-amber-400", managementOnly: true },
+  { title: "Deal Intelligence", href: "/deals", icon: <Radar className="h-5 w-5" />, iconColor: "text-purple-400", managementOnly: true },
+];
 
 function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutProps, 'children'>) {
   const [lastSync, setLastSync] = useState<Date>(new Date());
@@ -47,22 +65,22 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-30 flex h-14 sm:h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       {/* Mobile menu button */}
-      <div className="flex items-center gap-4 lg:hidden">
+      <div className="flex items-center gap-3 lg:hidden">
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="lg:hidden">
+            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 bg-background border-white/10">
+          <SheetContent side="left" className="w-72 p-0 bg-background border-white/10">
             <MobileSidebar onClose={() => setMobileMenuOpen(false)} />
           </SheetContent>
         </Sheet>
       </div>
 
-      {/* Title section */}
+      {/* Title section - desktop */}
       <div className="hidden lg:block">
         <h1 className="text-xl font-semibold text-white">{title}</h1>
         {subtitle && (
@@ -71,12 +89,12 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
       </div>
 
       {/* Mobile title */}
-      <div className="lg:hidden">
-        <h1 className="text-lg font-semibold text-white">{title}</h1>
+      <div className="lg:hidden flex-1 min-w-0 mx-2">
+        <h1 className="text-base sm:text-lg font-semibold text-white truncate">{title}</h1>
       </div>
 
       {/* Right side actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         {/* Last sync indicator */}
         <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
@@ -93,6 +111,14 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
           </div>
         </div>
 
+        {/* Mobile sync dot */}
+        <div className="md:hidden flex items-center">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-400"></span>
+          </span>
+        </div>
+
         {/* Refresh button */}
         {onRefresh && (
           <Button
@@ -100,10 +126,10 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
             size="sm"
             onClick={handleRefresh}
             disabled={isLoading}
-            className="border-white/10 bg-white/5 hover:bg-white/10 text-white focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 focus:ring-offset-background group"
+            className="border-white/10 bg-white/5 hover:bg-white/10 text-white focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 focus:ring-offset-background group h-8 sm:h-9 px-2 sm:px-3"
           >
             <RefreshCw className={cn(
-              "h-4 w-4 mr-2 transition-transform duration-500",
+              "h-4 w-4 sm:mr-2 transition-transform duration-500",
               isLoading && "animate-spin",
               !isLoading && "group-hover:rotate-180"
             )} />
@@ -117,10 +143,16 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
 }
 
 function MobileSidebar({ onClose }: { onClose: () => void }) {
+  const [location] = useLocation();
+  const role = useUserRole();
+  const visibleItems = role === "management"
+    ? mobileNavItems
+    : mobileNavItems.filter(item => !item.managementOnly);
+
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between border-b border-white/10 px-6">
+      <div className="flex h-14 items-center justify-between border-b border-white/10 px-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-teal">
             <span className="text-lg font-bold text-white">A</span>
@@ -132,15 +164,43 @@ function MobileSidebar({ onClose }: { onClose: () => void }) {
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9">
           <X className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Navigation placeholder - will be rendered by Sidebar */}
-      <div className="flex-1 p-4">
-        <p className="text-xs text-muted-foreground">Use desktop for full navigation</p>
-      </div>
+      {/* Navigation */}
+      <nav className="flex flex-col gap-1 p-3 flex-1">
+        <div className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground px-3">
+          Main
+        </div>
+        {visibleItems.map((item) => {
+          const isActive = location === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-white/10 text-white"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <span className={cn(isActive ? item.iconColor : "text-current", "transition-colors")}>
+                {item.icon}
+              </span>
+              <span className="flex-1">{item.title}</span>
+              {item.managementOnly && (
+                <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                  <Lock className="h-2.5 w-2.5" />
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
@@ -174,7 +234,7 @@ function DashboardContent({
         />
 
         {/* Page Content */}
-        <main className="p-4 md:p-6 animate-fade-in">
+        <main className="p-3 sm:p-4 md:p-6 animate-fade-in">
           {children}
         </main>
       </div>

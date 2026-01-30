@@ -647,7 +647,7 @@ export default function Timeline() {
       </div>
 
       {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Total Tasks"
           value={analytics.totalTasks.toString()}
@@ -724,7 +724,7 @@ export default function Timeline() {
       )}
 
       {/* Charts and Milestones Row */}
-      <div className="grid gap-6 lg:grid-cols-3 mb-8">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">
         {/* Category Breakdown */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10 pb-3">
@@ -898,7 +898,7 @@ export default function Timeline() {
       </div>
 
       {/* Weekly Activity Chart and Event Types */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-6 sm:mb-8">
         {/* Weekly Activity Chart */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10 pb-3">
@@ -908,7 +908,7 @@ export default function Timeline() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="h-[200px]">
+            <div className="h-[160px] sm:h-[200px]">
               {analytics.weeklyActivity.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analytics.weeklyActivity}>
@@ -953,7 +953,7 @@ export default function Timeline() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="h-[200px]">
+            <div className="h-[160px] sm:h-[200px]">
               {analytics.eventTypeBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>

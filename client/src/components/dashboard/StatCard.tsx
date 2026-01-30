@@ -48,11 +48,11 @@ export function StatCard({
         accentColors[accentColor]
       )} />
 
-      <CardContent className="relative p-6">
+      <CardContent className="relative p-4 sm:p-6">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-3xl font-semibold tracking-tight text-white">{value}</p>
+          <div className="space-y-1 sm:space-y-2 min-w-0 flex-1 mr-3">
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-white truncate">{value}</p>
             {change && (
               <p className={cn(
                 "text-xs font-medium",

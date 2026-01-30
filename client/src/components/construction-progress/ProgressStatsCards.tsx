@@ -89,22 +89,22 @@ export function ProgressStatsCards({ rooms }: ProgressStatsCardsProps) {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, index) => (
         <Card
           key={index}
           className={`border-white/10 bg-gradient-to-br ${stat.bgGradient} overflow-hidden relative`}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className={`text-3xl font-bold ${getCompletionColor(stat.progress || 100)}`}>
+              <div className="space-y-1 min-w-0 flex-1 mr-2">
+                <p className="text-xs sm:text-sm text-muted-foreground">{stat.title}</p>
+                <p className={`text-2xl sm:text-3xl font-bold ${getCompletionColor(stat.progress || 100)}`}>
                   {stat.value}
                 </p>
-                <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{stat.subtitle}</p>
               </div>
-              <div className={`p-2 rounded-lg bg-white/5 ${stat.iconColor}`}>
+              <div className={`p-1.5 sm:p-2 rounded-lg bg-white/5 ${stat.iconColor} flex-shrink-0`}>
                 {stat.icon}
               </div>
             </div>

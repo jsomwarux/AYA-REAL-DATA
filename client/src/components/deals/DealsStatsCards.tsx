@@ -70,12 +70,12 @@ function StatCard({ icon, label, value, subtext, accentColor, highlight }: StatC
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent animate-pulse" />
       )}
 
-      <CardContent className="relative p-6">
+      <CardContent className="relative p-4 sm:p-6">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className="space-y-1 sm:space-y-2 min-w-0 flex-1 mr-2">
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground">{label}</p>
             <p className={cn(
-              "text-3xl font-semibold tracking-tight",
+              "text-2xl sm:text-3xl font-semibold tracking-tight",
               highlight ? colors.text : "text-white"
             )}>
               {value}
@@ -118,7 +118,7 @@ export function DealsStatsCards({ data }: DealsStatsCardsProps) {
   ).length;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={<Building2 className="h-5 w-5" />}
         label="Properties Analyzed"

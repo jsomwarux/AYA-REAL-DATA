@@ -137,13 +137,13 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
 
   return (
     <Card className="border-white/10">
-      <CardHeader className="border-b border-white/10 pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <CardTitle className="flex items-center gap-2 text-white">
+      <CardHeader className="border-b border-white/10 pb-4 px-3 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <CardTitle className="flex items-center gap-2 text-white text-base sm:text-lg">
             <TableIcon className="h-5 w-5 text-teal-400" />
             Room Details
-            <span className="text-sm font-normal text-muted-foreground ml-2">
-              ({processedRooms.length} rooms)
+            <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1 sm:ml-2">
+              ({processedRooms.length})
             </span>
           </CardTitle>
 
@@ -157,13 +157,13 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
                 setSearch(e.target.value);
                 handleFilterChange();
               }}
-              className="pl-9 w-full sm:w-[200px] bg-white/5 border-white/10"
+              className="pl-9 w-full sm:w-[200px] bg-white/5 border-white/10 h-9"
             />
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mt-4">
+        <div className="flex flex-wrap gap-2 sm:gap-3 mt-3 sm:mt-4">
           <Select
             value={floorFilter}
             onValueChange={(v) => {
@@ -171,7 +171,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
               handleFilterChange();
             }}
           >
-            <SelectTrigger className="w-[140px] bg-white/5 border-white/10">
+            <SelectTrigger className="w-[120px] sm:w-[140px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
               <SelectValue placeholder="Floor" />
             </SelectTrigger>
             <SelectContent>
@@ -189,7 +189,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
               handleFilterChange();
             }}
           >
-            <SelectTrigger className="w-[160px] bg-white/5 border-white/10">
+            <SelectTrigger className="w-[130px] sm:w-[160px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -206,7 +206,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
             value={sortBy}
             onValueChange={setSortBy}
           >
-            <SelectTrigger className="w-[140px] bg-white/5 border-white/10">
+            <SelectTrigger className="w-[120px] sm:w-[140px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -222,7 +222,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
             variant="outline"
             size="icon"
             onClick={() => setSortOrder(o => o === "asc" ? "desc" : "asc")}
-            className="bg-white/5 border-white/10"
+            className="bg-white/5 border-white/10 h-9 w-9"
           >
             {sortOrder === "asc" ? "↑" : "↓"}
           </Button>
@@ -234,12 +234,12 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="border-white/10 hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Room</TableHead>
-                <TableHead className="text-muted-foreground">Floor</TableHead>
-                <TableHead className="text-muted-foreground">Bathroom</TableHead>
-                <TableHead className="text-muted-foreground">Bedroom</TableHead>
-                <TableHead className="text-muted-foreground">Overall</TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm">Room</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm">Floor</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm hidden sm:table-cell">Bathroom</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm hidden sm:table-cell">Bedroom</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm">Overall</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -249,48 +249,48 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
                   onClick={() => onRoomClick(room)}
                   className="border-white/10 cursor-pointer hover:bg-white/5 transition-colors"
                 >
-                  <TableCell className="font-medium text-white">
+                  <TableCell className="font-medium text-white text-xs sm:text-sm py-2.5 sm:py-4">
                     {room['ROOM #']}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground text-xs sm:text-sm py-2.5 sm:py-4">
                     {floor}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell py-2.5 sm:py-4">
                     <div className="flex items-center gap-2">
                       <Progress
                         value={completion.bathroom.percentage}
                         className="h-2 w-16 bg-white/10"
                       />
-                      <span className={cn("text-sm", getCompletionColor(completion.bathroom.percentage))}>
+                      <span className={cn("text-xs sm:text-sm", getCompletionColor(completion.bathroom.percentage))}>
                         {completion.bathroom.percentage}%
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell py-2.5 sm:py-4">
                     <div className="flex items-center gap-2">
                       <Progress
                         value={completion.bedroom.percentage}
                         className="h-2 w-16 bg-white/10"
                       />
-                      <span className={cn("text-sm", getCompletionColor(completion.bedroom.percentage))}>
+                      <span className={cn("text-xs sm:text-sm", getCompletionColor(completion.bedroom.percentage))}>
                         {completion.bedroom.percentage}%
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
+                  <TableCell className="py-2.5 sm:py-4">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <Progress
                         value={completion.overall.percentage}
-                        className="h-2 w-16 bg-white/10"
+                        className="h-2 w-12 sm:w-16 bg-white/10"
                       />
-                      <span className={cn("text-sm font-medium", getCompletionColor(completion.overall.percentage))}>
+                      <span className={cn("text-xs sm:text-sm font-medium", getCompletionColor(completion.overall.percentage))}>
                         {completion.overall.percentage}%
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-2.5 sm:py-4">
                     <span className={cn(
-                      "px-2 py-1 rounded text-xs font-medium",
+                      "px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium whitespace-nowrap",
                       completion.overall.percentage === 100 && "bg-green-500/20 text-green-400",
                       completion.overall.percentage > 0 && completion.overall.percentage < 100 && "bg-amber-500/20 text-amber-400",
                       completion.overall.percentage === 0 && "bg-gray-500/20 text-gray-400"
@@ -310,19 +310,17 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
-            <p className="text-sm text-muted-foreground">
-              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
-              {Math.min(currentPage * ITEMS_PER_PAGE, processedRooms.length)} of{" "}
-              {processedRooms.length} rooms
+          <div className="flex flex-col sm:flex-row items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-t border-white/10 gap-3">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, processedRooms.length)} of {processedRooms.length}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="h-8 w-8 bg-white/5 border-white/10"
+                className="h-9 w-9 bg-white/5 border-white/10"
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
@@ -331,19 +329,19 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
                 size="icon"
                 onClick={() => setCurrentPage(p => p - 1)}
                 disabled={currentPage === 1}
-                className="h-8 w-8 bg-white/5 border-white/10"
+                className="h-9 w-9 bg-white/5 border-white/10"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-muted-foreground px-2">
-                Page {currentPage} of {totalPages}
+              <span className="text-xs sm:text-sm text-muted-foreground px-1.5 sm:px-2">
+                {currentPage}/{totalPages}
               </span>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => setCurrentPage(p => p + 1)}
                 disabled={currentPage === totalPages}
-                className="h-8 w-8 bg-white/5 border-white/10"
+                className="h-9 w-9 bg-white/5 border-white/10"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -352,7 +350,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
                 size="icon"
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="h-8 w-8 bg-white/5 border-white/10"
+                className="h-9 w-9 bg-white/5 border-white/10"
               >
                 <ChevronsRight className="h-4 w-4" />
               </Button>

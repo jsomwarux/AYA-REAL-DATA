@@ -42,15 +42,15 @@ export function ConstructionProgressDashboard({
     return (
       <div className="space-y-6">
         {/* Loading skeleton */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <div
               key={i}
-              className="h-32 rounded-lg bg-white/5 animate-pulse"
+              className="h-28 sm:h-32 rounded-lg bg-white/5 animate-pulse"
             />
           ))}
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <div className="h-96 rounded-lg bg-white/5 animate-pulse" />
           <div className="h-96 rounded-lg bg-white/5 animate-pulse" />
         </div>
@@ -78,23 +78,26 @@ export function ConstructionProgressDashboard({
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-white/5 border border-white/10">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-white/10">
-            <Layers className="h-4 w-4 mr-2" />
-            Floor Overview
+        <TabsList className="bg-white/5 border border-white/10 w-full overflow-x-auto flex-nowrap justify-start sm:justify-center">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-white/10 text-xs sm:text-sm">
+            <Layers className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Floor Overview</span>
+            <span className="sm:hidden">Floors</span>
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="data-[state=active]:bg-white/10">
-            <Building className="h-4 w-4 mr-2" />
-            Task Breakdown
+          <TabsTrigger value="tasks" className="data-[state=active]:bg-white/10 text-xs sm:text-sm">
+            <Building className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Task Breakdown</span>
+            <span className="sm:hidden">Tasks</span>
           </TabsTrigger>
-          <TabsTrigger value="table" className="data-[state=active]:bg-white/10">
-            <TableIcon className="h-4 w-4 mr-2" />
-            Room List
+          <TabsTrigger value="table" className="data-[state=active]:bg-white/10 text-xs sm:text-sm">
+            <TableIcon className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Room List</span>
+            <span className="sm:hidden">Rooms</span>
           </TabsTrigger>
           {selectedFloor !== null && (
-            <TabsTrigger value="floor" className="data-[state=active]:bg-white/10">
-              <Building className="h-4 w-4 mr-2" />
-              Floor {selectedFloor}
+            <TabsTrigger value="floor" className="data-[state=active]:bg-white/10 text-xs sm:text-sm">
+              <Building className="h-4 w-4 sm:mr-2" />
+              F{selectedFloor}
             </TabsTrigger>
           )}
         </TabsList>

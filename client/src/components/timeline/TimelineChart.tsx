@@ -134,7 +134,7 @@ export function TimelineChart({
           {/* Header row with dates */}
           <div className="flex sticky top-0 z-20 bg-background border-b border-white/10">
             {/* Fixed left column for task names */}
-            <div className="sticky left-0 z-30 w-[250px] min-w-[250px] bg-background border-r border-white/10 p-3">
+            <div className="sticky left-0 z-30 w-[180px] sm:w-[250px] min-w-[180px] sm:min-w-[250px] bg-background border-r border-white/10 p-3">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Category / Task
               </span>
@@ -166,7 +166,7 @@ export function TimelineChart({
                   className="flex bg-white/5 border-b border-white/10 cursor-pointer hover:bg-white/10 transition-colors group"
                   onClick={() => onCategoryToggle(category)}
                 >
-                  <div className="sticky left-0 z-10 w-[250px] min-w-[250px] bg-white/5 border-r border-white/10 p-3 flex items-center gap-2">
+                  <div className="sticky left-0 z-10 w-[180px] sm:w-[250px] min-w-[180px] sm:min-w-[250px] bg-white/5 border-r border-white/10 p-3 flex items-center gap-2">
                     {isCollapsed ? (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     ) : (
@@ -222,7 +222,7 @@ export function TimelineChart({
                   <div key={task.id} className="flex border-b border-white/5 hover:bg-white/[0.02] relative">
                     {/* Task name */}
                     <div
-                      className="sticky left-0 z-10 w-[250px] min-w-[250px] bg-background border-r border-white/10 p-3 pl-9 cursor-pointer hover:bg-white/5 transition-colors"
+                      className="sticky left-0 z-10 w-[180px] sm:w-[250px] min-w-[180px] sm:min-w-[250px] bg-background border-r border-white/10 p-3 pl-9 cursor-pointer hover:bg-white/5 transition-colors"
                       onClick={() => onTaskClick(task)}
                     >
                       <span className="text-sm text-muted-foreground truncate block">

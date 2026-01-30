@@ -46,7 +46,7 @@ export function TaskProgressBars({ rooms }: TaskProgressBarsProps) {
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Bathroom Tasks */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10 pb-4">

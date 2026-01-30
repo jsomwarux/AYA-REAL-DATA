@@ -161,7 +161,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
     return (
       <div className="space-y-6 animate-fade-in">
         <StatsCardsSkeleton />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <ChartSkeleton type="bar" />
           <ChartSkeleton type="bar" />
           <ChartSkeleton type="radar" />
@@ -200,7 +200,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 md:grid-cols-3">
               {topDeals.map((deal, index) => (
                 <div
                   key={deal.bbl}
@@ -252,7 +252,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
           <BarChart3 className="h-5 w-5 text-purple-400" />
           <h2 className="text-lg font-semibold text-white">Analytics</h2>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <ScoreDistributionChart
             data={data}
             highlightScore={selectedDeal?.final_score}
@@ -269,7 +269,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
         {/* Search and Quick Filters */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           {/* Search Input */}
-          <div className="relative w-full sm:w-[300px]">
+          <div className="relative w-full sm:w-[250px] md:w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search address, BBL..."

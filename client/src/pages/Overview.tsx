@@ -311,7 +311,7 @@ export default function Overview() {
       )}
 
       {/* ═══ TOP-LEVEL KPI STATS ═══ */}
-      <div className={`mb-8 grid gap-4 md:grid-cols-2 ${isManagement ? 'lg:grid-cols-4' : 'lg:grid-cols-1 max-w-md'}`}>
+      <div className={`mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 ${isManagement ? 'lg:grid-cols-4' : 'lg:grid-cols-1 max-w-md'}`}>
         <StatCard
           title="Construction Progress"
           value={`${overallCompletion}%`}
@@ -351,7 +351,7 @@ export default function Overview() {
       </div>
 
       {/* ═══ 1. CONSTRUCTION COMPLETION + 2. TASKS NEEDING ATTENTION ═══ */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-4 sm:mb-6">
         {/* Construction Completion Summary */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
@@ -468,7 +468,7 @@ export default function Overview() {
       </div>
 
       {/* ═══ 3. BUDGET STATUS + 4. BUDGET BY CATEGORY ═══ */}
-      {isManagement && <div className="grid gap-6 lg:grid-cols-2 mb-6">
+      {isManagement && <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-4 sm:mb-6">
         {/* Budget Status Summary */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
@@ -554,7 +554,7 @@ export default function Overview() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[280px]">
+            <div className="h-[220px] sm:h-[280px]">
               {topCategories.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
@@ -605,7 +605,7 @@ export default function Overview() {
       </div>}
 
       {/* ═══ 5. TIMELINE ACTIVITY + 6. PROGRESS BY FLOOR ═══ */}
-      <div className={`grid gap-6 mb-6 ${isManagement ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+      <div className={`grid gap-4 sm:gap-6 mb-4 sm:mb-6 ${isManagement ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
         {/* Timeline Activity — redesigned (management only) */}
         {isManagement && <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
@@ -691,7 +691,7 @@ export default function Overview() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[280px]">
+            <div className="h-[220px] sm:h-[280px]">
               {floorChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={floorChartData}>
@@ -721,7 +721,7 @@ export default function Overview() {
       </div>
 
       {/* ═══ QUICK NAVIGATION ═══ */}
-      <div className={`grid gap-4 ${isManagement ? 'md:grid-cols-3' : 'md:grid-cols-1 max-w-md'}`}>
+      <div className={`grid gap-3 sm:gap-4 ${isManagement ? 'sm:grid-cols-2 md:grid-cols-3' : 'md:grid-cols-1 max-w-md'}`}>
         <Link href="/construction">
           <Card className="border-white/10 group hover:border-teal-500/30 transition-all cursor-pointer h-full">
             <CardContent className="p-5">

@@ -232,7 +232,7 @@ export default function Budget() {
       isLoading={isLoading}
     >
       {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Total Budget"
           value={formatCurrencyCompact(data?.totals?.totalBudget || 0)}
@@ -276,7 +276,7 @@ export default function Budget() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-6 sm:mb-8">
         {/* Category Breakdown Chart */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
@@ -286,7 +286,7 @@ export default function Budget() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[300px]">
+            <div className="h-[240px] sm:h-[300px]">
               {categoryChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryChartData} layout="vertical">
@@ -301,8 +301,8 @@ export default function Budget() {
                       type="category"
                       dataKey="name"
                       stroke="rgba(255,255,255,0.5)"
-                      fontSize={11}
-                      width={100}
+                      fontSize={10}
+                      width={80}
                     />
                     <Tooltip
                       contentStyle={{
@@ -341,7 +341,7 @@ export default function Budget() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[300px]">
+            <div className="h-[240px] sm:h-[300px]">
               {paidVsRemainingData.length > 0 && data?.totals?.totalBudget ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
@@ -383,7 +383,7 @@ export default function Budget() {
       </div>
 
       {/* Status Breakdown & Vendor Summary Row */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-6 sm:mb-8">
         {/* Status Breakdown */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
@@ -431,7 +431,7 @@ export default function Budget() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+            <div className="space-y-3 max-h-[240px] sm:h-[300px] overflow-y-auto pr-2">
               {displayedVendors.map((vendor, index) => (
                 <div
                   key={vendor.name}
@@ -441,7 +441,7 @@ export default function Budget() {
                     <span className="text-xs text-muted-foreground w-5">
                       {index + 1}.
                     </span>
-                    <span className="text-sm text-white truncate max-w-[180px]">
+                    <span className="text-xs sm:text-sm text-white truncate max-w-[120px] sm:max-w-[180px]">
                       {vendor.name}
                     </span>
                   </div>
@@ -468,16 +468,16 @@ export default function Budget() {
       {/* Detailed Table */}
       <Card className="border-white/10">
         <CardHeader className="border-b border-white/10">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+            <CardTitle className="flex items-center gap-2 text-white text-base sm:text-lg flex-wrap">
               <FileText className="h-5 w-5 text-teal-400" />
-              Budget Line Items
-              <Badge variant="outline" className="ml-2">
-                {filteredItems.length} items
+              Line Items
+              <Badge variant="outline" className="text-[10px] sm:text-xs">
+                {filteredItems.length}
               </Badge>
               {filteredItems.length !== data?.items?.length && (
-                <span className="text-sm text-muted-foreground">
-                  (Total: {formatCurrency(filteredTotal)})
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  ({formatCurrencyCompact(filteredTotal)})
                 </span>
               )}
             </CardTitle>
@@ -485,18 +485,18 @@ export default function Budget() {
         </CardHeader>
         <CardContent className="pt-4">
           {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-6">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
+            <div className="relative flex-1 min-w-[160px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search projects, categories, vendors..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white/5 border-white/10"
+                className="pl-9 bg-white/5 border-white/10 h-9 text-sm"
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px] bg-white/5 border-white/10">
+              <SelectTrigger className="w-[130px] sm:w-[180px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -507,7 +507,7 @@ export default function Budget() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] bg-white/5 border-white/10">
+              <SelectTrigger className="w-[130px] sm:w-[180px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -518,7 +518,7 @@ export default function Budget() {
               </SelectContent>
             </Select>
             <Select value={vendorFilter} onValueChange={setVendorFilter}>
-              <SelectTrigger className="w-[180px] bg-white/5 border-white/10">
+              <SelectTrigger className="w-[130px] sm:w-[180px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Vendor" />
               </SelectTrigger>
               <SelectContent>
@@ -537,34 +537,28 @@ export default function Budget() {
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white"
-                      onClick={() => handleSort('category')}
-                    >
-                      Category <SortIcon field="category" />
-                    </TableHead>
-                    <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white"
-                      onClick={() => handleSort('vendor')}
-                    >
-                      Vendor <SortIcon field="vendor" />
-                    </TableHead>
-                    <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white max-w-[300px]"
+                      className="text-muted-foreground cursor-pointer hover:text-white text-xs sm:text-sm"
                       onClick={() => handleSort('project')}
                     >
                       Project <SortIcon field="project" />
                     </TableHead>
                     <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white"
+                      className="text-muted-foreground cursor-pointer hover:text-white text-xs sm:text-sm hidden sm:table-cell"
+                      onClick={() => handleSort('vendor')}
+                    >
+                      Vendor <SortIcon field="vendor" />
+                    </TableHead>
+                    <TableHead
+                      className="text-muted-foreground cursor-pointer hover:text-white text-xs sm:text-sm hidden md:table-cell"
                       onClick={() => handleSort('status')}
                     >
                       Status <SortIcon field="status" />
                     </TableHead>
                     <TableHead
-                      className="text-muted-foreground text-right cursor-pointer hover:text-white"
+                      className="text-muted-foreground text-right cursor-pointer hover:text-white text-xs sm:text-sm"
                       onClick={() => handleSort('subtotal')}
                     >
-                      Subtotal <SortIcon field="subtotal" />
+                      Amount <SortIcon field="subtotal" />
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -576,28 +570,26 @@ export default function Budget() {
                         className="border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
                         onClick={() => setSelectedItem(item)}
                       >
-                        <TableCell className="font-medium text-white">
-                          {item.category}
+                        <TableCell className="text-white text-xs sm:text-sm py-2.5 sm:py-4">
+                          <div className="font-medium truncate max-w-[200px] sm:max-w-[300px]">{item.project}</div>
+                          <div className="text-[10px] sm:hidden text-muted-foreground mt-0.5">{item.vendor || item.category}</div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-muted-foreground text-xs sm:text-sm py-2.5 sm:py-4 hidden sm:table-cell">
                           {item.vendor || '-'}
                         </TableCell>
-                        <TableCell className="text-muted-foreground max-w-[300px] truncate">
-                          {item.project}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(item.status)}>
+                        <TableCell className="hidden md:table-cell py-2.5 sm:py-4">
+                          <Badge className={`${getStatusColor(item.status)} text-[10px] sm:text-xs`}>
                             {item.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-medium text-teal-400">
-                          {item.subtotal > 0 ? formatCurrency(item.subtotal) : '-'}
+                        <TableCell className="text-right font-medium text-teal-400 text-xs sm:text-sm py-2.5 sm:py-4 whitespace-nowrap">
+                          {item.subtotal > 0 ? formatCurrencyCompact(item.subtotal) : '-'}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         No items match your filters
                       </TableCell>
                     </TableRow>
