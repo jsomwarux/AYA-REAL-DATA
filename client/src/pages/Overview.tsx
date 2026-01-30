@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useUserRole } from "@/components/PasswordGate";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,6 +90,8 @@ interface SelectedTask {
 
 export default function Overview() {
   useDocumentTitle("Overview");
+  const role = useUserRole();
+  const isManagement = role === "management";
 
   const [selectedTask, setSelectedTask] = useState<SelectedTask | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<RoomProgress | null>(null);
@@ -110,6 +113,7 @@ export default function Overview() {
     queryFn: () => fetchBudgetData(),
     retry: false,
     staleTime: 1000 * 60 * 2,
+    enabled: isManagement,
   });
 
   const timelineQuery = useQuery({
@@ -117,18 +121,19 @@ export default function Overview() {
     queryFn: () => fetchTimelineData(),
     retry: false,
     staleTime: 1000 * 60 * 2,
+    enabled: isManagement,
   });
 
   const handleRefresh = async () => {
-    await Promise.all([
-      constructionProgressQuery.refetch(),
-      budgetQuery.refetch(),
-      timelineQuery.refetch(),
-    ]);
+    const promises: Promise<any>[] = [constructionProgressQuery.refetch()];
+    if (isManagement) {
+      promises.push(budgetQuery.refetch(), timelineQuery.refetch());
+    }
+    await Promise.all(promises);
     toastSuccess("Data Refreshed", "Dashboard data has been updated.");
   };
 
-  const isLoading = constructionProgressQuery.isLoading || budgetQuery.isLoading || timelineQuery.isLoading;
+  const isLoading = constructionProgressQuery.isLoading || (isManagement && (budgetQuery.isLoading || timelineQuery.isLoading));
   const sheetsConfigured = (healthQuery.data as any)?.sheetsConfigured;
 
   // ── Construction Data ──
@@ -306,7 +311,7 @@ export default function Overview() {
       )}
 
       {/* ═══ TOP-LEVEL KPI STATS ═══ */}
-      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className={`mb-8 grid gap-4 md:grid-cols-2 ${isManagement ? 'lg:grid-cols-4' : 'lg:grid-cols-1 max-w-md'}`}>
         <StatCard
           title="Construction Progress"
           value={`${overallCompletion}%`}
@@ -315,30 +320,34 @@ export default function Overview() {
           icon={<Building2 className="h-5 w-5" />}
           accentColor="teal"
         />
-        <StatCard
-          title="Budget"
-          value={formatCurrencyCompact(totalBudget)}
-          change={`${formatCurrencyCompact(totalBudget - paidThusFar)} remaining (${100 - budgetSpentPercent}%)`}
-          changeType={budgetSpentPercent > 90 ? "negative" : budgetSpentPercent > 70 ? "neutral" : "positive"}
-          icon={<DollarSign className="h-5 w-5" />}
-          accentColor="blue"
-        />
-        <StatCard
-          title="Timeline"
-          value={`${eventsThisWeek.length} This Week`}
-          change={`${totalEvents - completedEvents} events remaining`}
-          changeType={eventsThisWeek.length > 0 ? "positive" : "neutral"}
-          icon={<Calendar className="h-5 w-5" />}
-          accentColor="purple"
-        />
-        <StatCard
-          title="Top Vendor"
-          value={topVendor?.name ? (topVendor.name.length > 14 ? topVendor.name.slice(0, 14) + '…' : topVendor.name) : '—'}
-          change={topVendor ? `${formatCurrencyCompact(topVendor.total)} across ${topVendor.count} items` : 'No vendor data'}
-          changeType="neutral"
-          icon={<ListChecks className="h-5 w-5" />}
-          accentColor="amber"
-        />
+        {isManagement && (
+          <>
+            <StatCard
+              title="Budget"
+              value={formatCurrencyCompact(totalBudget)}
+              change={`${formatCurrencyCompact(totalBudget - paidThusFar)} remaining (${100 - budgetSpentPercent}%)`}
+              changeType={budgetSpentPercent > 90 ? "negative" : budgetSpentPercent > 70 ? "neutral" : "positive"}
+              icon={<DollarSign className="h-5 w-5" />}
+              accentColor="blue"
+            />
+            <StatCard
+              title="Timeline"
+              value={`${eventsThisWeek.length} This Week`}
+              change={`${totalEvents - completedEvents} events remaining`}
+              changeType={eventsThisWeek.length > 0 ? "positive" : "neutral"}
+              icon={<Calendar className="h-5 w-5" />}
+              accentColor="purple"
+            />
+            <StatCard
+              title="Top Vendor"
+              value={topVendor?.name ? (topVendor.name.length > 14 ? topVendor.name.slice(0, 14) + '…' : topVendor.name) : '—'}
+              change={topVendor ? `${formatCurrencyCompact(topVendor.total)} across ${topVendor.count} items` : 'No vendor data'}
+              changeType="neutral"
+              icon={<ListChecks className="h-5 w-5" />}
+              accentColor="amber"
+            />
+          </>
+        )}
       </div>
 
       {/* ═══ 1. CONSTRUCTION COMPLETION + 2. TASKS NEEDING ATTENTION ═══ */}
@@ -459,7 +468,7 @@ export default function Overview() {
       </div>
 
       {/* ═══ 3. BUDGET STATUS + 4. BUDGET BY CATEGORY ═══ */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
+      {isManagement && <div className="grid gap-6 lg:grid-cols-2 mb-6">
         {/* Budget Status Summary */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
@@ -593,12 +602,12 @@ export default function Overview() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* ═══ 5. TIMELINE ACTIVITY + 6. PROGRESS BY FLOOR ═══ */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        {/* Timeline Activity — redesigned */}
-        <Card className="border-white/10">
+      <div className={`grid gap-6 mb-6 ${isManagement ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+        {/* Timeline Activity — redesigned (management only) */}
+        {isManagement && <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-white">
@@ -664,7 +673,7 @@ export default function Overview() {
               )}
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Floor Progress Chart */}
         <Card className="border-white/10">
@@ -712,7 +721,7 @@ export default function Overview() {
       </div>
 
       {/* ═══ QUICK NAVIGATION ═══ */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={`grid gap-4 ${isManagement ? 'md:grid-cols-3' : 'md:grid-cols-1 max-w-md'}`}>
         <Link href="/construction">
           <Card className="border-white/10 group hover:border-teal-500/30 transition-all cursor-pointer h-full">
             <CardContent className="p-5">
@@ -730,39 +739,43 @@ export default function Overview() {
           </Card>
         </Link>
 
-        <Link href="/budget">
-          <Card className="border-white/10 group hover:border-blue-500/30 transition-all cursor-pointer h-full">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="rounded-xl p-3 bg-blue-500/20 text-blue-400 group-hover:scale-110 transition-transform">
-                  <DollarSign className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-white">Budget</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Vendor spend & line items</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-400 transition-colors" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+        {isManagement && (
+          <>
+            <Link href="/budget">
+              <Card className="border-white/10 group hover:border-blue-500/30 transition-all cursor-pointer h-full">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl p-3 bg-blue-500/20 text-blue-400 group-hover:scale-110 transition-transform">
+                      <DollarSign className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-white">Budget</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Vendor spend & line items</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-400 transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-        <Link href="/timeline">
-          <Card className="border-white/10 group hover:border-purple-500/30 transition-all cursor-pointer h-full">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="rounded-xl p-3 bg-purple-500/20 text-purple-400 group-hover:scale-110 transition-transform">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-white">Timeline</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Gantt chart & scheduling</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-purple-400 transition-colors" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+            <Link href="/timeline">
+              <Card className="border-white/10 group hover:border-purple-500/30 transition-all cursor-pointer h-full">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl p-3 bg-purple-500/20 text-purple-400 group-hover:scale-110 transition-transform">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-white">Timeline</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Gantt chart & scheduling</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-purple-400 transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Task Detail Modal */}

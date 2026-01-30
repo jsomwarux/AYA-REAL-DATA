@@ -16,6 +16,7 @@ declare module "http" {
 declare module "express-session" {
   interface SessionData {
     authenticated: boolean;
+    role: "management" | "default";
     dealsAuthenticated: boolean;
   }
 }
@@ -46,18 +47,38 @@ app.use(
 
 // Auth endpoints
 app.post("/api/auth/login", (req: Request, res: Response) => {
-  const { password } = req.body;
+  const { password, requestedRole } = req.body;
   const gatePassword = process.env.PASSWORD_GATE;
+  const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
 
-  if (!gatePassword) {
-    // No password configured — allow access
+  if (!gatePassword && !managementPassword) {
+    // No passwords configured — allow full access
     req.session.authenticated = true;
-    return res.json({ success: true });
+    req.session.role = "management";
+    return res.json({ success: true, role: "management" });
   }
 
-  if (password === gatePassword) {
+  // Management login requested (from /management route)
+  if (requestedRole === "management") {
+    if (managementPassword && password === managementPassword) {
+      req.session.authenticated = true;
+      req.session.role = "management";
+      return res.json({ success: true, role: "management" });
+    }
+    return res.status(401).json({ message: "Incorrect password" });
+  }
+
+  // Default login — accept either password
+  if (managementPassword && password === managementPassword) {
     req.session.authenticated = true;
-    return res.json({ success: true });
+    req.session.role = "management";
+    return res.json({ success: true, role: "management" });
+  }
+
+  if (gatePassword && password === gatePassword) {
+    req.session.authenticated = true;
+    req.session.role = "default";
+    return res.json({ success: true, role: "default" });
   }
 
   return res.status(401).json({ message: "Incorrect password" });
@@ -65,11 +86,14 @@ app.post("/api/auth/login", (req: Request, res: Response) => {
 
 app.get("/api/auth/check", (req: Request, res: Response) => {
   const gatePassword = process.env.PASSWORD_GATE;
-  if (!gatePassword) {
-    // No password configured — always authenticated
-    return res.json({ authenticated: true });
+  const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
+  if (!gatePassword && !managementPassword) {
+    return res.json({ authenticated: true, role: "management" });
   }
-  return res.json({ authenticated: !!req.session.authenticated });
+  return res.json({
+    authenticated: !!req.session.authenticated,
+    role: req.session.role || null,
+  });
 });
 
 // Deals-specific auth endpoints

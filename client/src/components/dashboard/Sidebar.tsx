@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUserRole } from "@/components/PasswordGate";
 
 interface SidebarContextType {
   isCollapsed: boolean;
@@ -34,6 +35,7 @@ interface NavItem {
   iconColor: string;
   description?: string;
   badge?: string;
+  managementOnly?: boolean;
 }
 
 const mainNavItems: NavItem[] = [
@@ -57,6 +59,7 @@ const mainNavItems: NavItem[] = [
     icon: <DollarSign className="h-5 w-5" />,
     iconColor: "text-green-400",
     description: "Project budget tracking",
+    managementOnly: true,
   },
   {
     title: "Timeline",
@@ -64,6 +67,7 @@ const mainNavItems: NavItem[] = [
     icon: <Calendar className="h-5 w-5" />,
     iconColor: "text-amber-400",
     description: "Project schedule and milestones",
+    managementOnly: true,
   },
   {
     title: "Deal Intelligence",
@@ -72,6 +76,7 @@ const mainNavItems: NavItem[] = [
     iconColor: "text-purple-400",
     description: "Score distressed properties",
     badge: "Protected",
+    managementOnly: true,
   },
 ];
 
@@ -151,6 +156,10 @@ function NavLink({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean })
 
 export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
+  const role = useUserRole();
+  const visibleNavItems = role === "management"
+    ? mainNavItems
+    : mainNavItems.filter(item => !item.managementOnly);
 
   return (
     <TooltipProvider>
@@ -188,7 +197,7 @@ export function Sidebar() {
           )}>
             {isCollapsed ? "•" : "Main"}
           </div>
-          {mainNavItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink key={item.href} item={item} isCollapsed={isCollapsed} />
           ))}
         </nav>

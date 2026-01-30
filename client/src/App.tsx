@@ -3,7 +3,7 @@ import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { PasswordGate } from "@/components/PasswordGate";
+import { PasswordGate, useUserRole } from "@/components/PasswordGate";
 import Overview from "@/pages/Overview";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
@@ -20,6 +20,15 @@ function ScrollToTop() {
   return null;
 }
 
+/** Redirects non-management users to / */
+function ManagementOnly({ component: Component }: { component: React.ComponentType }) {
+  const role = useUserRole();
+  if (role !== "management") {
+    return <Redirect to="/" />;
+  }
+  return <Component />;
+}
+
 function Router() {
   return (
     <>
@@ -27,10 +36,22 @@ function Router() {
     <Switch>
       <Route path="/" component={Overview} />
       <Route path="/construction" component={ConstructionProgress} />
-      <Route path="/budget" component={Budget} />
-      <Route path="/timeline" component={Timeline} />
-      <Route path="/deals" component={Deals} />
-      <Route path="/settings" component={Settings} />
+      <Route path="/budget">
+        <ManagementOnly component={Budget} />
+      </Route>
+      <Route path="/timeline">
+        <ManagementOnly component={Timeline} />
+      </Route>
+      <Route path="/deals">
+        <ManagementOnly component={Deals} />
+      </Route>
+      <Route path="/settings">
+        <ManagementOnly component={Settings} />
+      </Route>
+      {/* /management is handled by PasswordGate — it shows management login then redirects to / */}
+      <Route path="/management">
+        <Redirect to="/" />
+      </Route>
       <Route component={NotFound} />
     </Switch>
     </>
