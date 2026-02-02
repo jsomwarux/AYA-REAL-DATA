@@ -8,7 +8,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
@@ -116,14 +115,6 @@ export function ScoreDistributionChart({ data, highlightScore }: ScoreDistributi
                 allowDecimals={false}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
-
-              {/* Highlight zone for 80+ */}
-              <ReferenceLine
-                x="80-100"
-                stroke="rgba(16, 185, 129, 0.3)"
-                strokeWidth={60}
-                strokeDasharray="0"
-              />
 
               <Bar
                 dataKey="count"

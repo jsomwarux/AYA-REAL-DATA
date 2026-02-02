@@ -125,9 +125,6 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
       .slice(0, 3);
   }, [data]);
 
-  // Sample deal for radar chart (highest score)
-  const sampleDeal = topDeals[0];
-
   // Quick filter buttons
   const QuickFilterButton = ({
     recommendation,
@@ -258,9 +255,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
             highlightScore={selectedDeal?.final_score}
           />
           <BoroughBreakdown data={data} />
-          {sampleDeal && (
-            <ScoreComponentsRadar deal={sampleDeal} />
-          )}
+          <ScoreComponentsRadar data={data} />
         </div>
       </div>
 

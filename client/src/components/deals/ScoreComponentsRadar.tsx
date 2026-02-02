@@ -7,15 +7,13 @@ import {
   Radar,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Target, TrendingUp, Scale, Cog } from "lucide-react";
+import { Target } from "lucide-react";
 import { DealRecord } from "./DealsTable";
 
 interface ScoreComponentsRadarProps {
-  deal: DealRecord;
-  compareDeals?: DealRecord[];
+  data: DealRecord[];
 }
 
 const COMMITTEE_ROLES = {
@@ -39,47 +37,57 @@ const COMMITTEE_ROLES = {
   },
 };
 
-export function ScoreComponentsRadar({ deal, compareDeals }: ScoreComponentsRadarProps) {
+export function ScoreComponentsRadar({ data }: ScoreComponentsRadarProps) {
+  const averages = useMemo(() => {
+    if (data.length === 0) {
+      return { upside: 0, risk: 0, execution: 0, final: 0 };
+    }
+    const sum = data.reduce(
+      (acc, d) => ({
+        upside: acc.upside + (d.upside_score || 0),
+        risk: acc.risk + (d.risk_score || 0),
+        execution: acc.execution + (d.execution_score || 0),
+        final: acc.final + (d.final_score || 0),
+      }),
+      { upside: 0, risk: 0, execution: 0, final: 0 }
+    );
+    const n = data.length;
+    return {
+      upside: Math.round((sum.upside / n) * 10) / 10,
+      risk: Math.round((sum.risk / n) * 10) / 10,
+      execution: Math.round((sum.execution / n) * 10) / 10,
+      final: Math.round((sum.final / n) * 10) / 10,
+    };
+  }, [data]);
+
   const chartData = useMemo(() => {
     return [
       {
         metric: "Upside",
-        fullName: "Upside Score",
+        fullName: "Avg Upside Score",
         role: COMMITTEE_ROLES.upside.name,
-        current: deal.upside_score,
-        ...(compareDeals?.reduce((acc, d, i) => ({
-          ...acc,
-          [`compare${i}`]: d.upside_score,
-        }), {})),
+        value: averages.upside,
       },
       {
         metric: "Risk",
-        fullName: "Risk Score",
+        fullName: "Avg Risk Score",
         role: COMMITTEE_ROLES.risk.name,
-        current: deal.risk_score,
-        ...(compareDeals?.reduce((acc, d, i) => ({
-          ...acc,
-          [`compare${i}`]: d.risk_score,
-        }), {})),
+        value: averages.risk,
       },
       {
         metric: "Execution",
-        fullName: "Execution Score",
+        fullName: "Avg Execution Score",
         role: COMMITTEE_ROLES.execution.name,
-        current: deal.execution_score,
-        ...(compareDeals?.reduce((acc, d, i) => ({
-          ...acc,
-          [`compare${i}`]: d.execution_score,
-        }), {})),
+        value: averages.execution,
       },
     ];
-  }, [deal, compareDeals]);
+  }, [averages]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const d = payload[0].payload;
       const role = Object.values(COMMITTEE_ROLES).find(
-        (r) => r.name === data.role
+        (r) => r.name === d.role
       );
 
       return (
@@ -87,15 +95,15 @@ export function ScoreComponentsRadar({ deal, compareDeals }: ScoreComponentsRada
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">{role?.icon}</span>
             <div>
-              <p className="text-sm font-medium text-white">{data.fullName}</p>
+              <p className="text-sm font-medium text-white">{d.fullName}</p>
               <p className="text-xs text-muted-foreground">{role?.name}</p>
             </div>
           </div>
           <p className="text-xs text-muted-foreground mb-2">{role?.description}</p>
           <div className="pt-2 border-t border-white/10">
             <div className="flex justify-between">
-              <span className="text-xs text-muted-foreground">Score</span>
-              <span className="text-sm font-bold text-white">{data.current}</span>
+              <span className="text-xs text-muted-foreground">Avg Score</span>
+              <span className="text-sm font-bold text-white">{d.value}</span>
             </div>
           </div>
         </div>
@@ -104,16 +112,18 @@ export function ScoreComponentsRadar({ deal, compareDeals }: ScoreComponentsRada
     return null;
   };
 
-  // Calculate composite score explanation
-  const avgScore = Math.round((deal.upside_score + deal.risk_score + deal.execution_score) / 3);
-
   return (
     <Card className="border-white/10">
       <CardHeader className="border-b border-white/10 pb-4">
-        <CardTitle className="text-white flex items-center gap-2 text-base">
-          <Target className="h-5 w-5 text-teal-400" />
-          Investment Committee Scores
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-white flex items-center gap-2 text-base">
+            <Target className="h-5 w-5 text-teal-400" />
+            Investment Committee Scores
+          </CardTitle>
+          <span className="text-xs text-muted-foreground">
+            Avg across {data.length} deals
+          </span>
+        </div>
       </CardHeader>
       <CardContent className="pt-4">
         <div className="h-[220px]">
@@ -136,27 +146,14 @@ export function ScoreComponentsRadar({ deal, compareDeals }: ScoreComponentsRada
               <Tooltip content={<CustomTooltip />} />
 
               <Radar
-                name={deal.address}
-                dataKey="current"
+                name="Portfolio Average"
+                dataKey="value"
                 stroke="#8b5cf6"
                 fill="#8b5cf6"
                 fillOpacity={0.4}
                 strokeWidth={2}
                 animationDuration={1000}
               />
-
-              {compareDeals?.map((d, i) => (
-                <Radar
-                  key={d.bbl}
-                  name={d.address}
-                  dataKey={`compare${i}`}
-                  stroke={`hsl(${(i + 1) * 60}, 70%, 50%)`}
-                  fill={`hsl(${(i + 1) * 60}, 70%, 50%)`}
-                  fillOpacity={0.2}
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                />
-              ))}
             </RadarChart>
           </ResponsiveContainer>
         </div>
@@ -165,10 +162,10 @@ export function ScoreComponentsRadar({ deal, compareDeals }: ScoreComponentsRada
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10">
           {Object.entries(COMMITTEE_ROLES).map(([key, role]) => {
             const score = key === "upside"
-              ? deal.upside_score
+              ? averages.upside
               : key === "risk"
-              ? deal.risk_score
-              : deal.execution_score;
+              ? averages.risk
+              : averages.execution;
 
             return (
               <div
@@ -188,16 +185,16 @@ export function ScoreComponentsRadar({ deal, compareDeals }: ScoreComponentsRada
           })}
         </div>
 
-        {/* Score Formula */}
+        {/* Average Score Formula */}
         <div className="mt-3 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
           <p className="text-xs text-center text-muted-foreground">
-            <span className="text-purple-400 font-medium">Final Score ({deal.final_score})</span>
+            <span className="text-purple-400 font-medium">Avg Final Score ({averages.final})</span>
             {" = "}
-            <span className="text-emerald-400">{deal.upside_score}</span>
+            <span className="text-emerald-400">{averages.upside}</span>
             {" × 0.4 + "}
-            <span className="text-amber-400">{deal.risk_score}</span>
+            <span className="text-amber-400">{averages.risk}</span>
             {" × 0.35 + "}
-            <span className="text-blue-400">{deal.execution_score}</span>
+            <span className="text-blue-400">{averages.execution}</span>
             {" × 0.25"}
           </p>
         </div>

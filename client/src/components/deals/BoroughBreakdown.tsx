@@ -63,6 +63,7 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
             .reduce((sum, d) => sum + d.final_score, 0) / counts.total
         ),
       }))
+      .filter((item) => item.highScore > 0)
       .sort((a, b) => b.highScore - a.highScore);
   }, [data]);
 
@@ -177,7 +178,7 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
                 style={{ backgroundColor: item.color }}
               />
               <span className="text-xs text-muted-foreground">
-                {item.label} ({item.total})
+                {item.label} ({item.highScore})
               </span>
             </div>
           ))}
