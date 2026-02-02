@@ -249,7 +249,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
           <BarChart3 className="h-5 w-5 text-purple-400" />
           <h2 className="text-lg font-semibold text-white">Analytics</h2>
         </div>
-        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-h-[380px]">
           <ScoreDistributionChart
             data={data}
             highlightScore={selectedDeal?.final_score}

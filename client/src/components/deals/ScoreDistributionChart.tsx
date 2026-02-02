@@ -73,7 +73,7 @@ export function ScoreDistributionChart({ data, highlightScore }: ScoreDistributi
   };
 
   return (
-    <Card className="border-white/10">
+    <Card className="border-white/10 h-full flex flex-col">
       <CardHeader className="border-b border-white/10 pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center gap-2 text-base">
@@ -88,8 +88,8 @@ export function ScoreDistributionChart({ data, highlightScore }: ScoreDistributi
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4">
-        <div className="h-[200px]">
+      <CardContent className="pt-4 flex-1 flex flex-col">
+        <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}

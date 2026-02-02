@@ -63,8 +63,8 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
             .reduce((sum, d) => sum + d.final_score, 0) / counts.total
         ),
       }))
-      .filter((item) => item.highScore > 0)
-      .sort((a, b) => b.highScore - a.highScore);
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total);
   }, [data]);
 
   const topBorough = chartData[0];
@@ -96,12 +96,12 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
   };
 
   return (
-    <Card className="border-white/10">
+    <Card className="border-white/10 h-full flex flex-col">
       <CardHeader className="border-b border-white/10 pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center gap-2 text-base">
             <MapPin className="h-5 w-5 text-purple-400" />
-            High-Score Deals by Borough
+            Deals by Borough
           </CardTitle>
           {topBorough && (
             <div className="flex items-center gap-2">
@@ -119,8 +119,8 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-4">
-        <div className="h-[200px]">
+      <CardContent className="pt-4 flex-1 flex flex-col">
+        <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
@@ -151,7 +151,7 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
               <Bar
-                dataKey="highScore"
+                dataKey="total"
                 radius={[0, 4, 4, 0]}
                 animationDuration={1000}
               >
@@ -160,7 +160,7 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
                     key={`cell-${index}`}
                     fill={entry.color}
                     style={{
-                      filter: entry.highScore > 0 ? `drop-shadow(0 0 6px ${entry.color}40)` : undefined,
+                      filter: `drop-shadow(0 0 6px ${entry.color}40)`,
                     }}
                   />
                 ))}
@@ -178,7 +178,7 @@ export function BoroughBreakdown({ data }: BoroughBreakdownProps) {
                 style={{ backgroundColor: item.color }}
               />
               <span className="text-xs text-muted-foreground">
-                {item.label} ({item.highScore})
+                {item.label} ({item.total})
               </span>
             </div>
           ))}
