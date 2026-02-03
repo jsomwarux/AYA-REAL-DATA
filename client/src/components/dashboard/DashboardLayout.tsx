@@ -1,10 +1,12 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Sidebar, SidebarProvider, useSidebar } from "./Sidebar";
 import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Radar, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import type { TabAuthStatus } from "@/components/TabPasswordGate";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -20,14 +22,15 @@ interface MobileNavItem {
   icon: ReactNode;
   iconColor: string;
   managementOnly?: boolean;
+  requiredAuth?: keyof TabAuthStatus;
 }
 
 const mobileNavItems: MobileNavItem[] = [
-  { title: "Overview", href: "/overview", icon: <LayoutDashboard className="h-5 w-5" />, iconColor: "text-teal-400" },
-  { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400" },
-  { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true },
-  { title: "Timeline", href: "/timeline", icon: <Calendar className="h-5 w-5" />, iconColor: "text-amber-400", managementOnly: true },
-  { title: "Deal Intelligence", href: "/deals", icon: <Radar className="h-5 w-5" />, iconColor: "text-purple-400", managementOnly: true },
+  { title: "Overview", href: "/overview", icon: <LayoutDashboard className="h-5 w-5" />, iconColor: "text-teal-400", requiredAuth: "anyAuthenticated" },
+  { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400", requiredAuth: "construction" },
+  { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true, requiredAuth: "management" },
+  { title: "Timeline", href: "/timeline", icon: <Calendar className="h-5 w-5" />, iconColor: "text-amber-400", managementOnly: true, requiredAuth: "management" },
+  { title: "Deal Intelligence", href: "/deals", icon: <Radar className="h-5 w-5" />, iconColor: "text-purple-400", managementOnly: true, requiredAuth: "deals" },
 ];
 
 function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutProps, 'children'>) {
@@ -143,7 +146,23 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
 
 function MobileSidebar({ onClose }: { onClose: () => void }) {
   const [location] = useLocation();
-  const visibleItems = mobileNavItems;
+
+  const tabAuthQuery = useQuery({
+    queryKey: ["tab-auth"],
+    queryFn: async (): Promise<TabAuthStatus> => {
+      const res = await fetch("/api/auth/tab-check");
+      if (!res.ok) throw new Error("Tab auth check failed");
+      return res.json();
+    },
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const tabAuth = tabAuthQuery.data;
+  const visibleItems = mobileNavItems.filter(item => {
+    if (!item.requiredAuth) return true;
+    return tabAuth?.[item.requiredAuth] ?? false;
+  });
 
   return (
     <div className="flex h-full flex-col">

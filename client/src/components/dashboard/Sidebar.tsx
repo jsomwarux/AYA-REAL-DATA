@@ -1,5 +1,6 @@
 import { useState, createContext, useContext } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   HardHat,
   Radar,
@@ -14,6 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { TabAuthStatus } from "@/components/TabPasswordGate";
+
 interface SidebarContextType {
   isCollapsed: boolean;
   setIsCollapsed: (value: boolean) => void;
@@ -34,6 +37,8 @@ interface NavItem {
   description?: string;
   badge?: string;
   managementOnly?: boolean;
+  /** Which tab-auth key is required to show this item. "anyAuthenticated" for Overview. */
+  requiredAuth?: keyof TabAuthStatus;
 }
 
 const mainNavItems: NavItem[] = [
@@ -43,6 +48,7 @@ const mainNavItems: NavItem[] = [
     icon: <LayoutDashboard className="h-5 w-5" />,
     iconColor: "text-teal-400",
     description: "Dashboard overview",
+    requiredAuth: "anyAuthenticated",
   },
   {
     title: "Construction Progress",
@@ -50,6 +56,7 @@ const mainNavItems: NavItem[] = [
     icon: <Building2 className="h-5 w-5" />,
     iconColor: "text-blue-400",
     description: "Room-by-room progress tracking",
+    requiredAuth: "construction",
   },
   {
     title: "Budget",
@@ -58,6 +65,7 @@ const mainNavItems: NavItem[] = [
     iconColor: "text-green-400",
     description: "Project budget tracking",
     managementOnly: true,
+    requiredAuth: "management",
   },
   {
     title: "Timeline",
@@ -66,6 +74,7 @@ const mainNavItems: NavItem[] = [
     iconColor: "text-amber-400",
     description: "Project schedule and milestones",
     managementOnly: true,
+    requiredAuth: "management",
   },
   {
     title: "Deal Intelligence",
@@ -75,6 +84,7 @@ const mainNavItems: NavItem[] = [
     description: "Score distressed properties",
     badge: "Protected",
     managementOnly: true,
+    requiredAuth: "deals",
   },
 ];
 
@@ -154,7 +164,23 @@ function NavLink({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean })
 
 export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const visibleNavItems = mainNavItems;
+
+  const tabAuthQuery = useQuery({
+    queryKey: ["tab-auth"],
+    queryFn: async (): Promise<TabAuthStatus> => {
+      const res = await fetch("/api/auth/tab-check");
+      if (!res.ok) throw new Error("Tab auth check failed");
+      return res.json();
+    },
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const tabAuth = tabAuthQuery.data;
+  const visibleNavItems = mainNavItems.filter(item => {
+    if (!item.requiredAuth) return true;
+    return tabAuth?.[item.requiredAuth] ?? false;
+  });
 
   return (
     <TooltipProvider>
