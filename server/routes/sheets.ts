@@ -172,7 +172,7 @@ router.get('/deals', async (req, res) => {
       });
     }
 
-    const range = (req.query.range as string) || 'Sheet1!A:Z';
+    const range = (req.query.range as string) || 'Sheet1!A:BZ';
     const data = await fetchSheetData(spreadsheetId, range);
 
     // Add timestamps (preserving existing ones for known rows)

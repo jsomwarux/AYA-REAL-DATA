@@ -16,8 +16,10 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Sparkles,
   AlertCircle,
+  AlertTriangle,
   DollarSign,
   TrendingUp,
   Building2,
@@ -28,10 +30,11 @@ import {
   X,
   CheckCircle2,
   Quote,
+  Clock,
 } from "lucide-react";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ScoreGauge } from "./ScoreGauge";
-import { DealRecord } from "./DealsTable";
+import type { DealRecord, DrillDownTab } from "./types";
 import { cn } from "@/lib/utils";
 
 interface DealDetailModalProps {
@@ -39,11 +42,12 @@ interface DealDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaveDeal?: (deal: DealRecord) => void;
+  onOpenDrillDown?: (deal: DealRecord, tab: DrillDownTab) => void;
 }
 
 const COMMITTEE_MEMBERS = [
   {
-    key: "upside",
+    key: "upside" as DrillDownTab,
     name: "The Shark",
     icon: "🦈",
     title: "Upside Score",
@@ -53,7 +57,7 @@ const COMMITTEE_MEMBERS = [
     borderColor: "border-emerald-500/30",
   },
   {
-    key: "risk",
+    key: "risk" as DrillDownTab,
     name: "The Lawyer",
     icon: "⚖️",
     title: "Risk Score",
@@ -63,7 +67,7 @@ const COMMITTEE_MEMBERS = [
     borderColor: "border-amber-500/30",
   },
   {
-    key: "execution",
+    key: "execution" as DrillDownTab,
     name: "The Operator",
     icon: "⚙️",
     title: "Execution Score",
@@ -79,6 +83,7 @@ export function DealDetailModal({
   open,
   onOpenChange,
   onSaveDeal,
+  onOpenDrillDown,
 }: DealDetailModalProps) {
   const [jsonExpanded, setJsonExpanded] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
@@ -89,6 +94,18 @@ export function DealDetailModal({
     if (key === "upside") return deal.upside_score;
     if (key === "risk") return deal.risk_score;
     return deal.execution_score;
+  };
+
+  const getHeadline = (key: string) => {
+    if (key === "upside") return deal.upside_headline;
+    if (key === "risk") return deal.risk_headline;
+    return deal.execution_headline;
+  };
+
+  const getLabel = (key: string) => {
+    if (key === "upside") return deal.upside_label;
+    if (key === "risk") return deal.risk_label;
+    return deal.execution_label;
   };
 
   const dueDiligenceItems = deal.key_due_diligence
@@ -163,7 +180,21 @@ export function DealDetailModal({
                     <span className="font-mono text-sm">BBL: {deal.bbl}</span>
                   </div>
                 </div>
-                <RecommendationBadge recommendation={deal.recommendation} size="lg" />
+                <div className="flex items-center gap-2">
+                  <RecommendationBadge recommendation={deal.recommendation} size="lg" />
+                  {deal.alert_priority && (
+                    <span
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded-full font-medium",
+                        deal.alert_priority.toUpperCase() === "HIGH" && "bg-red-500/20 text-red-400",
+                        deal.alert_priority.toUpperCase() === "MEDIUM" && "bg-amber-500/20 text-amber-400",
+                        deal.alert_priority.toUpperCase() === "LOW" && "bg-gray-500/20 text-gray-400"
+                      )}
+                    >
+                      {deal.alert_priority} priority
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Quick Stats */}
@@ -176,6 +207,12 @@ export function DealDetailModal({
                   <p className="text-xs text-emerald-400 uppercase tracking-wider">Est. ROI</p>
                   <p className="text-lg font-semibold text-emerald-400">{deal.estimated_roi}</p>
                 </div>
+                {deal.stabilized_value && (
+                  <div>
+                    <p className="text-xs text-purple-400 uppercase tracking-wider">Stabilized Value</p>
+                    <p className="text-lg font-semibold text-purple-400">{deal.stabilized_value}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -193,10 +230,17 @@ export function DealDetailModal({
 
               {COMMITTEE_MEMBERS.map((member) => {
                 const score = getScore(member.key);
+                const headline = getHeadline(member.key);
+                const label = getLabel(member.key);
                 return (
                   <Card
                     key={member.key}
-                    className={cn("border", member.borderColor, member.bgColor)}
+                    className={cn(
+                      "border cursor-pointer transition-all hover:scale-[1.02]",
+                      member.borderColor,
+                      member.bgColor
+                    )}
+                    onClick={() => onOpenDrillDown?.(deal, member.key)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
@@ -218,9 +262,23 @@ export function DealDetailModal({
                               {score}
                             </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {member.description}
-                          </p>
+                          {label && (
+                            <span
+                              className="text-xs px-1.5 py-0.5 rounded border font-medium inline-block mt-1"
+                              style={{
+                                backgroundColor: `${member.color}15`,
+                                borderColor: `${member.color}40`,
+                                color: member.color,
+                              }}
+                            >
+                              {label.replace(/_/g, " ")}
+                            </span>
+                          )}
+                          {headline && (
+                            <p className="text-xs text-muted-foreground mt-2 italic line-clamp-2">
+                              {headline}
+                            </p>
+                          )}
                           {/* Progress Bar */}
                           <div className="mt-3 h-2 bg-white/10 rounded-full overflow-hidden">
                             <div
@@ -232,6 +290,10 @@ export function DealDetailModal({
                               }}
                             />
                           </div>
+                          <p className="text-xs text-muted-foreground/60 mt-1.5 flex items-center gap-1">
+                            <ChevronRight className="h-3 w-3" />
+                            Click for detailed analysis
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -317,6 +379,21 @@ export function DealDetailModal({
                 </CardContent>
               </Card>
 
+              {/* Dissenting Opinions */}
+              {deal.dissenting_opinions && (
+                <Card className="border-red-500/20 bg-red-500/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                      <p className="text-sm font-medium text-red-400">Dissenting Opinions</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground italic leading-relaxed">
+                      {deal.dissenting_opinions}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Financial Highlights */}
               <Card className="border-white/10 bg-white/5">
                 <CardContent className="p-4">
@@ -324,20 +401,30 @@ export function DealDetailModal({
                     <DollarSign className="h-4 w-4 text-teal-400" />
                     <p className="text-sm font-medium text-white">Financial Analysis</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={cn("grid gap-3", deal.stabilized_value ? "grid-cols-3" : "grid-cols-2")}>
                     <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                        Price Range
+                        Acquisition Range
                       </p>
-                      <p className="text-lg font-bold text-white mt-1">
+                      <p className="text-base font-bold text-white mt-1">
                         {deal.estimated_price_range}
                       </p>
                     </div>
+                    {deal.stabilized_value && (
+                      <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                        <p className="text-xs text-purple-400 uppercase tracking-wider">
+                          Stabilized Value
+                        </p>
+                        <p className="text-base font-bold text-purple-400 mt-1">
+                          {deal.stabilized_value}
+                        </p>
+                      </div>
+                    )}
                     <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                       <p className="text-xs text-emerald-400 uppercase tracking-wider">
                         Est. ROI
                       </p>
-                      <p className="text-lg font-bold text-emerald-400 mt-1">
+                      <p className="text-base font-bold text-emerald-400 mt-1">
                         {deal.estimated_roi}
                       </p>
                     </div>
@@ -397,6 +484,28 @@ export function DealDetailModal({
                   )}
                 </CardContent>
               </Card>
+
+              {/* Next Steps */}
+              {deal.next_steps && deal.next_steps.length > 0 && (
+                <Card className="border-blue-500/30 bg-blue-500/10">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="h-4 w-4 text-blue-400" />
+                      <p className="text-sm font-medium text-blue-400">Next Steps</p>
+                    </div>
+                    <div className="space-y-2">
+                      {deal.next_steps.map((step, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm">
+                          <span className="text-blue-400 font-mono text-xs mt-0.5 shrink-0">{i + 1}.</span>
+                          <span className="text-muted-foreground">
+                            {typeof step === "string" ? step : JSON.stringify(step)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Action Buttons */}
               <div className="space-y-2">

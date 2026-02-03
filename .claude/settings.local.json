@@ -19,7 +19,8 @@
       "Bash(cd:*)",
       "Bash(lsof:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx drizzle-kit push:*)"
+      "Bash(npx drizzle-kit push:*)",
+      "Bash(npx vite build)"
     ]
   }
 }

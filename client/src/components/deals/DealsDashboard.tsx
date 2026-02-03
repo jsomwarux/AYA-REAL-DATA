@@ -37,9 +37,11 @@ import {
   BarChart3,
 } from "lucide-react";
 import { DealsStatsCards } from "./DealsStatsCards";
-import { DealsTable, DealRecord } from "./DealsTable";
+import { DealsTable } from "./DealsTable";
 import { DealDetailModal } from "./DealDetailModal";
+import { DealDrillDownPanel } from "./DealDrillDownPanel";
 import { DealsPipeline } from "./DealsPipeline";
+import type { DealRecord, DrillDownTab } from "./types";
 import { ScoreDistributionChart } from "./ScoreDistributionChart";
 import { BoroughBreakdown } from "./BoroughBreakdown";
 import { ScoreComponentsRadar } from "./ScoreComponentsRadar";
@@ -63,6 +65,13 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 100]);
   const [selectedDeal, setSelectedDeal] = useState<DealRecord | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [drillDownDeal, setDrillDownDeal] = useState<DealRecord | null>(null);
+  const [drillDownTab, setDrillDownTab] = useState<DrillDownTab>("upside");
+
+  const handleOpenDrillDown = (deal: DealRecord, tab: DrillDownTab) => {
+    setDrillDownDeal(deal);
+    setDrillDownTab(tab);
+  };
 
   // Get unique boroughs from data
   const boroughs = useMemo(() => {
@@ -474,6 +483,7 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
         <DealsTable
           data={filteredData}
           onViewDetails={(deal) => setSelectedDeal(deal)}
+          onOpenDrillDown={handleOpenDrillDown}
         />
       ) : (
         <DealsPipeline
@@ -487,6 +497,15 @@ export function DealsDashboard({ data, isLoading }: DealsDashboardProps) {
         deal={selectedDeal}
         open={!!selectedDeal}
         onOpenChange={(open) => !open && setSelectedDeal(null)}
+        onOpenDrillDown={handleOpenDrillDown}
+      />
+
+      {/* Drill-Down Panel */}
+      <DealDrillDownPanel
+        deal={drillDownDeal}
+        open={!!drillDownDeal}
+        onOpenChange={(open) => !open && setDrillDownDeal(null)}
+        initialTab={drillDownTab}
       />
     </div>
   );

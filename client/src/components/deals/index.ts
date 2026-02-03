@@ -1,10 +1,11 @@
 export { DealsDashboard } from "./DealsDashboard";
 export { DealsStatsCards } from "./DealsStatsCards";
 export { DealsTable } from "./DealsTable";
-export type { DealRecord } from "./DealsTable";
+export type { DealRecord, DrillDownTab } from "./types";
 export { RecommendationBadge } from "./RecommendationBadge";
 export { ScoreGauge, ScoreBar } from "./ScoreGauge";
 export { DealDetailModal } from "./DealDetailModal";
+export { DealDrillDownPanel } from "./DealDrillDownPanel";
 export { DealsPipeline } from "./DealsPipeline";
 export { ScoreDistributionChart } from "./ScoreDistributionChart";
 export { BoroughBreakdown } from "./BoroughBreakdown";

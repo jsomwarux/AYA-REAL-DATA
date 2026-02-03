@@ -24,31 +24,21 @@ import {
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ScoreGauge, ScoreBar } from "./ScoreGauge";
 import { cn } from "@/lib/utils";
+import type { DealRecord, DrillDownTab } from "./types";
 
-export interface DealRecord {
-  bbl: string;
-  address: string;
-  borough: string;
-  final_score: number;
-  recommendation: string;
-  upside_score: number;
-  risk_score: number;
-  execution_score: number;
-  investment_thesis: string;
-  estimated_price_range: string;
-  estimated_roi: string;
-  key_due_diligence: string;
-}
+// Re-export for backward compatibility
+export type { DealRecord } from "./types";
 
 interface DealsTableProps {
   data: DealRecord[];
   onViewDetails?: (deal: DealRecord) => void;
+  onOpenDrillDown?: (deal: DealRecord, tab: DrillDownTab) => void;
 }
 
 type SortField = "final_score" | "address" | "borough" | "recommendation" | "estimated_roi";
 type SortDirection = "asc" | "desc";
 
-export function DealsTable({ data, onViewDetails }: DealsTableProps) {
+export function DealsTable({ data, onViewDetails, onOpenDrillDown }: DealsTableProps) {
   const [sortField, setSortField] = useState<SortField>("final_score");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -161,6 +151,46 @@ export function DealsTable({ data, onViewDetails }: DealsTableProps) {
     );
   };
 
+  // Clickable score badge for individual analyst scores
+  const ScoreBadge = ({
+    label,
+    score,
+    deal,
+    tab,
+  }: {
+    label: string;
+    score: number;
+    deal: DealRecord;
+    tab: DrillDownTab;
+  }) => {
+    const colorClass =
+      score >= 80
+        ? "text-emerald-400 bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25"
+        : score >= 60
+        ? "text-teal-400 bg-teal-500/15 border-teal-500/30 hover:bg-teal-500/25"
+        : score >= 40
+        ? "text-amber-400 bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25"
+        : score >= 20
+        ? "text-orange-400 bg-orange-500/15 border-orange-500/30 hover:bg-orange-500/25"
+        : "text-red-400 bg-red-500/15 border-red-500/30 hover:bg-red-500/25";
+
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenDrillDown?.(deal, tab);
+        }}
+        className={cn(
+          "px-1.5 py-0.5 rounded text-xs font-mono font-semibold border transition-all cursor-pointer",
+          colorClass
+        )}
+        title={`${label} Score: ${score} — Click for details`}
+      >
+        {label[0]}: {score}
+      </button>
+    );
+  };
+
   // Mobile card component
   const MobileDealCard = ({ deal, index }: { deal: DealRecord; index: number }) => (
     <div
@@ -189,6 +219,11 @@ export function DealsTable({ data, onViewDetails }: DealsTableProps) {
           <p className="text-xs text-muted-foreground">Est. ROI</p>
           <p className="text-sm font-semibold text-emerald-400">{deal.estimated_roi}</p>
         </div>
+      </div>
+      <div className="flex items-center gap-1.5 mt-2">
+        <ScoreBadge label="Upside" score={deal.upside_score} deal={deal} tab="upside" />
+        <ScoreBadge label="Risk" score={deal.risk_score} deal={deal} tab="risk" />
+        <ScoreBadge label="Exec" score={deal.execution_score} deal={deal} tab="execution" />
       </div>
     </div>
   );
@@ -294,10 +329,10 @@ export function DealsTable({ data, onViewDetails }: DealsTableProps) {
                         <RecommendationBadge recommendation={deal.recommendation} />
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <ScoreBar score={deal.upside_score} label="Upside" compact />
-                          <ScoreBar score={deal.risk_score} label="Risk" compact />
-                          <ScoreBar score={deal.execution_score} label="Exec" compact />
+                        <div className="flex items-center gap-1.5">
+                          <ScoreBadge label="Upside" score={deal.upside_score} deal={deal} tab="upside" />
+                          <ScoreBadge label="Risk" score={deal.risk_score} deal={deal} tab="risk" />
+                          <ScoreBadge label="Exec" score={deal.execution_score} deal={deal} tab="execution" />
                         </div>
                       </TableCell>
                       <TableCell>

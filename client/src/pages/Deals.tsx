@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { DealsDashboard } from "@/components/deals/DealsDashboard";
-import { DealRecord } from "@/components/deals/DealsTable";
+import type { DealRecord } from "@/components/deals/types";
 import { fetchDealsData } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
@@ -22,6 +22,26 @@ function getField(row: any, ...keys: string[]): any {
     if (row[key.toLowerCase()] !== undefined && row[key.toLowerCase()] !== null) return row[key.toLowerCase()];
   }
   return null;
+}
+
+// Safely parse a JSON column that may be a JSON string, already-parsed array, or comma-separated string
+function parseJsonColumn<T = string>(raw: any): T[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as T[];
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    }
+    // Fallback: comma-separated string → array of strings
+    return trimmed.split(',').map(s => s.trim()).filter(Boolean) as unknown as T[];
+  }
+  return [];
 }
 
 // Extract field from FULL_JSON if available
@@ -58,6 +78,16 @@ function extractDueDiligence(row: any): string {
   }
 
   return "Standard due diligence required";
+}
+
+// Parse boolean-like values from sheets
+function parseBooleanField(raw: any): boolean {
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'string') {
+    const lower = raw.toLowerCase().trim();
+    return lower === 'true' || lower === 'yes' || lower === '1' || lower === 'likely';
+  }
+  return !!raw;
 }
 
 export default function Deals() {
@@ -120,6 +150,7 @@ export default function Deals() {
   // Handle both uppercase and lowercase column names from Google Sheets
   const deals: DealRecord[] = data?.rows?.length
     ? data.rows.map((row: any) => ({
+        // === Core fields ===
         bbl: String(getField(row, 'bbl', 'BBL', 'id') || ""),
         address: getField(row, 'address', 'ADDRESS') || "Unknown Address",
         borough: getField(row, 'borough', 'BOROUGH') || "UNKNOWN",
@@ -132,6 +163,64 @@ export default function Deals() {
         estimated_price_range: getField(row, 'estimated_price_range', 'ESTIMATED_PRICE_RANGE', 'price_range') || "TBD",
         estimated_roi: getField(row, 'estimated_roi', 'ESTIMATED_ROI', 'roi') || "TBD",
         key_due_diligence: extractDueDiligence(row),
+
+        // === Upside Analysis ===
+        upside_label: getField(row, 'upside_label', 'UPSIDE_LABEL') || "",
+        upside_headline: getField(row, 'upside_headline', 'UPSIDE_HEADLINE') || "",
+        upside_discount_potential: getField(row, 'upside_discount_potential', 'UPSIDE_DISCOUNT_POTENTIAL') || "",
+        upside_value_add_opportunities: parseJsonColumn<string>(
+          getField(row, 'upside_value_add_opportunities', 'UPSIDE_VALUE_ADD_OPPORTUNITIES')
+        ),
+        upside_exit_strategy: getField(row, 'upside_exit_strategy', 'UPSIDE_EXIT_STRATEGY') || "",
+        upside_bull_case: getField(row, 'upside_bull_case', 'UPSIDE_BULL_CASE') || "",
+        upside_key_factors: parseJsonColumn(
+          getField(row, 'upside_key_factors', 'UPSIDE_KEY_FACTORS')
+        ),
+        upside_confidence: getField(row, 'upside_confidence', 'UPSIDE_CONFIDENCE') || "",
+
+        // === Risk Analysis ===
+        risk_label: getField(row, 'risk_label', 'RISK_LABEL') || "",
+        risk_headline: getField(row, 'risk_headline', 'RISK_HEADLINE') || "",
+        risk_rent_stabilized: parseBooleanField(
+          getField(row, 'risk_rent_stabilized', 'RISK_RENT_STABILIZED')
+        ),
+        risk_critical_risks: parseJsonColumn(
+          getField(row, 'risk_critical_risks', 'RISK_CRITICAL_RISKS')
+        ),
+        risk_legal_costs: getField(row, 'risk_legal_costs', 'RISK_LEGAL_COSTS') || "",
+        risk_deal_breakers: parseJsonColumn<string>(
+          getField(row, 'risk_deal_breakers', 'RISK_DEAL_BREAKERS')
+        ),
+        risk_bear_case: getField(row, 'risk_bear_case', 'RISK_BEAR_CASE') || "",
+        risk_due_diligence: parseJsonColumn<string>(
+          getField(row, 'risk_due_diligence', 'RISK_DUE_DILIGENCE')
+        ),
+        risk_confidence: getField(row, 'risk_confidence', 'RISK_CONFIDENCE') || "",
+
+        // === Execution Analysis ===
+        execution_label: getField(row, 'execution_label', 'EXECUTION_LABEL') || "",
+        execution_headline: getField(row, 'execution_headline', 'EXECUTION_HEADLINE') || "",
+        execution_renovation_cost: getField(row, 'execution_renovation_cost', 'EXECUTION_RENOVATION_COST') || "",
+        execution_timeline_months: Number(getField(row, 'execution_timeline_months', 'EXECUTION_TIMELINE_MONTHS')) || 0,
+        execution_total_capital: getField(row, 'execution_total_capital', 'EXECUTION_TOTAL_CAPITAL') || "",
+        execution_workstreams: parseJsonColumn(
+          getField(row, 'execution_workstreams', 'EXECUTION_WORKSTREAMS')
+        ),
+        execution_challenges: parseJsonColumn(
+          getField(row, 'execution_challenges', 'EXECUTION_CHALLENGES')
+        ),
+        execution_recommended_use: getField(row, 'execution_recommended_use', 'EXECUTION_RECOMMENDED_USE') || "",
+        execution_aya_fit: getField(row, 'execution_aya_fit', 'EXECUTION_AYA_FIT') || "",
+        execution_confidence: getField(row, 'execution_confidence', 'EXECUTION_CONFIDENCE') || "",
+
+        // === Other New Fields ===
+        stabilized_value: getField(row, 'stabilized_value', 'STABILIZED_VALUE') || "",
+        dissenting_opinions: getField(row, 'dissenting_opinions', 'DISSENTING_OPINIONS') || "",
+        next_steps: parseJsonColumn<string>(
+          getField(row, 'next_steps', 'NEXT_STEPS')
+        ),
+        alert_priority: getField(row, 'alert_priority', 'ALERT_PRIORITY') || "",
+        key_due_diligence_items: getField(row, 'key_due_diligence_items', 'KEY_DUE_DILIGENCE_ITEMS') || "",
       }))
     : [];
 
