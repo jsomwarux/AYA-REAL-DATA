@@ -20,7 +20,8 @@
       "Bash(lsof:*)",
       "Bash(npx tsc:*)",
       "Bash(npx drizzle-kit push:*)",
-      "Bash(npx vite build)"
+      "Bash(npx vite build)",
+      "Bash(npx tsx --eval \"import ''./server/index.ts''\")"
     ]
   }
 }

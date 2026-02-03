@@ -1,8 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -33,16 +35,22 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// Session middleware for password gate
+// Session middleware for password gate — persisted in PostgreSQL so sessions
+// survive server restarts.  Cookie (and DB row) lives for 24 hours.
+const PgStore = connectPgSimple(session);
 app.use(
   session({
+    store: new PgStore({
+      pool: pool as any,          // reuse the existing pg pool
+      createTableIfMissing: true, // auto-create "session" table on first run
+    }),
     secret: process.env.SESSION_SECRET || "aya-dashboard-secret-key-change-me",
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: false,
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      maxAge: 1000 * 60 * 60 * 24, // 24 hours
     },
   }),
 );
