@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { useUserRole } from "@/components/PasswordGate";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,8 +89,19 @@ interface SelectedTask {
 
 export default function Overview() {
   useDocumentTitle("Overview");
-  const role = useUserRole();
-  const isManagement = role === "management";
+
+  // Check which tabs user has access to
+  const tabAuthQuery = useQuery({
+    queryKey: ["tab-auth"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/tab-check");
+      if (!res.ok) throw new Error("Tab auth check failed");
+      return res.json() as Promise<{ construction: boolean; management: boolean; deals: boolean; anyAuthenticated: boolean }>;
+    },
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+  });
+  const isManagement = tabAuthQuery.data?.management ?? false;
 
   const [selectedTask, setSelectedTask] = useState<SelectedTask | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<RoomProgress | null>(null);

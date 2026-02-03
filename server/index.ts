@@ -18,6 +18,8 @@ declare module "express-session" {
     authenticated: boolean;
     role: "management" | "default";
     dealsAuthenticated: boolean;
+    constructionAuthenticated: boolean;
+    managementAuthenticated: boolean;
   }
 }
 
@@ -93,6 +95,64 @@ app.get("/api/auth/check", (req: Request, res: Response) => {
   return res.json({
     authenticated: !!req.session.authenticated,
     role: req.session.role || null,
+  });
+});
+
+// Per-tab auth endpoints
+app.post("/api/auth/tab-login", (req: Request, res: Response) => {
+  const { password, tab } = req.body;
+  const gatePassword = process.env.PASSWORD_GATE;
+  const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
+  const dealsPassword = process.env.DEALS_PASSWORD;
+
+  if (tab === "construction") {
+    if (!gatePassword || password === gatePassword) {
+      req.session.constructionAuthenticated = true;
+      req.session.authenticated = true;
+      req.session.role = req.session.role || "default";
+      return res.json({ success: true, tab: "construction" });
+    }
+    return res.status(401).json({ message: "Incorrect password" });
+  }
+
+  if (tab === "budget" || tab === "timeline") {
+    if (!managementPassword || password === managementPassword) {
+      req.session.managementAuthenticated = true;
+      req.session.authenticated = true;
+      req.session.role = "management";
+      return res.json({ success: true, tab });
+    }
+    return res.status(401).json({ message: "Incorrect password" });
+  }
+
+  if (tab === "deals") {
+    if (!dealsPassword || password === dealsPassword) {
+      req.session.dealsAuthenticated = true;
+      req.session.authenticated = true;
+      req.session.role = "management";
+      return res.json({ success: true, tab: "deals" });
+    }
+    return res.status(401).json({ message: "Incorrect password" });
+  }
+
+  return res.status(400).json({ message: "Invalid tab" });
+});
+
+app.get("/api/auth/tab-check", (req: Request, res: Response) => {
+  const gatePassword = process.env.PASSWORD_GATE;
+  const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
+  const dealsPassword = process.env.DEALS_PASSWORD;
+
+  const construction = !gatePassword || !!req.session.constructionAuthenticated;
+  const management = !managementPassword || !!req.session.managementAuthenticated;
+  const deals = !dealsPassword || !!req.session.dealsAuthenticated;
+  const anyAuthenticated = construction || management || deals;
+
+  return res.json({
+    construction,
+    management,
+    deals,
+    anyAuthenticated,
   });
 });
 

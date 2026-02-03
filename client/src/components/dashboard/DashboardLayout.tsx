@@ -5,7 +5,6 @@ import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Cale
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useUserRole } from "@/components/PasswordGate";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -24,7 +23,7 @@ interface MobileNavItem {
 }
 
 const mobileNavItems: MobileNavItem[] = [
-  { title: "Overview", href: "/", icon: <LayoutDashboard className="h-5 w-5" />, iconColor: "text-teal-400" },
+  { title: "Overview", href: "/overview", icon: <LayoutDashboard className="h-5 w-5" />, iconColor: "text-teal-400" },
   { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400" },
   { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true },
   { title: "Timeline", href: "/timeline", icon: <Calendar className="h-5 w-5" />, iconColor: "text-amber-400", managementOnly: true },
@@ -144,10 +143,7 @@ function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutP
 
 function MobileSidebar({ onClose }: { onClose: () => void }) {
   const [location] = useLocation();
-  const role = useUserRole();
-  const visibleItems = role === "management"
-    ? mobileNavItems
-    : mobileNavItems.filter(item => !item.managementOnly);
+  const visibleItems = mobileNavItems;
 
   return (
     <div className="flex h-full flex-col">

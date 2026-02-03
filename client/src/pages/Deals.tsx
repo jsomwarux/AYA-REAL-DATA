@@ -1,15 +1,10 @@
-import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { DealsDashboard } from "@/components/deals/DealsDashboard";
 import type { DealRecord } from "@/components/deals/types";
 import { fetchDealsData } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { toastSuccess, toastError } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Lock, Shield } from "lucide-react";
+import { toastSuccess } from "@/hooks/use-toast";
 
 // Helper to get value from row with case-insensitive key lookup
 function getField(row: any, ...keys: string[]): any {
@@ -98,52 +93,11 @@ function parseBooleanField(raw: any): boolean {
 export default function Deals() {
   useDocumentTitle("Deal Intelligence");
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  // Check if already authenticated via server session
-  useEffect(() => {
-    fetch("/api/auth/deals-check")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated) {
-          setIsAuthenticated(true);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setIsCheckingAuth(false));
-  }, []);
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch("/api/auth/deals-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (res.ok) {
-        setIsAuthenticated(true);
-        setError("");
-        toastSuccess("Access Granted", "Welcome to Deal Intelligence.");
-      } else {
-        setError("Incorrect password. Please try again.");
-        toastError("Access Denied", "Incorrect password.");
-      }
-    } catch {
-      setError("Failed to verify password. Please try again.");
-      toastError("Error", "Failed to verify password.");
-    }
-  };
-
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["deals"],
     queryFn: () => fetchDealsData(),
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    enabled: isAuthenticated, // Only fetch if authenticated
+    staleTime: 1000 * 60 * 5,
   });
 
   const handleRefresh = async () => {
@@ -230,69 +184,6 @@ export default function Deals() {
         ),
       }))
     : [];
-
-  // Show password gate if not authenticated
-  if (isCheckingAuth) {
-    return (
-      <DashboardLayout
-        title="Deal Intelligence"
-        subtitle="Checking authentication..."
-      >
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-pulse text-muted-foreground">Verifying access...</div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <DashboardLayout
-        title="Deal Intelligence"
-        subtitle="Protected area - authentication required"
-      >
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Card className="w-full max-w-md border-white/10 bg-gradient-to-br from-purple-500/10 to-purple-600/5">
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-purple-500/20">
-                <Shield className="h-8 w-8 text-purple-400" />
-              </div>
-              <CardTitle className="text-xl text-white">Protected Area</CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Deal Intelligence is password protected. Enter the password to continue.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="password"
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 bg-white/5 border-white/10"
-                  />
-                </div>
-                {error && (
-                  <p className="text-sm text-red-400">{error}</p>
-                )}
-                <Button
-                  type="submit"
-                  className="w-full bg-purple-600 hover:bg-purple-700"
-                >
-                  Access Deal Intelligence
-                </Button>
-              </form>
-              <p className="text-xs text-muted-foreground text-center mt-4">
-                This section contains sensitive deal analysis data.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   return (
     <DashboardLayout

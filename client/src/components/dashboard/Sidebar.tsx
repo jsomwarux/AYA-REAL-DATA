@@ -14,8 +14,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useUserRole } from "@/components/PasswordGate";
-
 interface SidebarContextType {
   isCollapsed: boolean;
   setIsCollapsed: (value: boolean) => void;
@@ -41,7 +39,7 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   {
     title: "Overview",
-    href: "/",
+    href: "/overview",
     icon: <LayoutDashboard className="h-5 w-5" />,
     iconColor: "text-teal-400",
     description: "Dashboard overview",
@@ -156,10 +154,7 @@ function NavLink({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean })
 
 export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const role = useUserRole();
-  const visibleNavItems = role === "management"
-    ? mainNavItems
-    : mainNavItems.filter(item => !item.managementOnly);
+  const visibleNavItems = mainNavItems;
 
   return (
     <TooltipProvider>
