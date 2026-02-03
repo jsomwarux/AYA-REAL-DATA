@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, Loader2, AlertCircle } from "lucide-react";
+import { Lock, Loader2, AlertCircle, Shield } from "lucide-react";
 
 type TabName = "construction" | "budget" | "timeline" | "deals";
 
@@ -107,16 +107,25 @@ export function TabPasswordGate({ tab, title, children, requireAny }: TabPasswor
     return <>{children}</>;
   }
 
+  // Management tabs (budget, timeline, deals) get pink/purple styling
+  const isManagementGate = tab === "budget" || tab === "timeline" || tab === "deals";
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
       <Card className="w-full max-w-sm border-white/10 bg-[#12121a]">
         <CardHeader className="text-center pb-4">
-          <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-teal-400/10 flex items-center justify-center">
-            <Lock className="h-6 w-6 text-teal-400" />
+          <div className={`mx-auto mb-3 h-12 w-12 rounded-full flex items-center justify-center ${isManagementGate ? "bg-pink-400/10" : "bg-teal-400/10"}`}>
+            {isManagementGate ? (
+              <Shield className="h-6 w-6 text-pink-400" />
+            ) : (
+              <Lock className="h-6 w-6 text-teal-400" />
+            )}
           </div>
           <CardTitle className="text-xl text-white">{title}</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Enter password to access this section
+            {isManagementGate
+              ? "Enter the management password to access this section"
+              : "Enter password to access this section"}
           </p>
         </CardHeader>
         <CardContent>
@@ -129,9 +138,9 @@ export function TabPasswordGate({ tab, title, children, requireAny }: TabPasswor
                   setPassword(e.target.value);
                   setError("");
                 }}
-                placeholder="Password"
+                placeholder={isManagementGate ? "Management password" : "Password"}
                 autoFocus
-                className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50"
+                className={`w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 ${isManagementGate ? "focus:ring-pink-400/50 focus:border-pink-400/50" : "focus:ring-teal-400/50 focus:border-teal-400/50"}`}
               />
             </div>
             {error && (
@@ -142,7 +151,7 @@ export function TabPasswordGate({ tab, title, children, requireAny }: TabPasswor
             )}
             <Button
               type="submit"
-              className="w-full text-white bg-teal-500 hover:bg-teal-600"
+              className={`w-full text-white ${isManagementGate ? "bg-pink-500 hover:bg-pink-600" : "bg-teal-500 hover:bg-teal-600"}`}
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending ? (
