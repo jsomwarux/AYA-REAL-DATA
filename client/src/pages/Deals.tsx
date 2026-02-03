@@ -24,24 +24,29 @@ function getField(row: any, ...keys: string[]): any {
   return null;
 }
 
-// Safely parse a JSON column that may be a JSON string, already-parsed array, or comma-separated string
-function parseJsonColumn<T = string>(raw: any): T[] {
+// Parse newline-separated simple list (each line is a plain string item)
+function parseSimpleList(raw: any): string[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw as T[];
+  if (Array.isArray(raw)) return raw.map(String);
   if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        return Array.isArray(parsed) ? parsed : [parsed];
-      } catch {
-        return [];
-      }
-    }
-    // Fallback: comma-separated string → array of strings
-    return trimmed.split(',').map(s => s.trim()).filter(Boolean) as unknown as T[];
+    return raw.split('\n').map(s => s.trim()).filter(Boolean);
   }
   return [];
+}
+
+// Parse newline-separated JSON objects (each line is a valid JSON object)
+function parseJsonLines<T = any>(raw: any): T[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as T[];
+  if (typeof raw !== 'string') return [];
+  const lines = raw.split('\n').filter(line => line.trim() !== '');
+  return lines.map(line => {
+    try {
+      return JSON.parse(line.trim());
+    } catch {
+      return { label: line.trim() } as unknown as T;
+    }
+  });
 }
 
 // Extract field from FULL_JSON if available
@@ -168,12 +173,12 @@ export default function Deals() {
         upside_label: getField(row, 'upside_label', 'UPSIDE_LABEL') || "",
         upside_headline: getField(row, 'upside_headline', 'UPSIDE_HEADLINE') || "",
         upside_discount_potential: getField(row, 'upside_discount_potential', 'UPSIDE_DISCOUNT_POTENTIAL') || "",
-        upside_value_add_opportunities: parseJsonColumn<string>(
+        upside_value_add_opportunities: parseSimpleList(
           getField(row, 'upside_value_add_opportunities', 'UPSIDE_VALUE_ADD_OPPORTUNITIES')
         ),
         upside_exit_strategy: getField(row, 'upside_exit_strategy', 'UPSIDE_EXIT_STRATEGY') || "",
         upside_bull_case: getField(row, 'upside_bull_case', 'UPSIDE_BULL_CASE') || "",
-        upside_key_factors: parseJsonColumn(
+        upside_key_factors: parseJsonLines(
           getField(row, 'upside_key_factors', 'UPSIDE_KEY_FACTORS')
         ),
         upside_confidence: getField(row, 'upside_confidence', 'UPSIDE_CONFIDENCE') || "",
@@ -184,15 +189,15 @@ export default function Deals() {
         risk_rent_stabilized: parseBooleanField(
           getField(row, 'risk_rent_stabilized', 'RISK_RENT_STABILIZED')
         ),
-        risk_critical_risks: parseJsonColumn(
+        risk_critical_risks: parseJsonLines(
           getField(row, 'risk_critical_risks', 'RISK_CRITICAL_RISKS')
         ),
         risk_legal_costs: getField(row, 'risk_legal_costs', 'RISK_LEGAL_COSTS') || "",
-        risk_deal_breakers: parseJsonColumn<string>(
+        risk_deal_breakers: parseSimpleList(
           getField(row, 'risk_deal_breakers', 'RISK_DEAL_BREAKERS')
         ),
         risk_bear_case: getField(row, 'risk_bear_case', 'RISK_BEAR_CASE') || "",
-        risk_due_diligence: parseJsonColumn<string>(
+        risk_due_diligence: parseSimpleList(
           getField(row, 'risk_due_diligence', 'RISK_DUE_DILIGENCE')
         ),
         risk_confidence: getField(row, 'risk_confidence', 'RISK_CONFIDENCE') || "",
@@ -203,10 +208,10 @@ export default function Deals() {
         execution_renovation_cost: getField(row, 'execution_renovation_cost', 'EXECUTION_RENOVATION_COST') || "",
         execution_timeline_months: Number(getField(row, 'execution_timeline_months', 'EXECUTION_TIMELINE_MONTHS')) || 0,
         execution_total_capital: getField(row, 'execution_total_capital', 'EXECUTION_TOTAL_CAPITAL') || "",
-        execution_workstreams: parseJsonColumn(
+        execution_workstreams: parseJsonLines(
           getField(row, 'execution_workstreams', 'EXECUTION_WORKSTREAMS')
         ),
-        execution_challenges: parseJsonColumn(
+        execution_challenges: parseJsonLines(
           getField(row, 'execution_challenges', 'EXECUTION_CHALLENGES')
         ),
         execution_recommended_use: getField(row, 'execution_recommended_use', 'EXECUTION_RECOMMENDED_USE') || "",
@@ -216,11 +221,13 @@ export default function Deals() {
         // === Other New Fields ===
         stabilized_value: getField(row, 'stabilized_value', 'STABILIZED_VALUE') || "",
         dissenting_opinions: getField(row, 'dissenting_opinions', 'DISSENTING_OPINIONS') || "",
-        next_steps: parseJsonColumn<string>(
+        next_steps: parseSimpleList(
           getField(row, 'next_steps', 'NEXT_STEPS')
         ),
         alert_priority: getField(row, 'alert_priority', 'ALERT_PRIORITY') || "",
-        key_due_diligence_items: getField(row, 'key_due_diligence_items', 'KEY_DUE_DILIGENCE_ITEMS') || "",
+        key_due_diligence_items: parseSimpleList(
+          getField(row, 'key_due_diligence_items', 'KEY_DUE_DILIGENCE_ITEMS')
+        ),
       }))
     : [];
 

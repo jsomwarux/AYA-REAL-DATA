@@ -85,7 +85,7 @@ export interface DealRecord {
   dissenting_opinions: string;
   next_steps: string[]; // parsed JSON array of strings
   alert_priority: string; // "HIGH" | "MEDIUM" | "LOW"
-  key_due_diligence_items: string;
+  key_due_diligence_items: string[];
 }
 
 // ============================================
