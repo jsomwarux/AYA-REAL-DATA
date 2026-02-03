@@ -108,10 +108,9 @@ export function DealDetailModal({
     return deal.execution_label;
   };
 
-  const dueDiligenceItems = deal.key_due_diligence
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const dueDiligenceItems = deal.key_due_diligence_items.length > 0
+    ? deal.key_due_diligence_items
+    : deal.key_due_diligence.split("\n").map((item) => item.trim()).filter(Boolean);
 
   const toggleCheck = (index: number) => {
     const newChecked = new Set(checkedItems);
@@ -402,29 +401,29 @@ export function DealDetailModal({
                     <p className="text-sm font-medium text-white">Financial Analysis</p>
                   </div>
                   <div className={cn("grid gap-3", deal.stabilized_value ? "grid-cols-3" : "grid-cols-2")}>
-                    <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                    <div className="p-3 rounded-lg bg-white/5 border border-white/10 overflow-hidden">
                       <p className="text-xs text-muted-foreground uppercase tracking-wider">
                         Acquisition Range
                       </p>
-                      <p className="text-base font-bold text-white mt-1">
+                      <p className="text-sm font-bold text-white mt-1 break-words">
                         {deal.estimated_price_range}
                       </p>
                     </div>
                     {deal.stabilized_value && (
-                      <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                      <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 overflow-hidden">
                         <p className="text-xs text-purple-400 uppercase tracking-wider">
                           Stabilized Value
                         </p>
-                        <p className="text-base font-bold text-purple-400 mt-1">
+                        <p className="text-sm font-bold text-purple-400 mt-1 break-words">
                           {deal.stabilized_value}
                         </p>
                       </div>
                     )}
-                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 overflow-hidden">
                       <p className="text-xs text-emerald-400 uppercase tracking-wider">
                         Est. ROI
                       </p>
-                      <p className="text-base font-bold text-emerald-400 mt-1">
+                      <p className="text-sm font-bold text-emerald-400 mt-1 break-words">
                         {deal.estimated_roi}
                       </p>
                     </div>

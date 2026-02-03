@@ -402,9 +402,24 @@ export function DealsTable({ data, onViewDetails, onOpenDrillDown }: DealsTableP
 
                               <div className="p-3 rounded-lg bg-white/5 border border-white/10 col-span-2">
                                 <div className="flex items-center gap-4">
-                                  <ScoreGauge score={deal.upside_score} label="Upside" size="sm" />
-                                  <ScoreGauge score={deal.risk_score} label="Risk" size="sm" />
-                                  <ScoreGauge score={deal.execution_score} label="Execution" size="sm" />
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); onOpenDrillDown?.(deal, "upside"); }}
+                                    className="cursor-pointer transition-transform hover:scale-110"
+                                  >
+                                    <ScoreGauge score={deal.upside_score} label="Upside" size="sm" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); onOpenDrillDown?.(deal, "risk"); }}
+                                    className="cursor-pointer transition-transform hover:scale-110"
+                                  >
+                                    <ScoreGauge score={deal.risk_score} label="Risk" size="sm" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); onOpenDrillDown?.(deal, "execution"); }}
+                                    className="cursor-pointer transition-transform hover:scale-110"
+                                  >
+                                    <ScoreGauge score={deal.execution_score} label="Execution" size="sm" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -417,13 +432,16 @@ export function DealsTable({ data, onViewDetails, onOpenDrillDown }: DealsTableP
                                   Key Due Diligence Items
                                 </p>
                                 <ul className="mt-1 space-y-1">
-                                  {deal.key_due_diligence.split(",").map((item, i) => (
+                                  {(deal.key_due_diligence_items.length > 0
+                                    ? deal.key_due_diligence_items
+                                    : deal.key_due_diligence.split("\n").map(s => s.trim()).filter(Boolean)
+                                  ).map((item, i) => (
                                     <li
                                       key={i}
                                       className="text-sm text-muted-foreground flex items-start gap-2"
                                     >
                                       <span className="text-amber-400 mt-1">•</span>
-                                      {item.trim()}
+                                      {item}
                                     </li>
                                   ))}
                                 </ul>
