@@ -126,6 +126,7 @@ app.post("/api/auth/tab-login", (req: Request, res: Response) => {
   if (tab === "budget" || tab === "timeline") {
     if (!managementPassword || password === managementPassword) {
       req.session.managementAuthenticated = true;
+      req.session.constructionAuthenticated = true; // management can also see construction
       req.session.authenticated = true;
       req.session.role = "management";
       return res.json({ success: true, tab });
@@ -151,8 +152,8 @@ app.get("/api/auth/tab-check", (req: Request, res: Response) => {
   const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
   const dealsPassword = process.env.DEALS_PASSWORD;
 
-  const construction = !gatePassword || !!req.session.constructionAuthenticated;
   const management = !managementPassword || !!req.session.managementAuthenticated;
+  const construction = !gatePassword || !!req.session.constructionAuthenticated || management;
   const deals = !dealsPassword || !!req.session.dealsAuthenticated;
   const anyAuthenticated = construction || management || deals;
 
