@@ -297,8 +297,8 @@ router.get('/construction-progress', async (req, res) => {
       });
     }
 
-    // Fetch both the Rooms Progress data and RECAP data
-    const roomsRange = "'Rooms Progress'!A3:Z500"; // Row 3 has headers, row 4+ has data
+    // Fetch both the A.I Rooms Progress data and RECAP data
+    const roomsRange = "'A.I Rooms Progress'!A3:Z500"; // Row 3 has headers, row 4+ has data
     const recapRange = "'RECAP'!A:Z";
 
     console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
