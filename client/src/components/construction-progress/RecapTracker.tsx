@@ -1,16 +1,6 @@
 import { useMemo } from "react";
 import { RecapSection } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 import { TrendingUp, Calendar, ArrowUpRight } from "lucide-react";
 
 interface RecapTrackerProps {
@@ -133,67 +123,6 @@ function SectionCard({ section }: { section: RecapSection }) {
           </Card>
         ))}
       </div>
-
-      {/* Line Chart */}
-      <Card className="bg-white/5 border-white/10">
-        <CardHeader className="pb-2 px-3 sm:px-6 pt-4 sm:pt-6">
-          <CardTitle className="text-sm sm:text-base font-medium text-white">
-            Progress Over Time
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-2 sm:px-6 pb-4 sm:pb-6">
-          <div className="h-[240px] sm:h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={chartData}
-                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: "#9ca3af", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                />
-                <YAxis
-                  tick={{ fill: "#9ca3af", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                  width={40}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(17, 24, 39, 0.95)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                  }}
-                  labelStyle={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}
-                  itemStyle={{ color: "#d1d5db", fontSize: 12 }}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-                {dataHeaders.map((header, idx) => (
-                  <Line
-                    key={header}
-                    type="monotone"
-                    dataKey={header}
-                    name={header}
-                    stroke={LINE_COLORS[idx % LINE_COLORS.length]}
-                    strokeWidth={2}
-                    dot={{ r: 4, fill: LINE_COLORS[idx % LINE_COLORS.length] }}
-                    activeDot={{ r: 6 }}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Data Table */}
       <Card className="bg-white/5 border-white/10">
