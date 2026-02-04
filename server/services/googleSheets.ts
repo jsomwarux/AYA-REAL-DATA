@@ -118,6 +118,60 @@ export async function fetchMultipleRanges(
   return result;
 }
 
+// Fetch sheet data with hyperlinks resolved
+// Uses spreadsheets.get with rowData to extract actual hyperlink URLs from cells
+export async function fetchSheetDataWithHyperlinks(
+  spreadsheetId: string,
+  sheetTitle: string,
+  startRow: number,
+  endRow: number,
+  endCol: string
+): Promise<SheetData> {
+  const sheets = getGoogleSheetsClient();
+  const range = `'${sheetTitle}'!A${startRow}:${endCol}${endRow}`;
+
+  const response = await sheets.spreadsheets.get({
+    spreadsheetId,
+    ranges: [range],
+    fields: 'sheets.data.rowData.values(formattedValue,hyperlink)',
+  });
+
+  const rowData = response.data.sheets?.[0]?.data?.[0]?.rowData || [];
+  if (rowData.length === 0) {
+    return { headers: [], rows: [], rawValues: [] };
+  }
+
+  // Build rawValues where hyperlinks take priority over display text
+  const rawValues: string[][] = rowData.map((row) => {
+    const cells = row.values || [];
+    return cells.map((cell) => {
+      // If cell has a hyperlink, use that as the value
+      if (cell.hyperlink) {
+        return cell.hyperlink;
+      }
+      return cell.formattedValue || '';
+    });
+  });
+
+  const headers = rawValues[0] || [];
+  const dataRows = rawValues.slice(1);
+  const rows = dataRows.map((row) => {
+    const obj: SheetRow = {};
+    headers.forEach((header, index) => {
+      const value = row[index];
+      if (value !== undefined && value !== '') {
+        const num = Number(value);
+        obj[header] = isNaN(num) ? value : num;
+      } else {
+        obj[header] = null;
+      }
+    });
+    return obj;
+  });
+
+  return { headers, rows, rawValues };
+}
+
 // Get spreadsheet metadata
 export async function getSpreadsheetInfo(spreadsheetId: string) {
   const sheets = getGoogleSheetsClient();

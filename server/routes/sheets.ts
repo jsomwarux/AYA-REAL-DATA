@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { fetchSheetData, fetchMultipleRanges, getSpreadsheetInfo, SheetRow as GoogleSheetRow } from '../services/googleSheets';
+import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, SheetRow as GoogleSheetRow } from '../services/googleSheets';
 import { db } from '../db';
 import { sheetRows } from '@shared/schema';
 import { eq, and, inArray } from 'drizzle-orm';
@@ -955,12 +955,10 @@ router.get('/container-schedule', async (req, res) => {
     }
 
     // Row 1 is a title/note row, Row 2 has headers, Row 3+ has data
-    // Fetch from row 2 onwards so headers are first row of result
-    const range = `'${tabName}'!A2:P500`;
-
-    console.log('[container-schedule] Fetching data from sheet:', spreadsheetId, 'range:', range);
-    const data = await fetchSheetData(spreadsheetId, range);
-    console.log('[container-schedule] Data fetched successfully');
+    // Use hyperlink-aware fetch to extract actual URLs from cells that display "Link"
+    console.log('[container-schedule] Fetching data with hyperlinks from sheet:', spreadsheetId);
+    const data = await fetchSheetDataWithHyperlinks(spreadsheetId, tabName, 2, 500, 'P');
+    console.log('[container-schedule] Data fetched successfully with hyperlinks');
 
     let containers: GoogleSheetRow[] = [];
 
