@@ -168,16 +168,8 @@ function MobileSidebar({ onClose }: { onClose: () => void }) {
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="flex h-14 items-center justify-between border-b border-white/10 px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-teal">
-            <span className="text-lg font-bold text-white">A</span>
-          </div>
-          <div>
-            <span className="text-xl font-bold tracking-tight text-white">AYA</span>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              Intelligence Platform
-            </p>
-          </div>
+        <div className="flex items-center">
+          <img src="/aya-icon.png" alt="AYA" className="h-9 w-auto object-contain" />
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9">
           <X className="h-5 w-5" />

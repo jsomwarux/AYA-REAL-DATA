@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 100" fill="none">
+  <!-- AYA Logo - Purple filled chevron letterforms matching brand -->
+  <!-- First A (left upward chevron) -->
+  <path d="M6 82 C2 88 4 94 10 94 L24 94 C28 94 32 91 34 88 L52 52 L70 88 C72 91 76 94 80 94 L94 94 C100 94 102 88 98 82 L60 14 C58 10 55 8 52 8 C49 8 46 10 44 14 Z" fill="#4A2882"/>
+
+  <!-- Y (center - downward V with stem) -->
+  <path d="M84 14 C82 10 85 4 90 8 L92 10 C94 12 96 14 98 18 L120 56 L142 18 C144 14 146 12 148 10 L150 8 C155 4 158 10 156 14 L128 66 L128 90 C128 94 125 96 122 96 L118 96 C115 96 112 94 112 90 L112 66 Z" fill="#4A2882"/>
+
+  <!-- Second A (right upward chevron) -->
+  <path d="M166 82 C162 88 164 94 170 94 L184 94 C188 94 192 91 194 88 L212 52 L230 88 C232 91 236 94 240 94 L254 94 C260 94 262 88 258 82 L220 14 C218 10 215 8 212 8 C209 8 206 10 204 14 Z" fill="#4A2882"/>
+</svg>

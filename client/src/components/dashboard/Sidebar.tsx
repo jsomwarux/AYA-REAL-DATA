@@ -215,17 +215,11 @@ export function Sidebar() {
           "flex h-16 items-center border-b border-white/10",
           isCollapsed ? "justify-center px-2" : "px-6"
         )}>
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-teal">
-              <span className="text-lg font-bold text-white">A</span>
-            </div>
-            {!isCollapsed && (
-              <div className="animate-fade-in">
-                <span className="text-xl font-bold tracking-tight text-white">AYA</span>
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Intelligence Platform
-                </p>
-              </div>
+          <Link href="/" className="flex items-center">
+            {isCollapsed ? (
+              <img src="/aya-icon.png" alt="AYA" className="h-7 w-auto object-contain" />
+            ) : (
+              <img src="/aya-icon.png" alt="AYA" className="h-9 w-auto object-contain" />
             )}
           </Link>
         </div>

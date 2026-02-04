@@ -106,9 +106,7 @@ export default function Landing() {
     <div className="min-h-screen bg-[#0a0a0f] flex flex-col">
       {/* Header */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-teal mb-4">
-          <span className="text-2xl font-bold text-white">A</span>
-        </div>
+        <img src="/aya-logo.png" alt="AYA" className="h-20 w-auto max-w-[220px] object-contain mb-4" />
         <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
           AYA Intelligence Platform
         </h1>

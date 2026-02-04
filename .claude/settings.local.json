@@ -21,7 +21,9 @@
       "Bash(npx tsc:*)",
       "Bash(npx drizzle-kit push:*)",
       "Bash(npx vite build)",
-      "Bash(npx tsx --eval \"import ''./server/index.ts''\")"
+      "Bash(npx tsx --eval \"import ''./server/index.ts''\")",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)"
     ]
   }
 }
