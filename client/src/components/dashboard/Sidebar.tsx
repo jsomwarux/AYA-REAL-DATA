@@ -11,6 +11,7 @@ import {
   Building2,
   DollarSign,
   Calendar,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,15 @@ const mainNavItems: NavItem[] = [
     icon: <Calendar className="h-5 w-5" />,
     iconColor: "text-amber-400",
     description: "Project schedule and milestones",
+    managementOnly: true,
+    requiredAuth: "management",
+  },
+  {
+    title: "Weekly Goals",
+    href: "/weekly-goals",
+    icon: <Target className="h-5 w-5" />,
+    iconColor: "text-orange-400",
+    description: "Weekly sprint goals and progress",
     managementOnly: true,
     requiredAuth: "management",
   },

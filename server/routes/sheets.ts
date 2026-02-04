@@ -814,4 +814,95 @@ router.get('/budget', async (req, res) => {
   }
 });
 
+// Get Weekly Goals data
+router.get('/weekly-goals', async (req, res) => {
+  console.log('[weekly-goals] Endpoint called');
+  try {
+    const spreadsheetId = process.env.WEEKLY_GOALS_SHEET_ID;
+    console.log('[weekly-goals] Sheet ID configured:', spreadsheetId ? 'YES' : 'NO');
+
+    if (!spreadsheetId) {
+      console.error('[weekly-goals] WEEKLY_GOALS_SHEET_ID not set');
+      return res.status(400).json({
+        error: 'Weekly Goals sheet ID not configured',
+        message: 'Please set WEEKLY_GOALS_SHEET_ID in environment variables'
+      });
+    }
+
+    const range = "'New updated'!A:F";
+
+    console.log('[weekly-goals] Fetching data from sheet:', spreadsheetId);
+    const data = await fetchSheetData(spreadsheetId, range);
+    console.log('[weekly-goals] Data fetched successfully');
+
+    // Process goals data
+    let goals: GoogleSheetRow[] = [];
+
+    if (data && data.rawValues && data.rawValues.length > 0) {
+      // Row 1 has headers
+      const headers = data.rawValues[0] as string[];
+      const dataRows = data.rawValues.slice(1);
+
+      // Map column indices
+      const goalIdx = headers.findIndex(h => h?.toLowerCase().includes('weekly goal'));
+      const assigneeIdx = headers.findIndex(h => h?.toLowerCase().includes('assignee'));
+      const targetIdx = headers.findIndex(h => h?.toLowerCase().includes('target'));
+      const deadlineIdx = headers.findIndex(h => h?.toLowerCase().includes('deadline'));
+      const resultIdx = headers.findIndex(h => h?.toLowerCase().includes('result'));
+      const commentsIdx = headers.findIndex(h => h?.toLowerCase().includes('comment'));
+
+      console.log('[weekly-goals] Column indices:', { goalIdx, assigneeIdx, targetIdx, deadlineIdx, resultIdx, commentsIdx });
+
+      goals = dataRows.map((row, index) => {
+        const weeklyGoal = (row[goalIdx] || '').toString().trim();
+        const assignee = (row[assigneeIdx] || '').toString().trim();
+        const target = (row[targetIdx] || '').toString().trim();
+        const deadline = (row[deadlineIdx] || '').toString().trim();
+        const result = (row[resultIdx] || '').toString().trim();
+        const comments = (row[commentsIdx] || '').toString().trim();
+
+        return {
+          id: index + 2, // Excel row number (1-indexed + header)
+          weeklyGoal,
+          assignee,
+          target,
+          deadline,
+          result,
+          comments,
+        };
+      }).filter(goal => goal.weeklyGoal !== ''); // Filter out empty rows
+    }
+
+    // Compute summary stats
+    const byStatus: Record<string, number> = {};
+    const byAssignee: Record<string, number> = {};
+
+    for (const goal of goals) {
+      const status = (goal.result as string) || 'No status';
+      byStatus[status] = (byStatus[status] || 0) + 1;
+
+      const assignee = (goal.assignee as string) || 'Unassigned';
+      byAssignee[assignee] = (byAssignee[assignee] || 0) + 1;
+    }
+
+    console.log(`[weekly-goals] Returning ${goals.length} goals`);
+
+    res.json({
+      goals,
+      summary: {
+        total: goals.length,
+        byStatus,
+        byAssignee,
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error fetching weekly goals data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch weekly goals data',
+      message: error.message
+    });
+  }
+});
+
 export default router;

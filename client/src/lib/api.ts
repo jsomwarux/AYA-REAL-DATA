@@ -329,3 +329,32 @@ export async function deleteCustomEventType(id: number): Promise<{ success: bool
   const response = await fetch(`${TIMELINE_BASE}/event-types/${id}`, { method: 'DELETE' });
   return handleResponse<{ success: boolean }>(response);
 }
+
+// Weekly Goals Types
+export interface WeeklyGoal {
+  id: number;
+  weeklyGoal: string;
+  assignee: string;
+  target: string;
+  deadline: string;
+  result: string;
+  comments: string;
+}
+
+export interface WeeklyGoalsSummary {
+  total: number;
+  byStatus: Record<string, number>;
+  byAssignee: Record<string, number>;
+}
+
+export interface WeeklyGoalsData {
+  goals: WeeklyGoal[];
+  summary: WeeklyGoalsSummary;
+  lastUpdated: string;
+}
+
+// Fetch Weekly Goals data
+export async function fetchWeeklyGoalsData(): Promise<WeeklyGoalsData> {
+  const response = await fetch(`${API_BASE}/weekly-goals`);
+  return handleResponse<WeeklyGoalsData>(response);
+}

@@ -10,6 +10,7 @@ import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
 import Timeline from "@/pages/Timeline";
 import Deals from "@/pages/Deals";
+import WeeklyGoals from "@/pages/WeeklyGoals";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
@@ -54,6 +55,13 @@ function Router() {
         <Route path="/timeline">
           <TabPasswordGate tab="timeline" title="Timeline">
             <Timeline />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Weekly Goals - MANAGEMENT_PASSWORD_GATE */}
+        <Route path="/weekly-goals">
+          <TabPasswordGate tab="budget" title="Weekly Goals">
+            <WeeklyGoals />
           </TabPasswordGate>
         </Route>
 
