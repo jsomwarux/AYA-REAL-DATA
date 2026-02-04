@@ -33,6 +33,8 @@ AYA-REAL-DATA/
 │       │   ├── ConstructionProgress.tsx   # Construction tracking page
 │       │   ├── Budget.tsx                 # Budget tracking page
 │       │   ├── Timeline.tsx              # Gantt/timeline page (~900 lines)
+│       │   ├── WeeklyGoals.tsx           # Weekly sprint goals tracking page
+│       │   ├── ContainerSchedule.tsx    # Container shipment tracking page
 │       │   ├── Deals.tsx                 # Deal management page
 │       │   ├── Settings.tsx              # App settings page
 │       │   └── not-found.tsx             # 404 page
@@ -42,6 +44,10 @@ AYA-REAL-DATA/
 │       │   │   ├── Sidebar.tsx           # Navigation sidebar
 │       │   │   └── StatCard.tsx          # Reusable stat card component
 │       │   ├── PasswordGate.tsx          # Password gate wrapper component
+│       │   ├── weekly-goals/
+│       │   │   └── WeeklyGoalsDashboard.tsx # Weekly goals table, filters, stat cards
+│       │   ├── container-schedule/
+│       │   │   └── ContainerScheduleDashboard.tsx # Container table, filters, stat cards
 │       │   ├── timeline/
 │       │   │   ├── TimelineChart.tsx     # Gantt-style calendar grid
 │       │   │   ├── EventModal.tsx        # Add/edit event dialog
@@ -89,6 +95,8 @@ AYA-REAL-DATA/
 | `/construction` | ConstructionProgress | Construction tracking from Google Sheets |
 | `/budget` | Budget | Budget tracking and analysis |
 | `/timeline` | Timeline | Gantt-style project timeline (local DB) |
+| `/weekly-goals` | WeeklyGoals | Weekly sprint goals from Google Sheets |
+| `/container-schedule` | ContainerSchedule | Container shipment tracking from Google Sheets |
 | `/deals` | Deals | Deal pipeline management |
 | `/settings` | Settings | Application settings |
 
@@ -178,6 +186,8 @@ The entire app is protected by a simple password gate. Users must enter the corr
 - `PASSWORD_GATE` - Password required to access the dashboard (Replit secret)
 - `SESSION_SECRET` - Express session secret (optional, has fallback)
 - `TIMELINE_SHEET_ID` - Google Spreadsheet ID for timeline data import
+- `WEEKLY_GOALS_SHEET_ID` - Google Spreadsheet ID for weekly goals data
+- `CONTAINER_SCHEDULE_SHEET_ID` - Google Spreadsheet ID for container schedule data
 - Google Sheets API credentials (service account)
 - PostgreSQL connection string
 

@@ -1,6 +1,64 @@
 # Change Log
 
-## Latest Session Changes
+## February 4, 2026
+
+### Weekly Goals Tab (New)
+- **New page**: `/weekly-goals` — Tracks weekly sprint goals pulled from Google Sheets (`WEEKLY_GOALS_SHEET_ID`, tab: "New updated")
+- 4 summary stat cards: Total Goals, Done, In Progress, Not Started
+- Filterable/sortable goals table with search, assignee dropdown, status dropdown
+- Color-coded assignee chips for 9 team members (Gil, Andrew, Fatima, Gilad, Mia, Daniel, Kobi, Libby, Liat)
+- Color-coded status badges: Done (green), In Progress (blue), Partially Completed (amber), Did not start (red), Not done yet (gray)
+- Comments shown via tooltip icon on hover
+- Mobile-responsive card layout on small screens
+- Protected by management password
+- Dynamic tab name resolution via `getSpreadsheetInfo()` to handle exact tab name matching
+
+**Files created:**
+- `client/src/pages/WeeklyGoals.tsx`
+- `client/src/components/weekly-goals/WeeklyGoalsDashboard.tsx`
+
+**Files changed:**
+- `server/routes/sheets.ts` — Added `GET /api/sheets/weekly-goals` endpoint
+- `client/src/lib/api.ts` — Added `WeeklyGoal`, `WeeklyGoalsSummary`, `WeeklyGoalsData` types and `fetchWeeklyGoalsData()` function
+- `client/src/App.tsx` — Added `/weekly-goals` route with management password gate
+- `client/src/components/dashboard/Sidebar.tsx` — Added Weekly Goals nav item (orange Target icon)
+- `client/src/pages/Landing.tsx` — Added Weekly Goals card to landing page grid
+
+---
+
+### Container Schedule Tab (New)
+- **New page**: `/container-schedule` — Tracks container shipments from factory to warehouse, pulled from Google Sheets (`CONTAINER_SCHEDULE_SHEET_ID`, tab: "Summary")
+- 4 summary stat cards: Total Containers, Shipped, At Port, Delivered
+- Filterable/sortable table with search, factory dropdown, status dropdown
+- Color-coded factory chips (IDM, SESE, ZHONGSHAN, ORBITA, DONGNA, DONGFANG, ZHONGBAI)
+- Status badges following shipment lifecycle: Ready to be shipped (amber), Passed inspection (sky), Shipped (blue), Arrived NY Port (violet), Warehouse (emerald), Arrived to hotel (green)
+- Expandable rows revealing full details: all date milestones (Delivery, Loading, Vessel Departure, ETA Port, ETA Warehouse), product details, and document links (BOL Copy, Insurance, Product List w/ Photos, Packing List, Warehouse Proof of Delivery)
+- Key dates shown in main table: Vessel Departure, ETA NY Port, ETA Warehouse
+- Truncated container contents with tooltip for long descriptions
+- Mobile-responsive card layout
+- Protected by management password
+- Row 1 in sheet is a title/note row; headers parsed from Row 2
+- Columns A-P: Factory, Container loaded, Shipment #, Container #, Delivery, Loading Date, Vessel Departure Date, ETA to NY Port, ETA to Warehouse, Status, BOL Copy, Insurance, Product list w/th photos, Packing list, Product Details, Warehouse Proof of delivery
+
+**Files created:**
+- `client/src/pages/ContainerSchedule.tsx`
+- `client/src/components/container-schedule/ContainerScheduleDashboard.tsx`
+
+**Files changed:**
+- `server/routes/sheets.ts` — Added `GET /api/sheets/container-schedule` endpoint
+- `client/src/lib/api.ts` — Added `ContainerScheduleItem`, `ContainerScheduleSummary`, `ContainerScheduleData` types and `fetchContainerScheduleData()` function
+- `client/src/App.tsx` — Added `/container-schedule` route with management password gate
+- `client/src/components/dashboard/Sidebar.tsx` — Added Container Schedule nav item (cyan Ship icon)
+- `client/src/pages/Landing.tsx` — Added Container Schedule card to landing page grid
+
+---
+
+### Documentation Updates
+- Updated `ProjectContext.md`, `PROJECT_CONTEXT.md`, and `ChangeLog.md` with Weekly Goals and Container Schedule tabs
+
+---
+
+## Previous Session Changes
 
 ### Overview Page Overhaul
 - **Rewrote Overview page** to pull data from **all** data sources (Construction, Budget, Timeline) instead of just Construction

@@ -11,6 +11,7 @@ import Budget from "@/pages/Budget";
 import Timeline from "@/pages/Timeline";
 import Deals from "@/pages/Deals";
 import WeeklyGoals from "@/pages/WeeklyGoals";
+import ContainerSchedule from "@/pages/ContainerSchedule";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
@@ -62,6 +63,13 @@ function Router() {
         <Route path="/weekly-goals">
           <TabPasswordGate tab="budget" title="Weekly Goals">
             <WeeklyGoals />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Container Schedule - MANAGEMENT_PASSWORD_GATE */}
+        <Route path="/container-schedule">
+          <TabPasswordGate tab="budget" title="Container Schedule">
+            <ContainerSchedule />
           </TabPasswordGate>
         </Route>
 

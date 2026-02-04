@@ -829,9 +829,26 @@ router.get('/weekly-goals', async (req, res) => {
       });
     }
 
-    const range = "'New updated'!A:F";
+    // First, fetch spreadsheet info to get the exact tab name
+    let tabName = 'New updated';
+    try {
+      const info = await getSpreadsheetInfo(spreadsheetId);
+      const matchingSheet = info.sheets?.find(
+        (s: any) => s.title?.toLowerCase().trim() === 'new updated'
+      );
+      if (matchingSheet?.title) {
+        tabName = matchingSheet.title;
+        console.log('[weekly-goals] Found exact tab name:', JSON.stringify(tabName));
+      } else {
+        console.log('[weekly-goals] Available tabs:', info.sheets?.map((s: any) => s.title));
+      }
+    } catch (infoErr: any) {
+      console.warn('[weekly-goals] Could not fetch sheet info, using default tab name:', infoErr.message);
+    }
 
-    console.log('[weekly-goals] Fetching data from sheet:', spreadsheetId);
+    const range = `'${tabName}'!A:F`;
+
+    console.log('[weekly-goals] Fetching data from sheet:', spreadsheetId, 'range:', range);
     const data = await fetchSheetData(spreadsheetId, range);
     console.log('[weekly-goals] Data fetched successfully');
 
@@ -900,6 +917,141 @@ router.get('/weekly-goals', async (req, res) => {
     console.error('Error fetching weekly goals data:', error);
     res.status(500).json({
       error: 'Failed to fetch weekly goals data',
+      message: error.message
+    });
+  }
+});
+
+// Get Container Schedule data
+router.get('/container-schedule', async (req, res) => {
+  console.log('[container-schedule] Endpoint called');
+  try {
+    const spreadsheetId = process.env.CONTAINER_SCHEDULE_SHEET_ID;
+    console.log('[container-schedule] Sheet ID configured:', spreadsheetId ? 'YES' : 'NO');
+
+    if (!spreadsheetId) {
+      console.error('[container-schedule] CONTAINER_SCHEDULE_SHEET_ID not set');
+      return res.status(400).json({
+        error: 'Container Schedule sheet ID not configured',
+        message: 'Please set CONTAINER_SCHEDULE_SHEET_ID in environment variables'
+      });
+    }
+
+    // Fetch tab info to get exact tab name
+    let tabName = 'Summary';
+    try {
+      const info = await getSpreadsheetInfo(spreadsheetId);
+      const matchingSheet = info.sheets?.find(
+        (s: any) => s.title?.toLowerCase().trim() === 'summary'
+      );
+      if (matchingSheet?.title) {
+        tabName = matchingSheet.title;
+        console.log('[container-schedule] Found exact tab name:', JSON.stringify(tabName));
+      } else {
+        console.log('[container-schedule] Available tabs:', info.sheets?.map((s: any) => s.title));
+      }
+    } catch (infoErr: any) {
+      console.warn('[container-schedule] Could not fetch sheet info:', infoErr.message);
+    }
+
+    // Row 1 is a title/note row, Row 2 has headers, Row 3+ has data
+    // Fetch from row 2 onwards so headers are first row of result
+    const range = `'${tabName}'!A2:P500`;
+
+    console.log('[container-schedule] Fetching data from sheet:', spreadsheetId, 'range:', range);
+    const data = await fetchSheetData(spreadsheetId, range);
+    console.log('[container-schedule] Data fetched successfully');
+
+    let containers: GoogleSheetRow[] = [];
+
+    if (data && data.rawValues && data.rawValues.length > 0) {
+      const headers = data.rawValues[0] as string[];
+      const dataRows = data.rawValues.slice(1);
+
+      // Map column indices by header name (case-insensitive)
+      const findCol = (keyword: string) => headers.findIndex(h =>
+        h?.toLowerCase().trim().includes(keyword.toLowerCase())
+      );
+
+      const factoryIdx = findCol('factory');
+      const containerLoadedIdx = findCol('container loaded');
+      const shipmentIdx = findCol('shipment');
+      const containerNumIdx = findCol('container #');
+      const deliveryIdx = findCol('delivery');
+      const loadingDateIdx = findCol('loading date');
+      const vesselIdx = findCol('vessel');
+      const etaNYIdx = findCol('eta to ny');
+      const etaWarehouseIdx = findCol('eta to warehouse');
+      const statusIdx = findCol('status');
+      const bolIdx = findCol('bol');
+      const insuranceIdx = findCol('insurance');
+      const productListIdx = findCol('product list');
+      const packingIdx = findCol('packing');
+      const productDetailsIdx = findCol('product detail');
+      const warehouseProofIdx = findCol('warehouse proof');
+
+      console.log('[container-schedule] Column indices:', {
+        factoryIdx, containerLoadedIdx, shipmentIdx, containerNumIdx,
+        deliveryIdx, loadingDateIdx, vesselIdx, etaNYIdx, etaWarehouseIdx,
+        statusIdx, bolIdx, insuranceIdx, productListIdx, packingIdx,
+        productDetailsIdx, warehouseProofIdx
+      });
+
+      containers = dataRows.map((row, index) => {
+        const getValue = (idx: number) => {
+          if (idx < 0 || idx >= row.length) return '';
+          return (row[idx] || '').toString().trim();
+        };
+
+        return {
+          id: index + 3, // Excel row number (row 3 is first data row)
+          factory: getValue(factoryIdx),
+          containerLoaded: getValue(containerLoadedIdx),
+          shipmentNumber: getValue(shipmentIdx),
+          containerNumber: getValue(containerNumIdx),
+          delivery: getValue(deliveryIdx),
+          loadingDate: getValue(loadingDateIdx),
+          vesselDepartureDate: getValue(vesselIdx),
+          etaNYPort: getValue(etaNYIdx),
+          etaWarehouse: getValue(etaWarehouseIdx),
+          status: getValue(statusIdx),
+          bolCopy: getValue(bolIdx),
+          insurance: getValue(insuranceIdx),
+          productListWithPhotos: getValue(productListIdx),
+          packingList: getValue(packingIdx),
+          productDetails: getValue(productDetailsIdx),
+          warehouseProofOfDelivery: getValue(warehouseProofIdx),
+        };
+      }).filter(c => c.factory !== '' || c.containerLoaded !== ''); // Filter out empty rows
+    }
+
+    // Compute summary stats
+    const byStatus: Record<string, number> = {};
+    const byFactory: Record<string, number> = {};
+
+    for (const container of containers) {
+      const status = (container.status as string) || 'No status';
+      byStatus[status] = (byStatus[status] || 0) + 1;
+
+      const factory = (container.factory as string) || 'Unknown';
+      byFactory[factory] = (byFactory[factory] || 0) + 1;
+    }
+
+    console.log(`[container-schedule] Returning ${containers.length} containers`);
+
+    res.json({
+      containers,
+      summary: {
+        total: containers.length,
+        byStatus,
+        byFactory,
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error fetching container schedule data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch container schedule data',
       message: error.message
     });
   }

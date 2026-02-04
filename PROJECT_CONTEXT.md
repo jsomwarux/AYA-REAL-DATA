@@ -47,6 +47,10 @@ AYA-REAL-DATA/
 │       │   │   └── TaskModal.tsx        # Create/edit/delete tasks
 │       │   ├── budget/              # Budget page components
 │       │   │   └── BudgetItemModal.tsx
+│       │   ├── weekly-goals/        # Weekly goals page components
+│       │   │   └── WeeklyGoalsDashboard.tsx  # Table, filters, stat cards
+│       │   ├── container-schedule/  # Container schedule page components
+│       │   │   └── ContainerScheduleDashboard.tsx  # Table, filters, stat cards
 │       │   ├── deals/               # Deals page components
 │       │   │   ├── DealsDashboard.tsx
 │       │   │   └── DealsTable.tsx
@@ -56,6 +60,8 @@ AYA-REAL-DATA/
 │       │   ├── ConstructionProgress.tsx
 │       │   ├── Budget.tsx
 │       │   ├── Timeline.tsx
+│       │   ├── WeeklyGoals.tsx      # Weekly sprint goals tracking
+│       │   ├── ContainerSchedule.tsx # Container shipment tracking
 │       │   └── Deals.tsx            # Password-protected deal intelligence
 │       ├── hooks/
 │       │   ├── use-document-title.ts
@@ -113,7 +119,27 @@ AYA-REAL-DATA/
 - Import from Google Sheets
 - Event type chart showing distribution
 
-### 5. Deal Intelligence (`/deals`)
+### 5. Weekly Goals (`/weekly-goals`)
+- Weekly sprint goals from Google Sheets (tab: "New updated")
+- Summary stat cards: Total Goals, Done, In Progress, Not Started
+- Filterable/sortable goals table with search, assignee filter, status filter
+- Color-coded assignee chips (Gil, Andrew, Fatima, Gilad, Mia, Daniel, Kobi, Libby, Liat)
+- Status badges: Done (green), In Progress (blue), Partially Completed (amber), Did not start (red), Not done yet (gray)
+- Mobile-responsive card layout
+- Protected by management password
+
+### 6. Container Schedule (`/container-schedule`)
+- Container shipment tracking from Google Sheets (tab: "Summary")
+- Summary stat cards: Total Containers, Shipped, At Port, Delivered
+- Filterable/sortable table with search, factory filter, status filter
+- Color-coded factory chips (IDM, SESE, ZHONGSHAN, ORBITA, DONGNA, DONGFANG, ZHONGBAI)
+- Status badges: Ready to be shipped (amber), Shipped (blue), Arrived NY Port (violet), Warehouse (emerald), Arrived to hotel (green)
+- Expandable rows showing all dates, product details, and document links (BOL, Insurance, Product List, Packing List, Warehouse Proof)
+- Key dates shown: Vessel Departure, ETA NY Port, ETA Warehouse
+- Mobile-responsive card layout
+- Protected by management password
+
+### 7. Deal Intelligence (`/deals`)
 - Password-protected (separate `DEALS_PASSWORD` env var, server-side auth)
 - Deal records from Google Sheets
 - Supports `DEALS_MOCK_MODE=true` for demo data
@@ -177,6 +203,8 @@ AYA-REAL-DATA/
 - `GET /api/sheets/construction-progress` — Rooms Progress sheet (parsed)
 - `GET /api/sheets/budget` — Budget data (parsed with totals, breakdowns)
 - `GET /api/sheets/deals` — Deal Intelligence data (supports `DEALS_MOCK_MODE`)
+- `GET /api/sheets/weekly-goals` — Weekly Goals data (parsed with summary stats)
+- `GET /api/sheets/container-schedule` — Container Schedule data (parsed with summary stats)
 - `GET /api/sheets/sheet/:id` — Generic sheet data
 - `GET /api/sheets/info/:id` — Spreadsheet metadata
 
@@ -207,6 +235,8 @@ AYA-REAL-DATA/
 | `CONSTRUCTION_SHEET_ID` | Google Sheet ID for construction data |
 | `TIMELINE_SHEET_ID` | Google Sheet ID for timeline import |
 | `DEALS_SHEET_ID` | Google Sheet ID for deals data |
+| `WEEKLY_GOALS_SHEET_ID` | Google Sheet ID for weekly goals data |
+| `CONTAINER_SCHEDULE_SHEET_ID` | Google Sheet ID for container schedule data |
 | `GOOGLE_CREDENTIALS` | Google service account JSON |
 
 ## Key Design Decisions

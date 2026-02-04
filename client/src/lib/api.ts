@@ -358,3 +358,42 @@ export async function fetchWeeklyGoalsData(): Promise<WeeklyGoalsData> {
   const response = await fetch(`${API_BASE}/weekly-goals`);
   return handleResponse<WeeklyGoalsData>(response);
 }
+
+// Container Schedule Types
+export interface ContainerScheduleItem {
+  id: number;
+  factory: string;
+  containerLoaded: string;
+  shipmentNumber: string;
+  containerNumber: string;
+  delivery: string;
+  loadingDate: string;
+  vesselDepartureDate: string;
+  etaNYPort: string;
+  etaWarehouse: string;
+  status: string;
+  bolCopy: string;
+  insurance: string;
+  productListWithPhotos: string;
+  packingList: string;
+  productDetails: string;
+  warehouseProofOfDelivery: string;
+}
+
+export interface ContainerScheduleSummary {
+  total: number;
+  byStatus: Record<string, number>;
+  byFactory: Record<string, number>;
+}
+
+export interface ContainerScheduleData {
+  containers: ContainerScheduleItem[];
+  summary: ContainerScheduleSummary;
+  lastUpdated: string;
+}
+
+// Fetch Container Schedule data
+export async function fetchContainerScheduleData(): Promise<ContainerScheduleData> {
+  const response = await fetch(`${API_BASE}/container-schedule`);
+  return handleResponse<ContainerScheduleData>(response);
+}
