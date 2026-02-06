@@ -116,6 +116,49 @@ export function TaskDetailModal({
     return { complete, incomplete, na, total, applicable, percentage };
   }, [roomsWithStatus]);
 
+  // Calculate value distribution breakdown
+  const valueDistribution = useMemo(() => {
+    if (!fieldConfig) return [];
+
+    const counts = new Map<string, number>();
+
+    for (const item of roomsWithStatus) {
+      const raw = item.value;
+      let label: string;
+
+      if (fieldConfig.type === 'checkbox') {
+        const isChecked = raw === true || raw === 1 || String(raw).toUpperCase() === 'TRUE' || String(raw) === '1';
+        label = isChecked ? 'Checked' : 'Not checked';
+      } else if (raw === null || raw === undefined || raw === '') {
+        label = 'Not started';
+      } else {
+        label = String(raw).trim();
+      }
+
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+
+    const total = roomsWithStatus.length;
+    const entries = Array.from(counts.entries()).map(([value, count]) => {
+      const isComplete = fieldConfig.completeValues.some(
+        (cv) => cv.toLowerCase() === value.toLowerCase()
+      ) || (fieldConfig.type === 'checkbox' && value === 'Checked');
+      const isNa = fieldConfig.naValues.some(
+        (nv) => nv.toLowerCase() === value.toLowerCase()
+      );
+
+      return { value, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0, isComplete, isNa };
+    });
+
+    // Sort: completed values first, then by count descending
+    entries.sort((a, b) => {
+      if (a.isComplete !== b.isComplete) return a.isComplete ? -1 : 1;
+      return b.count - a.count;
+    });
+
+    return entries;
+  }, [roomsWithStatus, fieldConfig]);
+
   // Group filtered rooms by floor
   const groupedByFloor = useMemo(() => {
     const groups = new Map<number, RoomWithStatus[]>();
@@ -187,6 +230,46 @@ export function TaskDetailModal({
             </div>
           </div>
           <Progress value={stats.percentage} className="h-2 bg-white/10" />
+
+          {/* Value Distribution Breakdown */}
+          {valueDistribution.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Breakdown by Status</h4>
+              {valueDistribution.map((entry) => (
+                <div key={entry.value} className="flex items-center gap-3">
+                  <div className="w-[140px] shrink-0 text-sm truncate" title={entry.value}>
+                    <span className={
+                      entry.isComplete
+                        ? "text-green-400"
+                        : entry.isNa
+                        ? "text-gray-500"
+                        : "text-muted-foreground"
+                    }>
+                      {entry.value}
+                    </span>
+                  </div>
+                  <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        entry.isComplete
+                          ? "bg-green-500"
+                          : entry.isNa
+                          ? "bg-gray-600"
+                          : entry.value === "Not started" || entry.value === "Not checked"
+                          ? "bg-white/10"
+                          : "bg-amber-500"
+                      }`}
+                      style={{ width: `${entry.percentage}%` }}
+                    />
+                  </div>
+                  <div className="w-[90px] shrink-0 text-right text-sm tabular-nums">
+                    <span className="text-white font-medium">{entry.count}</span>
+                    <span className="text-muted-foreground"> ({entry.percentage}%)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Filters */}
