@@ -1260,6 +1260,18 @@ router.get('/room-overview', async (req, res) => {
       console.log('[room-overview] First mapped room:', JSON.stringify(rooms[0]));
     }
 
+    // Forward-fill FLOOR column: Google Sheets merged cells only return a value
+    // for the first cell in the merge. Subsequent rows get empty strings.
+    // We carry the last non-zero floor value forward to fill the gaps.
+    let lastFloor = 0;
+    for (const room of rooms) {
+      if ((room.floor as number) > 0) {
+        lastFloor = room.floor as number;
+      } else {
+        room.floor = lastFloor;
+      }
+    }
+
     rooms = rooms.filter(r => (r.roomNumber as number) > 0);
     console.log('[room-overview] Rooms after filter (roomNumber > 0):', rooms.length);
 

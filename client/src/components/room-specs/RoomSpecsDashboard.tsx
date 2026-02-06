@@ -19,6 +19,7 @@ import {
   Tv,
   Lamp,
   Bath,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,19 +69,31 @@ const SIZE_COLORS: Record<string, { bg: string; text: string; border: string }> 
 };
 const DEFAULT_SIZE_COLOR = { bg: "bg-gray-500/15", text: "text-gray-400", border: "border-gray-500/25" };
 
-// Feature definitions for the dot display
+// Feature definitions for the dot display and toggle filters
 const FEATURE_DEFS = [
-  { key: "connectingDoor" as const, label: "Connecting Door", short: "CD" },
-  { key: "showerWindow" as const, label: "Shower Window", short: "SW" },
-  { key: "mossWall" as const, label: "Moss Wall", short: "MW" },
-  { key: "mirrorSlidingDoor" as const, label: "Mirror Sliding Door", short: "MD" },
-  { key: "moxyBar" as const, label: "Moxy Bar", short: "MB" },
-  { key: "speakeasy" as const, label: "Speakeasy", short: "SP" },
-  { key: "partyBoxHeadboard" as const, label: "Party Box Headboard", short: "PB" },
+  { key: "connectingDoor" as const, label: "Connecting Door", short: "Connect" },
+  { key: "showerWindow" as const, label: "Shower Window", short: "Shower Win" },
+  { key: "mossWall" as const, label: "Moss Wall", short: "Moss" },
+  { key: "mirrorSlidingDoor" as const, label: "Mirror Sliding Door", short: "Mirror" },
+  { key: "moxyBar" as const, label: "Moxy Bar", short: "Moxy" },
+  { key: "speakeasy" as const, label: "Speakeasy", short: "Speak" },
+  { key: "partyBoxHeadboard" as const, label: "Party Box Headboard", short: "Party Box" },
+];
+
+// Spec filter definitions (non-boolean fields for dropdown filters)
+const SPEC_FILTER_DEFS = [
+  { key: "sinkStyle" as const, label: "Sink Style" },
+  { key: "sinkSize" as const, label: "Sink Size" },
+  { key: "showerWithGlassDoor" as const, label: "Shower Type" },
+  { key: "miniBarSize" as const, label: "Mini Bar" },
+  { key: "curtainType" as const, label: "Curtain Type" },
+  { key: "nightStands" as const, label: "Night Stands" },
+  { key: "tvSize" as const, label: "TV Size" },
 ];
 
 type SortField = "floor" | "roomNumber" | "area" | "sizeCategory" | "roomType" | "bedSize" | "ada";
 type SortDirection = "asc" | "desc";
+type TriState = "all" | "Yes" | "No";
 
 // Feature dot indicator
 function FeatureDot({ value, label }: { value: string; label: string }) {
@@ -126,8 +139,42 @@ function FeatureBadges({ room }: { room: RoomOverviewItem }) {
   );
 }
 
+// Feature toggle chip — cycles through All → Yes → No → All
+function FeatureToggleChip({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: TriState;
+  onChange: (v: TriState) => void;
+}) {
+  const cycle = () => {
+    if (value === "all") onChange("Yes");
+    else if (value === "Yes") onChange("No");
+    else onChange("all");
+  };
+
+  return (
+    <button
+      onClick={cycle}
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-all select-none ${
+        value === "Yes"
+          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+          : value === "No"
+          ? "bg-red-500/10 text-red-400/80 border-red-500/20"
+          : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/10"
+      }`}
+    >
+      {value === "Yes" && <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+      {value === "No" && <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-400/60" />}
+      {label}
+    </button>
+  );
+}
+
 // Yes/No value display with colored indicator
-function YesNoValue({ value, label }: { value: string; label?: string }) {
+function YesNoValue({ value }: { value: string; label?: string }) {
   const lower = (value || "").toLowerCase();
   const isYes = lower === "yes";
   const isNo = lower === "no";
@@ -151,7 +198,7 @@ function SpecRow({ label, value, children }: { label: string; value?: string; ch
   return (
     <div className="flex items-center justify-between py-1.5">
       <span className="text-xs text-muted-foreground">{label}</span>
-      {children || <span className="text-sm text-white">{value || "—"}</span>}
+      {children || <span className="text-sm text-white">{value || "\u2014"}</span>}
     </div>
   );
 }
@@ -278,16 +325,57 @@ interface RoomSpecsDashboardProps {
 
 export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  // Primary filters
   const [floorFilter, setFloorFilter] = useState<string>("all");
   const [sizeCategoryFilter, setSizeCategoryFilter] = useState<string>("all");
   const [roomTypeFilter, setRoomTypeFilter] = useState<string>("all");
   const [bedSizeFilter, setBedSizeFilter] = useState<string>("all");
   const [adaFilter, setAdaFilter] = useState<string>("all");
+  // Feature toggle filters (Yes/No/All)
+  const [connectingDoorFilter, setConnectingDoorFilter] = useState<TriState>("all");
+  const [showerWindowFilter, setShowerWindowFilter] = useState<TriState>("all");
+  const [mossWallFilter, setMossWallFilter] = useState<TriState>("all");
+  const [mirrorSlidingDoorFilter, setMirrorSlidingDoorFilter] = useState<TriState>("all");
+  const [moxyBarFilter, setMoxyBarFilter] = useState<TriState>("all");
+  const [speakeasyFilter, setSpeakeasyFilter] = useState<TriState>("all");
+  const [partyBoxFilter, setPartyBoxFilter] = useState<TriState>("all");
+  // Spec dropdown filters
+  const [sinkStyleFilter, setSinkStyleFilter] = useState<string>("all");
+  const [sinkSizeFilter, setSinkSizeFilter] = useState<string>("all");
+  const [showerTypeFilter, setShowerTypeFilter] = useState<string>("all");
+  const [miniBarFilter, setMiniBarFilter] = useState<string>("all");
+  const [curtainTypeFilter, setCurtainTypeFilter] = useState<string>("all");
+  const [nightStandsFilter, setNightStandsFilter] = useState<string>("all");
+  const [tvSizeFilter, setTvSizeFilter] = useState<string>("all");
+  // UI state
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [sortField, setSortField] = useState<SortField>("roomNumber");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<RoomOverviewItem | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Feature filter map for easy iteration
+  const featureFilters: { key: keyof RoomOverviewItem; label: string; value: TriState; setter: (v: TriState) => void }[] = [
+    { key: "connectingDoor", label: "Connect", value: connectingDoorFilter, setter: setConnectingDoorFilter },
+    { key: "showerWindow", label: "Shower Win", value: showerWindowFilter, setter: setShowerWindowFilter },
+    { key: "mossWall", label: "Moss Wall", value: mossWallFilter, setter: setMossWallFilter },
+    { key: "mirrorSlidingDoor", label: "Mirror Door", value: mirrorSlidingDoorFilter, setter: setMirrorSlidingDoorFilter },
+    { key: "moxyBar", label: "Moxy Bar", value: moxyBarFilter, setter: setMoxyBarFilter },
+    { key: "speakeasy", label: "Speakeasy", value: speakeasyFilter, setter: setSpeakeasyFilter },
+    { key: "partyBoxHeadboard", label: "Party Box", value: partyBoxFilter, setter: setPartyBoxFilter },
+  ];
+
+  // Spec filter map for easy iteration
+  const specFilters: { key: keyof RoomOverviewItem; label: string; value: string; setter: (v: string) => void }[] = [
+    { key: "sinkStyle", label: "Sink Style", value: sinkStyleFilter, setter: setSinkStyleFilter },
+    { key: "sinkSize", label: "Sink Size", value: sinkSizeFilter, setter: setSinkSizeFilter },
+    { key: "showerWithGlassDoor", label: "Shower Type", value: showerTypeFilter, setter: setShowerTypeFilter },
+    { key: "miniBarSize", label: "Mini Bar", value: miniBarFilter, setter: setMiniBarFilter },
+    { key: "curtainType", label: "Curtain", value: curtainTypeFilter, setter: setCurtainTypeFilter },
+    { key: "nightStands", label: "Night Stands", value: nightStandsFilter, setter: setNightStandsFilter },
+    { key: "tvSize", label: "TV Size", value: tvSizeFilter, setter: setTvSizeFilter },
+  ];
 
   // Escape key to exit fullscreen
   useEffect(() => {
@@ -325,6 +413,28 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
     return [...new Set(rooms.map((r) => r.bedSize).filter(Boolean))].sort();
   }, [rooms]);
 
+  // Unique values for spec filters
+  const specUniqueValues = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const sf of specFilters) {
+      const vals = [...new Set(rooms.map((r) => String(r[sf.key] || "")).filter(Boolean))].sort();
+      map[sf.key as string] = vals;
+    }
+    return map;
+  }, [rooms]);
+
+  // Count active advanced filters
+  const advancedFilterCount = useMemo(() => {
+    let count = 0;
+    for (const ff of featureFilters) {
+      if (ff.value !== "all") count++;
+    }
+    for (const sf of specFilters) {
+      if (sf.value !== "all") count++;
+    }
+    return count;
+  }, [connectingDoorFilter, showerWindowFilter, mossWallFilter, mirrorSlidingDoorFilter, moxyBarFilter, speakeasyFilter, partyBoxFilter, sinkStyleFilter, sinkSizeFilter, showerTypeFilter, miniBarFilter, curtainTypeFilter, nightStandsFilter, tvSizeFilter]);
+
   // Filtered and sorted
   const filteredRooms = useMemo(() => {
     let result = [...rooms];
@@ -336,15 +446,36 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
           r.roomNumber.toString().includes(q) ||
           r.roomType.toLowerCase().includes(q) ||
           r.bedSize.toLowerCase().includes(q) ||
-          r.sinkStyle.toLowerCase().includes(q)
+          r.sinkStyle.toLowerCase().includes(q) ||
+          r.curtainType.toLowerCase().includes(q) ||
+          r.showerWithGlassDoor.toLowerCase().includes(q) ||
+          r.miniBarSize.toLowerCase().includes(q) ||
+          r.nightStands.toLowerCase().includes(q) ||
+          r.tvSize.toLowerCase().includes(q) ||
+          r.sinkSize.toLowerCase().includes(q)
       );
     }
 
+    // Primary filters
     if (floorFilter !== "all") result = result.filter((r) => r.floor.toString() === floorFilter);
     if (sizeCategoryFilter !== "all") result = result.filter((r) => r.sizeCategory === sizeCategoryFilter);
     if (roomTypeFilter !== "all") result = result.filter((r) => r.roomType === roomTypeFilter);
     if (bedSizeFilter !== "all") result = result.filter((r) => r.bedSize === bedSizeFilter);
     if (adaFilter !== "all") result = result.filter((r) => r.ada.toLowerCase() === adaFilter.toLowerCase());
+
+    // Feature toggle filters
+    for (const ff of featureFilters) {
+      if (ff.value !== "all") {
+        result = result.filter((r) => (String(r[ff.key]) || "").toLowerCase() === ff.value.toLowerCase());
+      }
+    }
+
+    // Spec dropdown filters
+    for (const sf of specFilters) {
+      if (sf.value !== "all") {
+        result = result.filter((r) => String(r[sf.key]) === sf.value);
+      }
+    }
 
     result.sort((a, b) => {
       const dir = sortDirection === "asc" ? 1 : -1;
@@ -359,7 +490,7 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
     });
 
     return result;
-  }, [rooms, searchQuery, floorFilter, sizeCategoryFilter, roomTypeFilter, bedSizeFilter, adaFilter, sortField, sortDirection]);
+  }, [rooms, searchQuery, floorFilter, sizeCategoryFilter, roomTypeFilter, bedSizeFilter, adaFilter, connectingDoorFilter, showerWindowFilter, mossWallFilter, mirrorSlidingDoorFilter, moxyBarFilter, speakeasyFilter, partyBoxFilter, sinkStyleFilter, sinkSizeFilter, showerTypeFilter, miniBarFilter, curtainTypeFilter, nightStandsFilter, tvSizeFilter, sortField, sortDirection]);
 
   const hasActiveFilters =
     searchQuery !== "" ||
@@ -367,7 +498,8 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
     sizeCategoryFilter !== "all" ||
     roomTypeFilter !== "all" ||
     bedSizeFilter !== "all" ||
-    adaFilter !== "all";
+    adaFilter !== "all" ||
+    advancedFilterCount > 0;
 
   const handleSort = useCallback(
     (field: SortField) => {
@@ -388,6 +520,22 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
     setRoomTypeFilter("all");
     setBedSizeFilter("all");
     setAdaFilter("all");
+    // Feature filters
+    setConnectingDoorFilter("all");
+    setShowerWindowFilter("all");
+    setMossWallFilter("all");
+    setMirrorSlidingDoorFilter("all");
+    setMoxyBarFilter("all");
+    setSpeakeasyFilter("all");
+    setPartyBoxFilter("all");
+    // Spec filters
+    setSinkStyleFilter("all");
+    setSinkSizeFilter("all");
+    setShowerTypeFilter("all");
+    setMiniBarFilter("all");
+    setCurtainTypeFilter("all");
+    setNightStandsFilter("all");
+    setTvSizeFilter("all");
   }, []);
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -422,11 +570,11 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
   // Expanded detail for a room
   const renderExpandedDetail = (room: RoomOverviewItem) => {
     return (
-      <div className="px-6 py-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="px-5 py-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Bathroom */}
-          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-3.5">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
               <ShowerHead className="h-3 w-3" />
               Bathroom
             </p>
@@ -441,8 +589,8 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
           </div>
 
           {/* Room Features */}
-          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-3.5">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
               <DoorOpen className="h-3 w-3" />
               Room Features
             </p>
@@ -467,8 +615,8 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
           </div>
 
           {/* Furnishing */}
-          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-3.5">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
               <Lamp className="h-3 w-3" />
               Furnishing
             </p>
@@ -500,7 +648,7 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
   // Column header helper
   const ColHeader = ({ field, label, className = "" }: { field: SortField; label: string; className?: string }) => (
     <th
-      className={`text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-white transition-colors select-none ${className}`}
+      className={`text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2.5 cursor-pointer hover:text-white transition-colors select-none ${className}`}
       onClick={() => handleSort(field)}
     >
       <div className="flex items-center gap-1">
@@ -518,23 +666,23 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10 bg-white/[0.02]">
-              <ColHeader field="floor" label="Floor" className="w-[60px]" />
-              <ColHeader field="roomNumber" label="Room #" className="w-[80px]" />
-              <ColHeader field="area" label="Area" className="w-[80px]" />
-              <ColHeader field="sizeCategory" label="Size" className="w-[55px]" />
-              <ColHeader field="roomType" label="Room Type" className="min-w-[180px]" />
-              <ColHeader field="bedSize" label="Bed" className="w-[80px]" />
-              <ColHeader field="ada" label="ADA" className="w-[50px]" />
-              <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 w-[140px] select-none">
+              <ColHeader field="floor" label="Floor" className="w-[52px]" />
+              <ColHeader field="roomNumber" label="Room #" className="w-[70px]" />
+              <ColHeader field="area" label="Area" className="w-[72px]" />
+              <ColHeader field="sizeCategory" label="Size" className="w-[52px]" />
+              <ColHeader field="roomType" label="Type" />
+              <ColHeader field="bedSize" label="Bed" className="w-[90px]" />
+              <ColHeader field="ada" label="ADA" className="w-[46px]" />
+              <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2.5 w-[120px] select-none">
                 Features
               </th>
-              <th className="w-[40px] px-2 py-3" />
+              <th className="w-[32px] px-1 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {filteredRooms.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-16 text-center">
+                <td colSpan={9} className="px-3 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <BedDouble className="h-8 w-8 text-muted-foreground/30" />
                     <p className="text-sm text-muted-foreground">No rooms match your filters</p>
@@ -566,12 +714,12 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
                       onClick={() => setExpandedRow(isExpanded ? null : room.id)}
                     >
                       {/* Floor */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <span className="text-[13px] text-muted-foreground tabular-nums">{room.floor}</span>
                       </td>
 
                       {/* Room # */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <button
                           className="text-[13px] text-white font-semibold tabular-nums hover:text-cyan-400 transition-colors"
                           onClick={(e) => {
@@ -584,48 +732,48 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
                       </td>
 
                       {/* Area */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <span className="text-[13px] text-white tabular-nums">{room.area}</span>
                         <span className="text-[10px] text-muted-foreground/50 ml-0.5">ft²</span>
                       </td>
 
                       {/* Size */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <span className={`inline-flex items-center justify-center w-7 h-6 rounded text-[11px] font-bold border ${sizeColor.bg} ${sizeColor.text} ${sizeColor.border}`}>
                           {room.sizeCategory}
                         </span>
                       </td>
 
                       {/* Room Type */}
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold border ${roomTypeColor.bg} ${roomTypeColor.text} ${roomTypeColor.border}`}>
+                      <td className="px-3 py-2.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border whitespace-nowrap ${roomTypeColor.bg} ${roomTypeColor.text} ${roomTypeColor.border}`}>
                           {room.roomType}
                         </span>
                       </td>
 
                       {/* Bed Size */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <span className="text-[13px] text-muted-foreground">{room.bedSize}</span>
                       </td>
 
                       {/* ADA */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         {isAda ? (
                           <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15">
                             <Check className="h-3 w-3 text-emerald-400" />
                           </span>
                         ) : (
-                          <span className="text-muted-foreground/30">—</span>
+                          <span className="text-muted-foreground/30">{"\u2014"}</span>
                         )}
                       </td>
 
                       {/* Features */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <FeatureBadges room={room} />
                       </td>
 
                       {/* Expand */}
-                      <td className="px-2 py-3">
+                      <td className="px-1 py-2.5">
                         <ChevronRight
                           className={`h-4 w-4 text-muted-foreground/40 transition-transform duration-200 ${
                             isExpanded ? "rotate-90" : ""
@@ -638,7 +786,7 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
                     {isExpanded && (
                       <tr className="bg-white/[0.02]">
                         <td colSpan={9} className="p-0 border-b border-white/[0.04]">
-                          <div className="border-l-2 border-cyan-400/30 ml-4">
+                          <div className="border-l-2 border-cyan-400/30 ml-3">
                             {renderExpandedDetail(room)}
                           </div>
                         </td>
@@ -751,7 +899,7 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <input
           type="text"
-          placeholder="Search room #, type, bed size..."
+          placeholder="Search room #, type, bed, sink, curtain..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-muted-foreground/50 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/40 focus:border-cyan-400/30 transition-all"
@@ -766,11 +914,11 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         )}
       </div>
 
-      {/* Row 2: Filter dropdowns */}
+      {/* Row 2: Primary filter dropdowns */}
       <div className="flex flex-wrap gap-2">
         <Select value={floorFilter} onValueChange={setFloorFilter}>
-          <SelectTrigger className="w-[100px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
-            <SelectValue placeholder="Floor" />
+          <SelectTrigger className="w-[120px] bg-white/[0.04] border-white/[0.08] text-white h-8 text-xs">
+            <SelectValue placeholder="All Floors" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Floors</SelectItem>
@@ -783,8 +931,8 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         </Select>
 
         <Select value={sizeCategoryFilter} onValueChange={setSizeCategoryFilter}>
-          <SelectTrigger className="w-[90px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
-            <SelectValue placeholder="Size" />
+          <SelectTrigger className="w-[110px] bg-white/[0.04] border-white/[0.08] text-white h-8 text-xs">
+            <SelectValue placeholder="All Sizes" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sizes</SelectItem>
@@ -795,11 +943,11 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         </Select>
 
         <Select value={roomTypeFilter} onValueChange={setRoomTypeFilter}>
-          <SelectTrigger className="w-[180px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
-            <SelectValue placeholder="Room Type" />
+          <SelectTrigger className="w-[180px] bg-white/[0.04] border-white/[0.08] text-white h-8 text-xs">
+            <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Room Types</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
             {roomTypes.map((t) => (
               <SelectItem key={t} value={t}>
                 {t}
@@ -809,8 +957,8 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         </Select>
 
         <Select value={bedSizeFilter} onValueChange={setBedSizeFilter}>
-          <SelectTrigger className="w-[110px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
-            <SelectValue placeholder="Bed" />
+          <SelectTrigger className="w-[130px] bg-white/[0.04] border-white/[0.08] text-white h-8 text-xs">
+            <SelectValue placeholder="All Beds" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Beds</SelectItem>
@@ -823,27 +971,89 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
         </Select>
 
         <Select value={adaFilter} onValueChange={setAdaFilter}>
-          <SelectTrigger className="w-[100px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
-            <SelectValue placeholder="ADA" />
+          <SelectTrigger className="w-[110px] bg-white/[0.04] border-white/[0.08] text-white h-8 text-xs">
+            <SelectValue placeholder="All ADA" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All ADA</SelectItem>
             <SelectItem value="Yes">ADA Only</SelectItem>
             <SelectItem value="No">Non-ADA</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* More Filters toggle */}
+        <button
+          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-medium border transition-all ${
+            showAdvancedFilters || advancedFilterCount > 0
+              ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/25"
+              : "bg-white/[0.04] text-muted-foreground border-white/[0.08] hover:text-white hover:border-white/15"
+          }`}
+        >
+          <SlidersHorizontal className="h-3 w-3" />
+          More
+          {advancedFilterCount > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-400">
+              {advancedFilterCount}
+            </span>
+          )}
+        </button>
 
         {hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="text-xs text-muted-foreground hover:text-white h-9 px-2 shrink-0"
+            className="text-xs text-muted-foreground hover:text-white h-8 px-2 shrink-0"
           >
             <X className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
+
+      {/* Row 3: Advanced filters (collapsible) */}
+      {showAdvancedFilters && (
+        <div className="space-y-2 pt-1">
+          {/* Feature toggle chips */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1 shrink-0">Features</span>
+            <div className="flex flex-wrap gap-1.5">
+              {featureFilters.map((ff) => (
+                <FeatureToggleChip
+                  key={ff.key as string}
+                  label={ff.label}
+                  value={ff.value}
+                  onChange={ff.setter}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Spec dropdown filters */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1 shrink-0">Specs</span>
+            {specFilters.map((sf) => {
+              const uniqueVals = specUniqueValues[sf.key as string] || [];
+              if (uniqueVals.length === 0) return null;
+              return (
+                <Select key={sf.key as string} value={sf.value} onValueChange={sf.setter}>
+                  <SelectTrigger className="w-auto min-w-[100px] max-w-[160px] bg-white/[0.04] border-white/[0.08] text-white h-8 text-xs">
+                    <SelectValue placeholder={sf.label} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All {sf.label}</SelectItem>
+                    {uniqueVals.map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 
