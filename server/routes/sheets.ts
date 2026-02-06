@@ -1204,50 +1204,30 @@ router.get('/room-overview', async (req, res) => {
       console.warn('[room-overview] Could not fetch sheet info:', infoErr.message);
     }
 
-    // Row 1 is a title/spacer, Row 2 has headers, Row 3+ has data
-    // fetchSheetData treats first row of range as headers
-    const range = `'${tabName}'!A2:U500`;
+    // Row 2 has headers, Row 3+ has data
+    // Fetch starting from row 3 (data only) since we know the exact column layout:
+    // A=FLOOR, B=ROOM#, C=AREA, D=SIZE CATEGORY, E=ROOM TYPE, F=BED SIZE,
+    // G=ADA, H=Connecting Door, I=Sink Style, J=Sink Size,
+    // K=Shower With Glass Door, L=Shower Window, M=Moss Wall,
+    // N=Mirror Sliding Door, O=Moxy Bar, P=Mini Bar Size,
+    // Q=Speakeasy, R=Party Box Headboard, S=Curtain Type, T=NIGHT STANDS, U=TV Size
+    const range = `'${tabName}'!A3:U500`;
+    console.log('[room-overview] Fetching range:', range);
     const data = await fetchSheetData(spreadsheetId, range);
+    console.log('[room-overview] fetchSheetData returned - rawValues rows:', data?.rawValues?.length);
+    if (data?.rawValues?.[0]) {
+      console.log('[room-overview] First row sample:', JSON.stringify(data.rawValues[0].slice(0, 5)));
+    }
 
     let rooms: GoogleSheetRow[] = [];
 
-    if (data && data.rawValues && data.rawValues.length > 0) {
-      const headers = data.rawValues[0] as string[];
-      const dataRows = data.rawValues.slice(1);
-
-      // Case-insensitive column finder
-      const findCol = (keyword: string) => headers.findIndex(h =>
-        h?.toLowerCase().trim().includes(keyword.toLowerCase())
-      );
-
-      const floorIdx = findCol('floor');
-      const roomIdx = findCol('room');
-      const areaIdx = findCol('area');
-      const sizeCatIdx = findCol('size category');
-      const roomTypeIdx = findCol('room type');
-      const bedSizeIdx = findCol('bed size');
-      const adaIdx = findCol('ada');
-      const connectDoorIdx = findCol('connecting door');
-      const sinkStyleIdx = findCol('sink style');
-      const sinkSizeIdx = findCol('sink size');
-      const showerGlassIdx = findCol('shower with glass');
-      const showerWindowIdx = findCol('shower window');
-      const mossWallIdx = findCol('moss wall');
-      const mirrorSlidingIdx = findCol('mirror sliding');
-      const moxyBarIdx = findCol('moxy bar');
-      const miniBarIdx = findCol('mini bar');
-      const speakeasyIdx = findCol('speakeasy');
-      const partyBoxIdx = findCol('party box');
-      const curtainIdx = findCol('curtain');
-      const nightStandsIdx = findCol('night stand');
-      const tvSizeIdx = findCol('tv size');
-
-      console.log('[room-overview] Column indices:', {
-        floorIdx, roomIdx, areaIdx, sizeCatIdx, roomTypeIdx, bedSizeIdx,
-        adaIdx, connectDoorIdx, sinkStyleIdx, sinkSizeIdx, showerGlassIdx,
-        showerWindowIdx, mossWallIdx, mirrorSlidingIdx, moxyBarIdx,
-        miniBarIdx, speakeasyIdx, partyBoxIdx, curtainIdx, nightStandsIdx, tvSizeIdx
-      });
+    // Use fixed column positions (A=0 through U=20) since we know the layout
+    const rawRows = data?.rawValues || [];
+    if (rawRows.length > 0) {
+      // Skip header row if fetchSheetData treated first data row as header
+      // Since we start at A3, rawValues[0] is the first data row (treated as headers by fetchSheetData)
+      // and rawValues includes ALL rows. Use rawValues directly.
+      const allRows = rawRows;
 
       const getValue = (row: any[], idx: number): string => {
         if (idx < 0 || idx >= row.length) return '';
@@ -1277,7 +1257,15 @@ router.get('/room-overview', async (req, res) => {
         curtainType: getValue(row, curtainIdx),
         nightStands: getValue(row, nightStandsIdx),
         tvSize: getValue(row, tvSizeIdx),
-      })).filter(r => (r.roomNumber as number) > 0);
+      }));
+
+      console.log('[room-overview] Mapped rows before filter:', rooms.length);
+      if (rooms.length > 0) {
+        console.log('[room-overview] First mapped room:', JSON.stringify(rooms[0]));
+      }
+
+      rooms = rooms.filter(r => (r.roomNumber as number) > 0);
+      console.log('[room-overview] Rooms after filter (roomNumber > 0):', rooms.length);
     }
 
     // Compute summary statistics
