@@ -139,7 +139,8 @@ export async function listDriveFiles(folderId: string): Promise<DriveFile[]> {
   return allFiles;
 }
 
-// Get a readable stream for a Drive file (for proxying content)
+// Get a readable stream for a Drive file (for proxying content).
+// Google-native files (Sheets, Docs, Slides, etc.) are exported as PDF since they have no binary content.
 export async function getDriveFileStream(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string; size: string | null; name: string }> {
   const drive = getGoogleDriveClient();
 
@@ -149,7 +150,26 @@ export async function getDriveFileStream(fileId: string): Promise<{ stream: Node
     fields: 'name, mimeType, size',
   });
 
-  // Download the file content as a stream
+  const originalMimeType = meta.data.mimeType || 'application/octet-stream';
+  const fileName = meta.data.name || 'file';
+
+  // Google Docs Editor files (Sheets, Docs, Slides, Drawings, etc.) cannot be downloaded
+  // directly — they must be exported to a standard format.
+  if (originalMimeType.startsWith('application/vnd.google-apps.')) {
+    const response = await drive.files.export(
+      { fileId, mimeType: 'application/pdf' },
+      { responseType: 'stream' }
+    );
+
+    return {
+      stream: response.data as unknown as NodeJS.ReadableStream,
+      mimeType: 'application/pdf',
+      size: null, // export size is not known upfront
+      name: fileName.replace(/\.[^.]*$/, '') + '.pdf',
+    };
+  }
+
+  // Regular binary files (PDFs, images, etc.) — download directly
   const response = await drive.files.get(
     { fileId, alt: 'media' },
     { responseType: 'stream' }
@@ -157,9 +177,9 @@ export async function getDriveFileStream(fileId: string): Promise<{ stream: Node
 
   return {
     stream: response.data as unknown as NodeJS.ReadableStream,
-    mimeType: meta.data.mimeType || 'application/octet-stream',
+    mimeType: originalMimeType,
     size: meta.data.size || null,
-    name: meta.data.name || 'file',
+    name: fileName,
   };
 }
 

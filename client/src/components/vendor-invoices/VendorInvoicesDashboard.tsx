@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   FileText,
+  FileSpreadsheet,
   Files,
   File,
   FolderOpen,
@@ -10,6 +11,7 @@ import {
   X,
   ExternalLink,
   Eye,
+  Presentation,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,9 +43,22 @@ function formatDate(dateStr: string | null): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function isGoogleNativeType(mimeType: string): boolean {
+  return mimeType.startsWith("application/vnd.google-apps.");
+}
+
 function getFileIcon(mimeType: string) {
   if (mimeType === "application/pdf") {
     return <File className="h-4 w-4 text-red-400 shrink-0" />;
+  }
+  if (mimeType === "application/vnd.google-apps.spreadsheet") {
+    return <FileSpreadsheet className="h-4 w-4 text-green-400 shrink-0" />;
+  }
+  if (mimeType === "application/vnd.google-apps.document") {
+    return <FileText className="h-4 w-4 text-blue-400 shrink-0" />;
+  }
+  if (mimeType === "application/vnd.google-apps.presentation") {
+    return <Presentation className="h-4 w-4 text-orange-400 shrink-0" />;
   }
   if (mimeType.startsWith("image/")) {
     return <File className="h-4 w-4 text-blue-400 shrink-0" />;
@@ -51,8 +66,8 @@ function getFileIcon(mimeType: string) {
   return <FileText className="h-4 w-4 text-muted-foreground shrink-0" />;
 }
 
-function isPdfViewable(mimeType: string): boolean {
-  return mimeType === "application/pdf";
+function isViewableInline(mimeType: string): boolean {
+  return mimeType === "application/pdf" || isGoogleNativeType(mimeType);
 }
 
 // ── Summary Stats ───────────────────────────────────────────────────────────
@@ -110,7 +125,7 @@ function SummaryStats({ summary, isLoading }: { summary: VendorInvoicesSummary; 
 // ── File Row ────────────────────────────────────────────────────────────────
 
 function FileRow({ file, onView }: { file: DriveFile; onView: (file: DriveFile) => void }) {
-  const viewable = isPdfViewable(file.mimeType);
+  const viewable = isViewableInline(file.mimeType);
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors border-t border-white/5 first:border-t-0">
@@ -238,7 +253,7 @@ function PdfViewerDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[90vw] h-[85vh] p-0 gap-0 bg-[#0a0a0f] border-white/10">
+      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] flex flex-col p-0 gap-0 bg-[#0a0a0f] border-white/10 [&>button]:hidden">
         <DialogHeader className="px-4 py-3 border-b border-white/10 flex-row items-center justify-between space-y-0 shrink-0">
           <div className="flex-1 min-w-0 mr-4">
             <DialogTitle className="text-sm font-medium text-white truncate">
