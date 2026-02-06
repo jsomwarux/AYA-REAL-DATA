@@ -1205,68 +1205,63 @@ router.get('/room-overview', async (req, res) => {
     }
 
     // Row 2 has headers, Row 3+ has data
-    // Fetch starting from row 3 (data only) since we know the exact column layout:
-    // A=FLOOR, B=ROOM#, C=AREA, D=SIZE CATEGORY, E=ROOM TYPE, F=BED SIZE,
-    // G=ADA, H=Connecting Door, I=Sink Style, J=Sink Size,
-    // K=Shower With Glass Door, L=Shower Window, M=Moss Wall,
-    // N=Mirror Sliding Door, O=Moxy Bar, P=Mini Bar Size,
-    // Q=Speakeasy, R=Party Box Headboard, S=Curtain Type, T=NIGHT STANDS, U=TV Size
+    // Fetch starting from row 3 (data only) to avoid header-parsing issues.
+    // We use fixed column positions since we know the exact layout:
+    // A(0)=FLOOR, B(1)=ROOM#, C(2)=AREA, D(3)=SIZE CATEGORY, E(4)=ROOM TYPE,
+    // F(5)=BED SIZE, G(6)=ADA, H(7)=Connecting Door, I(8)=Sink Style, J(9)=Sink Size,
+    // K(10)=Shower With Glass Door, L(11)=Shower Window, M(12)=Moss Wall,
+    // N(13)=Mirror Sliding Door, O(14)=Moxy Bar, P(15)=Mini Bar Size,
+    // Q(16)=Speakeasy, R(17)=Party Box Headboard, S(18)=Curtain Type,
+    // T(19)=NIGHT STANDS, U(20)=TV Size
     const range = `'${tabName}'!A3:U500`;
     console.log('[room-overview] Fetching range:', range);
     const data = await fetchSheetData(spreadsheetId, range);
-    console.log('[room-overview] fetchSheetData returned - rawValues rows:', data?.rawValues?.length);
-    if (data?.rawValues?.[0]) {
-      console.log('[room-overview] First row sample:', JSON.stringify(data.rawValues[0].slice(0, 5)));
+
+    // rawValues contains ALL rows from the API response (including the first row
+    // which fetchSheetData treats as headers). We need ALL rows as data.
+    const allRows = data?.rawValues || [];
+    console.log('[room-overview] Total raw rows returned:', allRows.length);
+    if (allRows[0]) {
+      console.log('[room-overview] First row sample:', JSON.stringify(allRows[0].slice(0, 6)));
     }
 
-    let rooms: GoogleSheetRow[] = [];
+    const getValue = (row: any[], idx: number): string => {
+      if (idx < 0 || idx >= row.length) return '';
+      return (row[idx] || '').toString().trim();
+    };
 
-    // Use fixed column positions (A=0 through U=20) since we know the layout
-    const rawRows = data?.rawValues || [];
-    if (rawRows.length > 0) {
-      // Skip header row if fetchSheetData treated first data row as header
-      // Since we start at A3, rawValues[0] is the first data row (treated as headers by fetchSheetData)
-      // and rawValues includes ALL rows. Use rawValues directly.
-      const allRows = rawRows;
+    let rooms: GoogleSheetRow[] = allRows.map((row, index) => ({
+      id: index + 3,
+      floor: parseInt(getValue(row, 0)) || 0,       // A - FLOOR
+      roomNumber: parseInt(getValue(row, 1)) || 0,   // B - ROOM #
+      area: parseInt(getValue(row, 2)) || 0,         // C - AREA (Sq ft)
+      sizeCategory: getValue(row, 3),                // D - SIZE CATEGORY
+      roomType: getValue(row, 4),                    // E - ROOM TYPE
+      bedSize: getValue(row, 5),                     // F - BED SIZE
+      ada: getValue(row, 6),                         // G - ADA
+      connectingDoor: getValue(row, 7),              // H - Connecting Door
+      sinkStyle: getValue(row, 8),                   // I - Sink Style
+      sinkSize: getValue(row, 9),                    // J - Sink Size
+      showerWithGlassDoor: getValue(row, 10),        // K - Shower With Glass Door
+      showerWindow: getValue(row, 11),               // L - Shower Window
+      mossWall: getValue(row, 12),                   // M - Moss Wall
+      mirrorSlidingDoor: getValue(row, 13),          // N - Mirror Sliding Door
+      moxyBar: getValue(row, 14),                    // O - Moxy Bar
+      miniBarSize: getValue(row, 15),                // P - Mini Bar Size
+      speakeasy: getValue(row, 16),                  // Q - Speakeasy
+      partyBoxHeadboard: getValue(row, 17),          // R - Party Box Headboard
+      curtainType: getValue(row, 18),                // S - Curtain Type
+      nightStands: getValue(row, 19),                // T - NIGHT STANDS
+      tvSize: getValue(row, 20),                     // U - TV Size
+    }));
 
-      const getValue = (row: any[], idx: number): string => {
-        if (idx < 0 || idx >= row.length) return '';
-        return (row[idx] || '').toString().trim();
-      };
-
-      rooms = dataRows.map((row, index) => ({
-        id: index + 3,
-        floor: parseInt(getValue(row, floorIdx)) || 0,
-        roomNumber: parseInt(getValue(row, roomIdx)) || 0,
-        area: parseInt(getValue(row, areaIdx)) || 0,
-        sizeCategory: getValue(row, sizeCatIdx),
-        roomType: getValue(row, roomTypeIdx),
-        bedSize: getValue(row, bedSizeIdx),
-        ada: getValue(row, adaIdx),
-        connectingDoor: getValue(row, connectDoorIdx),
-        sinkStyle: getValue(row, sinkStyleIdx),
-        sinkSize: getValue(row, sinkSizeIdx),
-        showerWithGlassDoor: getValue(row, showerGlassIdx),
-        showerWindow: getValue(row, showerWindowIdx),
-        mossWall: getValue(row, mossWallIdx),
-        mirrorSlidingDoor: getValue(row, mirrorSlidingIdx),
-        moxyBar: getValue(row, moxyBarIdx),
-        miniBarSize: getValue(row, miniBarIdx),
-        speakeasy: getValue(row, speakeasyIdx),
-        partyBoxHeadboard: getValue(row, partyBoxIdx),
-        curtainType: getValue(row, curtainIdx),
-        nightStands: getValue(row, nightStandsIdx),
-        tvSize: getValue(row, tvSizeIdx),
-      }));
-
-      console.log('[room-overview] Mapped rows before filter:', rooms.length);
-      if (rooms.length > 0) {
-        console.log('[room-overview] First mapped room:', JSON.stringify(rooms[0]));
-      }
-
-      rooms = rooms.filter(r => (r.roomNumber as number) > 0);
-      console.log('[room-overview] Rooms after filter (roomNumber > 0):', rooms.length);
+    console.log('[room-overview] Mapped rows before filter:', rooms.length);
+    if (rooms.length > 0) {
+      console.log('[room-overview] First mapped room:', JSON.stringify(rooms[0]));
     }
+
+    rooms = rooms.filter(r => (r.roomNumber as number) > 0);
+    console.log('[room-overview] Rooms after filter (roomNumber > 0):', rooms.length);
 
     // Compute summary statistics
     const floors = [...new Set(rooms.map(r => r.floor as number))].sort((a, b) => a - b);
