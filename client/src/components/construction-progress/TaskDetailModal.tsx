@@ -128,7 +128,7 @@ export function TaskDetailModal({
 
       if (fieldConfig.type === 'checkbox') {
         const isChecked = raw === true || raw === 1 || String(raw).toUpperCase() === 'TRUE' || String(raw) === '1';
-        label = isChecked ? 'Checked' : 'Not checked';
+        label = isChecked ? 'Completed' : 'Not Completed';
       } else if (raw === null || raw === undefined || raw === '') {
         label = 'Not started';
       } else {
@@ -142,7 +142,7 @@ export function TaskDetailModal({
     const entries = Array.from(counts.entries()).map(([value, count]) => {
       const isComplete = fieldConfig.completeValues.some(
         (cv) => cv.toLowerCase() === value.toLowerCase()
-      ) || (fieldConfig.type === 'checkbox' && value === 'Checked');
+      ) || (fieldConfig.type === 'checkbox' && value === 'Completed');
       const isNa = fieldConfig.naValues.some(
         (nv) => nv.toLowerCase() === value.toLowerCase()
       );
@@ -255,7 +255,7 @@ export function TaskDetailModal({
                           ? "bg-green-500"
                           : entry.isNa
                           ? "bg-gray-600"
-                          : entry.value === "Not started" || entry.value === "Not checked"
+                          : entry.value === "Not started" || entry.value === "Not Completed"
                           ? "bg-white/10"
                           : "bg-amber-500"
                       }`}

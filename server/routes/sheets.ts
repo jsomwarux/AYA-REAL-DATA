@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, SheetRow as GoogleSheetRow } from '../services/googleSheets';
+import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, listDriveFiles, SheetRow as GoogleSheetRow } from '../services/googleSheets';
 import { db } from '../db';
 import { sheetRows } from '@shared/schema';
 import { eq, and, inArray } from 'drizzle-orm';
@@ -302,11 +302,49 @@ router.get('/construction-progress', async (req, res) => {
     const recapRange = "'RECAP'!A:Z";
 
     console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
-    const data = await fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]);
+    // Fetch values and hyperlinks in parallel
+    const [data, hyperlinkData] = await Promise.all([
+      fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]),
+      // Fetch Column B hyperlinks (ROOM # links to Google Drive folders)
+      fetchSheetDataWithHyperlinks(spreadsheetId, 'A.I Rooms Progress', 3, 500, 'B'),
+    ]);
     console.log('[construction-progress] Data fetched successfully');
 
-    // Process Rooms Progress data
+    // Build a map of room number → Google Drive folder URL from hyperlinks
+    const roomDriveFolderMap = new Map<string, string>();
+    if (hyperlinkData && hyperlinkData.rawValues && hyperlinkData.rawValues.length > 1) {
+      const hlRows = hyperlinkData.rawValues.slice(1); // Skip header row
+      for (const row of hlRows) {
+        const roomNum = (row[0] || '').trim(); // Column A = empty in our range, but we fetched A:B
+        const roomLink = (row[1] || '').trim(); // Column B = ROOM # with hyperlink
+        // The hyperlink fetcher returns the URL as the value when a hyperlink exists
+        // Column A is empty, Column B has the room number text or its hyperlink URL
+        // Since we fetch A3:B500, row[0] = Col A (empty), row[1] = Col B (room # or URL)
+        // If col B has a hyperlink, the value will be the URL, and we need to match by row position
+      }
+    }
+    // Better approach: match hyperlink data by row index to room data
+    // The hyperlink fetch returns Col A and Col B values where hyperlinks replace display text
+    // We need to compare the displayed room numbers with the URLs
+    // Since fetchSheetDataWithHyperlinks returns hyperlink as value, Col B cells that have
+    // a hyperlink will show the URL, not the room number. We need the formattedValue too.
+    // Let's build the map differently - iterate the hyperlink rawValues and use the values data for room numbers
     const roomsData = data.get(roomsRange);
+    if (hyperlinkData && hyperlinkData.rawValues && roomsData && roomsData.rawValues) {
+      const hlRows = hyperlinkData.rawValues.slice(1); // skip header
+      const valRows = roomsData.rawValues.slice(1); // skip header
+      for (let i = 0; i < Math.min(hlRows.length, valRows.length); i++) {
+        const roomNum = String(valRows[i][1] || '').trim(); // Column B from values data (index 1)
+        const hlValue = (hlRows[i][1] || '').trim(); // Column B from hyperlink data
+        // If the hyperlink value is a URL (starts with http), it's the Drive folder link
+        if (roomNum && hlValue && hlValue.startsWith('http')) {
+          roomDriveFolderMap.set(roomNum, hlValue);
+        }
+      }
+      console.log(`[construction-progress] Found ${roomDriveFolderMap.size} room Drive folder links`);
+    }
+
+    // Process Rooms Progress data (roomsData already fetched above for hyperlink matching)
     const recapData = data.get(recapRange);
 
     // Transform rooms data - need special handling for the merged BATHROOM/BEDROOM headers
@@ -409,6 +447,15 @@ router.get('/construction-progress', async (req, res) => {
       const afterDedup = processedRooms.length;
       if (beforeDedup !== afterDedup) {
         console.log(`[construction-progress] Deduplicated rooms: ${beforeDedup} → ${afterDedup} (removed ${beforeDedup - afterDedup} duplicates)`);
+      }
+
+      // Attach Google Drive folder URLs to each room
+      for (const room of processedRooms) {
+        const roomNum = String(room['ROOM #'] || room['Room #'] || room['ROOM'] || room['room']);
+        const driveUrl = roomDriveFolderMap.get(roomNum);
+        if (driveUrl) {
+          room['_driveFolderUrl'] = driveUrl;
+        }
       }
 
       // Log field completion counts for debugging data accuracy
@@ -531,6 +578,48 @@ router.get('/construction-progress', async (req, res) => {
     console.error('Error fetching construction progress data:', error);
     res.status(500).json({
       error: 'Failed to fetch construction progress data',
+      message: error.message
+    });
+  }
+});
+
+// Get files from a Google Drive folder (for room progress photos)
+router.get('/drive-files', async (req, res) => {
+  try {
+    const folderUrl = req.query.folderUrl as string;
+
+    if (!folderUrl) {
+      return res.status(400).json({ error: 'folderUrl query parameter is required' });
+    }
+
+    // Extract folder ID from various Google Drive URL formats
+    let folderId: string | null = null;
+    // Format: https://drive.google.com/drive/folders/FOLDER_ID
+    const folderMatch = folderUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (folderMatch) {
+      folderId = folderMatch[1];
+    }
+    // Format: https://drive.google.com/open?id=FOLDER_ID
+    if (!folderId) {
+      const openMatch = folderUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (openMatch) {
+        folderId = openMatch[1];
+      }
+    }
+
+    if (!folderId) {
+      return res.status(400).json({ error: 'Could not extract folder ID from URL', url: folderUrl });
+    }
+
+    console.log(`[drive-files] Listing files from folder: ${folderId}`);
+    const files = await listDriveFiles(folderId);
+    console.log(`[drive-files] Found ${files.length} files`);
+
+    res.json({ files, folderId });
+  } catch (error: any) {
+    console.error('Error listing drive files:', error);
+    res.status(500).json({
+      error: 'Failed to list drive files',
       message: error.message
     });
   }

@@ -1,4 +1,4 @@
-import { google, sheets_v4 } from 'googleapis';
+import { google, sheets_v4, drive_v3 } from 'googleapis';
 
 // Types for Google Sheets data
 export interface SheetRow {
@@ -11,18 +11,39 @@ export interface SheetData {
   rawValues: string[][];
 }
 
-// Initialize Google Sheets client
-function getGoogleSheetsClient(): sheets_v4.Sheets {
-  // Check for service account credentials
+// Types for Google Drive files
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  thumbnailUrl: string | null;
+  webViewUrl: string | null;
+  size: string | null;
+  createdTime: string | null;
+  modifiedTime: string | null;
+}
+
+// Shared auth instance for both Sheets and Drive
+function getGoogleAuth() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    const auth = new google.auth.GoogleAuth({
+    return new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
         private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/drive.readonly',
+      ],
     });
+  }
+  return null;
+}
 
+// Initialize Google Sheets client
+function getGoogleSheetsClient(): sheets_v4.Sheets {
+  const auth = getGoogleAuth();
+  if (auth) {
     return google.sheets({ version: 'v4', auth });
   }
 
@@ -35,6 +56,65 @@ function getGoogleSheetsClient(): sheets_v4.Sheets {
   }
 
   throw new Error('Google Sheets credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY or GOOGLE_API_KEY');
+}
+
+// Initialize Google Drive client
+function getGoogleDriveClient(): drive_v3.Drive {
+  const auth = getGoogleAuth();
+  if (auth) {
+    return google.drive({ version: 'v3', auth });
+  }
+
+  if (process.env.GOOGLE_API_KEY) {
+    return google.drive({
+      version: 'v3',
+      auth: process.env.GOOGLE_API_KEY,
+    });
+  }
+
+  throw new Error('Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY or GOOGLE_API_KEY');
+}
+
+// List all files in a Google Drive folder (recursively includes subfolders)
+export async function listDriveFiles(folderId: string): Promise<DriveFile[]> {
+  const drive = getGoogleDriveClient();
+  const allFiles: DriveFile[] = [];
+
+  async function listFolder(parentId: string) {
+    let pageToken: string | undefined;
+    do {
+      const response = await drive.files.list({
+        q: `'${parentId}' in parents and trashed = false`,
+        fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webViewLink, size, createdTime, modifiedTime)',
+        pageSize: 100,
+        pageToken,
+        orderBy: 'name',
+      });
+
+      const files = response.data.files || [];
+      for (const file of files) {
+        if (file.mimeType === 'application/vnd.google-apps.folder') {
+          // Recurse into subfolders
+          await listFolder(file.id!);
+        } else {
+          allFiles.push({
+            id: file.id!,
+            name: file.name || 'Unknown',
+            mimeType: file.mimeType || 'application/octet-stream',
+            thumbnailUrl: file.thumbnailLink || null,
+            webViewUrl: file.webViewLink || null,
+            size: file.size || null,
+            createdTime: file.createdTime || null,
+            modifiedTime: file.modifiedTime || null,
+          });
+        }
+      }
+      pageToken = response.data.nextPageToken || undefined;
+    } while (pageToken);
+  }
+
+  await listFolder(folderId);
+  return allFiles;
 }
 
 // Fetch data from a Google Sheet

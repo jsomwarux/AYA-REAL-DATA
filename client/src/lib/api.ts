@@ -83,6 +83,7 @@ export interface RoomProgress {
   'Flooring'?: boolean;             // Checkbox
   // Metadata
   retrieved_at?: string;
+  _driveFolderUrl?: string;
   // Allow dynamic access for case-insensitive lookups
   [key: string]: string | number | boolean | null | undefined;
 }
@@ -116,6 +117,29 @@ export interface ConstructionProgressData {
 export async function fetchConstructionProgressData(): Promise<ConstructionProgressData> {
   const response = await fetch(`${API_BASE}/construction-progress`);
   return handleResponse<ConstructionProgressData>(response);
+}
+
+// Google Drive file types
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  thumbnailUrl: string | null;
+  webViewUrl: string | null;
+  size: string | null;
+  createdTime: string | null;
+  modifiedTime: string | null;
+}
+
+export interface DriveFilesResponse {
+  files: DriveFile[];
+  folderId: string;
+}
+
+// Fetch files from a Google Drive folder
+export async function fetchDriveFiles(folderUrl: string): Promise<DriveFilesResponse> {
+  const response = await fetch(`${API_BASE}/drive-files?folderUrl=${encodeURIComponent(folderUrl)}`);
+  return handleResponse<DriveFilesResponse>(response);
 }
 
 // Budget Types

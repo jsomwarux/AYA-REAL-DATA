@@ -621,31 +621,6 @@ export default function Timeline() {
       onRefresh={handleRefresh}
       isLoading={isLoading}
     >
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3 mb-6">
-        <Button
-          variant="outline"
-          onClick={() => setIsAddingTask(true)}
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Task
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setShowImportDialog(true)}
-          disabled={importMutation.isPending}
-          className="gap-2"
-        >
-          {importMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          Import from Google Sheet
-        </Button>
-      </div>
-
       {/* Stats Grid */}
       <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
         <StatCard
@@ -1005,7 +980,17 @@ export default function Timeline() {
               <Calendar className="h-5 w-5 text-teal-400" />
               Project Schedule
             </CardTitle>
-            <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddingTask(true)}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Task
+              </Button>
+              <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded" style={{ backgroundColor: '#93c5fd' }}></span>
                 <span className="text-muted-foreground">Begins/Start</span>
@@ -1025,6 +1010,7 @@ export default function Timeline() {
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded" style={{ backgroundColor: '#5eead4' }}></span>
                 <span className="text-muted-foreground">Installation</span>
+              </div>
               </div>
             </div>
           </div>
@@ -1048,20 +1034,7 @@ export default function Timeline() {
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Calendar className="h-12 w-12 mb-4 opacity-50" />
               <p className="text-lg mb-2">No timeline data yet</p>
-              <p className="text-sm mb-4">Import data from Google Sheets to get started</p>
-              <Button
-                variant="outline"
-                onClick={() => setShowImportDialog(true)}
-                disabled={importMutation.isPending}
-                className="gap-2"
-              >
-                {importMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                Import from Google Sheet
-              </Button>
+              <p className="text-sm">Add tasks using the button above to get started</p>
             </div>
           )}
         </CardContent>
