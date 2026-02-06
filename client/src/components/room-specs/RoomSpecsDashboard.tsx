@@ -663,14 +663,14 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
     <>
       {/* Desktop Table */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead>
             <tr className="border-b border-white/10 bg-white/[0.02]">
               <ColHeader field="floor" label="Floor" className="w-[52px]" />
               <ColHeader field="roomNumber" label="Room #" className="w-[70px]" />
               <ColHeader field="area" label="Area" className="w-[72px]" />
               <ColHeader field="sizeCategory" label="Size" className="w-[52px]" />
-              <ColHeader field="roomType" label="Type" />
+              <ColHeader field="roomType" label="Type" className="w-[180px]" />
               <ColHeader field="bedSize" label="Bed" className="w-[90px]" />
               <ColHeader field="ada" label="ADA" className="w-[46px]" />
               <th className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2.5 w-[120px] select-none">
@@ -745,7 +745,7 @@ export function RoomSpecsDashboard({ rooms, summary, isLoading }: RoomSpecsDashb
                       </td>
 
                       {/* Room Type */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 overflow-hidden">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border whitespace-nowrap ${roomTypeColor.bg} ${roomTypeColor.text} ${roomTypeColor.border}`}>
                           {room.roomType}
                         </span>

@@ -1272,6 +1272,14 @@ router.get('/room-overview', async (req, res) => {
       }
     }
 
+    // Fallback: derive floor from room number (401→4, 502→5, 612→6).
+    // Handles cases where the merged cell anchor is outside our fetch range.
+    for (const room of rooms) {
+      if ((room.floor as number) === 0 && (room.roomNumber as number) > 0) {
+        room.floor = Math.floor((room.roomNumber as number) / 100);
+      }
+    }
+
     rooms = rooms.filter(r => (r.roomNumber as number) > 0);
     console.log('[room-overview] Rooms after filter (roomNumber > 0):', rooms.length);
 
