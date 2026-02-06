@@ -100,20 +100,20 @@ function SummaryStats({ summary, isLoading }: { summary: VendorInvoicesSummary; 
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-3 mb-4">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
       {stats.map((stat) => (
         <Card key={stat.label} className="border-white/10 bg-[#12121a]">
-          <CardContent className="flex items-center gap-3 p-3">
-            <div className={cn("rounded-lg p-2", stat.bg)}>
+          <CardContent className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3">
+            <div className={cn("rounded-lg p-1.5 sm:p-2", stat.bg)}>
               <span className={stat.color}>{stat.icon}</span>
             </div>
             <div className="min-w-0">
               {isLoading ? (
-                <Skeleton className="h-6 w-12 mb-1" />
+                <Skeleton className="h-5 sm:h-6 w-10 sm:w-12 mb-1" />
               ) : (
-                <p className={cn("text-lg font-bold", stat.color)}>{stat.value.toLocaleString()}</p>
+                <p className={cn("text-base sm:text-lg font-bold", stat.color)}>{stat.value.toLocaleString()}</p>
               )}
-              <p className="text-[11px] text-muted-foreground truncate">{stat.label}</p>
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate">{stat.label}</p>
             </div>
           </CardContent>
         </Card>
@@ -128,10 +128,10 @@ function FileRow({ file, onView }: { file: DriveFile; onView: (file: DriveFile) 
   const viewable = isViewableInline(file.mimeType);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors border-t border-white/5 first:border-t-0">
+    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-2.5 hover:bg-white/[0.03] transition-colors border-t border-white/5 first:border-t-0">
       {getFileIcon(file.mimeType)}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/90 truncate">{file.name}</p>
+        <p className="text-xs sm:text-sm text-white/90 truncate">{file.name}</p>
       </div>
       <span className="text-[11px] text-muted-foreground hidden sm:block w-20 text-right shrink-0">
         {formatFileSize(file.size)}
@@ -144,7 +144,7 @@ function FileRow({ file, onView }: { file: DriveFile; onView: (file: DriveFile) 
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10"
+            className="h-8 sm:h-7 px-2.5 sm:px-2 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10"
             onClick={() => onView(file)}
           >
             <Eye className="h-3.5 w-3.5 mr-1" />
@@ -155,7 +155,7 @@ function FileRow({ file, onView }: { file: DriveFile; onView: (file: DriveFile) 
             href={`/api/sheets/drive-file/${file.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center h-7 px-2 text-xs text-muted-foreground hover:text-white rounded-md hover:bg-white/5 transition-colors"
+            className="inline-flex items-center h-8 sm:h-7 px-2.5 sm:px-2 text-xs text-muted-foreground hover:text-white rounded-md hover:bg-white/5 transition-colors"
           >
             <Download className="h-3.5 w-3.5 mr-1" />
             Open
@@ -200,14 +200,14 @@ function VendorRow({
   return (
     <Collapsible open={effectiveOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger asChild>
-        <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-left group">
+        <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.03] transition-colors text-left group">
           <FolderOpen className={cn("h-5 w-5 shrink-0 transition-colors", effectiveOpen ? "text-yellow-400" : "text-muted-foreground group-hover:text-yellow-400/70")} />
           <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium text-white/90 truncate block">{vendor.name}</span>
+            <span className="text-xs sm:text-sm font-medium text-white/90 truncate block">{vendor.name}</span>
           </div>
-          <span className="text-[11px] text-muted-foreground shrink-0">
+          <span className="text-[10px] sm:text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
             {pdfCount > 0 && (
-              <span className="inline-flex items-center gap-1 mr-2">
+              <span className="hidden sm:inline-flex items-center gap-1 mr-2">
                 <File className="h-3 w-3 text-red-400/60" />
                 {pdfCount}
               </span>
@@ -253,37 +253,43 @@ function PdfViewerDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] flex flex-col p-0 gap-0 bg-[#0a0a0f] border-white/10 [&>button]:hidden">
-        <DialogHeader className="px-4 py-3 border-b border-white/10 flex-row items-center justify-between space-y-0 shrink-0">
-          <div className="flex-1 min-w-0 mr-4">
-            <DialogTitle className="text-sm font-medium text-white truncate">
+      <DialogContent className="w-[96vw] sm:w-[90vw] max-w-[96vw] sm:max-w-[90vw] h-[95vh] sm:h-[90vh] flex flex-col p-0 gap-0 bg-[#0a0a0f] border-white/10 [&>button]:hidden rounded-lg sm:rounded-lg">
+        <DialogHeader className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/10 flex-row items-center justify-between space-y-0 shrink-0">
+          <div className="flex-1 min-w-0 mr-2 sm:mr-4">
+            <DialogTitle className="text-xs sm:text-sm font-medium text-white truncate">
               {file.name}
             </DialogTitle>
-            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
               {vendorName} {file.size ? `\u00B7 ${formatFileSize(file.size)}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <a
               href={`/api/sheets/drive-file/${file.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center h-8 px-3 text-xs rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors"
+              className="inline-flex items-center h-7 sm:h-8 px-2 sm:px-3 text-xs rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors"
             >
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Download
+              <Download className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Download</span>
             </a>
             {file.webViewUrl && (
               <a
                 href={file.webViewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center h-8 px-3 text-xs rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors"
+                className="inline-flex items-center h-7 sm:h-8 px-2 sm:px-3 text-xs rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors"
               >
-                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                Drive
+                <ExternalLink className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Drive</span>
               </a>
             )}
+            <button
+              onClick={onClose}
+              className="inline-flex items-center justify-center h-7 sm:h-8 w-7 sm:w-8 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors sm:hidden"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         </DialogHeader>
         <div className="flex-1 min-h-0">
@@ -303,28 +309,28 @@ function PdfViewerDialog({
 function LoadingSkeleton() {
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
         {[1, 2, 3].map((i) => (
           <Card key={i} className="border-white/10 bg-[#12121a]">
-            <CardContent className="flex items-center gap-3 p-3">
-              <Skeleton className="h-9 w-9 rounded-lg" />
-              <div>
-                <Skeleton className="h-5 w-12 mb-1" />
-                <Skeleton className="h-3 w-20" />
+            <CardContent className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3">
+              <Skeleton className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg shrink-0" />
+              <div className="min-w-0">
+                <Skeleton className="h-4 sm:h-5 w-10 sm:w-12 mb-1" />
+                <Skeleton className="h-3 w-14 sm:w-20" />
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-      <Skeleton className="h-10 w-full mb-4 rounded-lg" />
+      <Skeleton className="h-9 sm:h-10 w-full mb-3 sm:mb-4 rounded-lg" />
       <Card className="border-white/10 bg-[#12121a]">
         <CardContent className="p-0">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-b-0">
-              <Skeleton className="h-5 w-5 rounded" />
+            <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 border-b border-white/5 last:border-b-0">
+              <Skeleton className="h-5 w-5 rounded shrink-0" />
               <Skeleton className="h-4 flex-1" />
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-4 w-12 sm:w-16 hidden sm:block" />
+              <Skeleton className="h-4 w-4 shrink-0" />
             </div>
           ))}
         </CardContent>
@@ -359,13 +365,13 @@ export function VendorInvoicesDashboard({ vendors, summary, isLoading }: VendorI
       <SummaryStats summary={summary} isLoading={isLoading} />
 
       {/* Search */}
-      <div className="relative mb-4">
+      <div className="relative mb-3 sm:mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search vendors or file names..."
+          placeholder="Search vendors or files..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-10 bg-[#12121a] border-white/10 text-white placeholder:text-muted-foreground focus:border-yellow-400/30 focus:ring-yellow-400/20"
+          className="pl-9 h-9 sm:h-10 text-sm bg-[#12121a] border-white/10 text-white placeholder:text-muted-foreground focus:border-yellow-400/30 focus:ring-yellow-400/20"
         />
         {searchQuery && (
           <button

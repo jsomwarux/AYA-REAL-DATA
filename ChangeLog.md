@@ -1,5 +1,111 @@
 # Change Log
 
+## February 6, 2026
+
+### Tab-Based Password Gate (Architecture Change)
+- **Replaced** single `PasswordGate` with `TabPasswordGate` component supporting 3 auth tiers:
+  - `construction` — Construction Progress access (`PASSWORD_GATE` env var)
+  - `management` — Budget, Timeline, Weekly Goals, Container Schedule, Room Specs, Vendor Invoices, Settings (`MANAGEMENT_PASSWORD_GATE` env var)
+  - `deals` — Deal Intelligence (`DEALS_PASSWORD` env var)
+  - `anyAuthenticated` — Overview (accessible when any tier is unlocked)
+- Server endpoints: `POST /api/auth/tab-login`, `GET /api/auth/tab-check`
+- Session stores per-tier auth flags: `constructionAuthenticated`, `managementAuthenticated`, `dealsAuthenticated`
+- Sidebar and mobile nav now dynamically show/hide items based on which tiers are authenticated
+
+**Files created:**
+- `client/src/components/TabPasswordGate.tsx`
+
+**Files changed:**
+- `server/index.ts` — Added tab-based auth endpoints, 3-tier password validation
+- `client/src/App.tsx` — All routes now use `TabPasswordGate` with appropriate `tab` prop
+- `client/src/components/dashboard/Sidebar.tsx` — Nav items filtered by `requiredAuth` field
+- `client/src/components/dashboard/DashboardLayout.tsx` — Mobile nav filtered by `requiredAuth`
+- `client/src/pages/Landing.tsx` — Tab cards show lock icon based on auth status
+
+---
+
+### Construction Progress Enhancements
+- **Completion counting fix**: Corrected how task completion percentages are calculated
+- **Value distribution breakdown**: Added to `TaskDetailModal` for drill-down analysis
+- **Checkbox breakdown labels**: Fixed to show descriptive names
+- **Room photos from Google Drive**: Integrated via `listDriveFiles()` and proxy endpoint
+- **Video thumbnails and playback**: Fixed across 3 iterations for proper rendering
+
+**Files changed:**
+- `client/src/components/construction-progress/TaskDetailModal.tsx` — Value distribution breakdown
+- `client/src/components/construction-progress/RoomDetailModal.tsx` — Room photos from Drive
+- `client/src/components/construction-progress/utils.ts` — Completion counting fix
+- `server/routes/sheets.ts` — Added `GET /api/sheets/drive-files` and `GET /api/sheets/drive-file/:fileId` endpoints
+- `server/services/googleSheets.ts` — Added `listDriveFiles()` (recursive) and `getDriveFileStream()` functions
+
+---
+
+### Room Specs Tab (New)
+- **New page**: `/room-specs` — Room specifications and fact sheet pulled from Google Sheets (`ROOM_OVERVIEW_SHEET_ID`, tab: "Fact Sheet")
+- 21 columns mapped via fixed positional indexing (A=0 through U=20): Floor, Room Number, Size Category, Room Type, Bed Size, ADA, Moxy Bar, Living Wall, Shower Window, Closet Type, Desk Type, Vanity Mirror, Shower Head, Bath Accessories, Toilet Type, Shower Drain, Bathtub, Chair Type, Nightstand, Lighting Package
+- Summary stats: Total Rooms, Floors, ADA Rooms, by Room Type/Bed Size
+- 5 primary dropdown filters: Floor, Size, Room Type, Bed Size, ADA
+- 7 feature toggle chips (tri-state: All/Yes/No cycling) for boolean columns: Moxy Bar, Living Wall, Shower Window, etc.
+- 7 spec dropdown filters in collapsible "More Filters" section with active count badge
+- Desktop table with `table-fixed` layout + mobile card view
+- Search across all text fields
+- Floor derivation fallback: `Math.floor(roomNumber / 100)` when merged cell data is missing
+- Protected by management password
+
+**Files created:**
+- `client/src/pages/RoomSpecs.tsx`
+- `client/src/components/room-specs/RoomSpecsDashboard.tsx`
+
+**Files changed:**
+- `server/routes/sheets.ts` — Added `GET /api/sheets/room-overview` endpoint with fixed positional column mapping and floor derivation
+- `client/src/lib/api.ts` — Added `RoomOverviewItem`, `RoomOverviewSummary`, `RoomOverviewData` types and `fetchRoomOverviewData()`
+- `client/src/App.tsx` — Added `/room-specs` route with management password gate
+- `client/src/components/dashboard/Sidebar.tsx` — Added Room Specs nav item (rose BedDouble icon)
+- `client/src/components/dashboard/DashboardLayout.tsx` — Added Room Specs mobile nav item
+- `client/src/pages/Landing.tsx` — Added Room Specs card to landing page grid
+
+---
+
+### Vendor Invoices Tab (New)
+- **New page**: `/vendor-invoices` — Browse vendor documents and invoices from Google Drive (`VENDOR_INVOICES_DRIVE_ID`)
+- Pulls from Google Drive (not Sheets): lists vendor subfolders, recursively fetches all files per vendor
+- 3 summary stat cards: Total Vendors, Total Documents, PDFs
+- Search bar filtering vendor names AND file names simultaneously
+- Vendor accordion list: collapsible rows with folder icon, file count, PDF count
+- File rows with type-specific icons: red for PDF, green for Sheets, blue for Docs, orange for Slides
+- Inline PDF viewer dialog: near-fullscreen modal with `<iframe src="/api/sheets/drive-file/{fileId}">`
+- Google-native file export: Sheets/Docs/Slides auto-exported as PDF via `drive.files.export()` on server
+- Download and "Open in Drive" buttons in viewer header
+- 5-minute server-side in-memory cache to avoid hitting Drive API on every page load
+- Mobile-responsive: 96vw/95vh dialog on mobile, icon-only header buttons, mobile close button, tighter stat card spacing, larger touch targets
+- Protected by management password
+
+**Files created:**
+- `client/src/pages/VendorInvoices.tsx`
+- `client/src/components/vendor-invoices/VendorInvoicesDashboard.tsx`
+
+**Files changed:**
+- `server/services/googleSheets.ts` — Added `listDriveSubfolders()` function; updated `getDriveFileStream()` to detect Google-native MIME types and use `drive.files.export()` instead of `alt: 'media'`
+- `server/routes/sheets.ts` — Added `GET /api/sheets/vendor-invoices` endpoint with in-memory cache
+- `client/src/lib/api.ts` — Added `VendorFolder`, `VendorInvoicesSummary`, `VendorInvoicesData` types and `fetchVendorInvoicesData()`
+- `client/src/App.tsx` — Added `/vendor-invoices` route with management password gate
+- `client/src/components/dashboard/Sidebar.tsx` — Added Vendor Invoices nav item (yellow FileText icon)
+- `client/src/components/dashboard/DashboardLayout.tsx` — Added Vendor Invoices mobile nav item
+- `client/src/pages/Landing.tsx` — Added Vendor Invoices card to landing page grid
+- `.env.example` — Added `VENDOR_INVOICES_DRIVE_ID`
+
+---
+
+### Container Schedule UI/UX Optimization
+- Table layout improvements for better readability and spacing
+
+---
+
+### Documentation Updates
+- Updated `ProjectContext.md`, `PROJECT_CONTEXT.md`, and `ChangeLog.md` with all February 6 changes
+
+---
+
 ## February 4, 2026
 
 ### Weekly Goals Tab (New)
