@@ -443,11 +443,11 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
               />
             ) : (
               <iframe
+                key={mediaFiles[lightboxIndex].id}
                 src={getVideoEmbedUrl(mediaFiles[lightboxIndex])}
                 className="w-[80vw] h-[70vh] max-w-4xl rounded-lg border-0"
                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                 allowFullScreen
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
               />
             )}
             <div className="mt-3 text-center">
