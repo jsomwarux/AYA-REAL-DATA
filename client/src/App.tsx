@@ -13,6 +13,7 @@ import Deals from "@/pages/Deals";
 import WeeklyGoals from "@/pages/WeeklyGoals";
 import ContainerSchedule from "@/pages/ContainerSchedule";
 import RoomSpecs from "@/pages/RoomSpecs";
+import VendorInvoices from "@/pages/VendorInvoices";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
@@ -78,6 +79,13 @@ function Router() {
         <Route path="/room-specs">
           <TabPasswordGate tab="budget" title="Room Specs">
             <RoomSpecs />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Vendor Invoices - MANAGEMENT_PASSWORD_GATE */}
+        <Route path="/vendor-invoices">
+          <TabPasswordGate tab="budget" title="Vendor Invoices">
+            <VendorInvoices />
           </TabPasswordGate>
         </Route>
 

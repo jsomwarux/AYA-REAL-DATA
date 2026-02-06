@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, listDriveFiles, getDriveFileStream, SheetRow as GoogleSheetRow } from '../services/googleSheets';
+import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, listDriveFiles, listDriveSubfolders, getDriveFileStream, SheetRow as GoogleSheetRow } from '../services/googleSheets';
 import { db } from '../db';
 import { sheetRows } from '@shared/schema';
 import { eq, and, inArray } from 'drizzle-orm';
@@ -1327,6 +1327,93 @@ router.get('/room-overview', async (req, res) => {
     res.status(500).json({
       error: 'Failed to fetch room overview data',
       message: error.message
+    });
+  }
+});
+
+// ── Vendor Invoices ──────────────────────────────────────────────────────────
+// In-memory cache for vendor invoices (5-minute TTL)
+let vendorInvoicesCache: { data: any; timestamp: number } | null = null;
+const VENDOR_INVOICES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+router.get('/vendor-invoices', async (req, res) => {
+  console.log('[vendor-invoices] Endpoint called');
+  try {
+    const rootFolderId = process.env.VENDOR_INVOICES_DRIVE_ID;
+
+    if (!rootFolderId) {
+      console.error('[vendor-invoices] VENDOR_INVOICES_DRIVE_ID not set');
+      return res.status(400).json({
+        error: 'Vendor Invoices Drive folder ID not configured',
+        message: 'Please set VENDOR_INVOICES_DRIVE_ID in environment variables'
+      });
+    }
+
+    // Check cache
+    const forceRefresh = req.query.refresh === 'true';
+    if (!forceRefresh && vendorInvoicesCache && Date.now() - vendorInvoicesCache.timestamp < VENDOR_INVOICES_CACHE_TTL) {
+      console.log('[vendor-invoices] Returning cached data');
+      return res.json(vendorInvoicesCache.data);
+    }
+
+    console.log('[vendor-invoices] Fetching vendor folders from root:', rootFolderId);
+
+    // List top-level vendor folders
+    const vendorFolders = await listDriveSubfolders(rootFolderId);
+    console.log(`[vendor-invoices] Found ${vendorFolders.length} vendor folders`);
+
+    // Fetch files for each vendor folder in parallel
+    const vendorResults = await Promise.all(
+      vendorFolders.map(async (folder) => {
+        try {
+          const files = await listDriveFiles(folder.id);
+          return {
+            name: folder.name,
+            folderId: folder.id,
+            files,
+            fileCount: files.length,
+          };
+        } catch (err: any) {
+          console.error(`[vendor-invoices] Error listing files for "${folder.name}":`, err.message);
+          return {
+            name: folder.name,
+            folderId: folder.id,
+            files: [],
+            fileCount: 0,
+          };
+        }
+      })
+    );
+
+    // Compute summary
+    const totalFiles = vendorResults.reduce((sum, v) => sum + v.fileCount, 0);
+    const byMimeType: Record<string, number> = {};
+    for (const vendor of vendorResults) {
+      for (const file of vendor.files) {
+        byMimeType[file.mimeType] = (byMimeType[file.mimeType] || 0) + 1;
+      }
+    }
+
+    const responseData = {
+      vendors: vendorResults,
+      summary: {
+        totalVendors: vendorResults.length,
+        totalFiles,
+        byMimeType,
+      },
+      lastUpdated: new Date().toISOString(),
+    };
+
+    // Cache the result
+    vendorInvoicesCache = { data: responseData, timestamp: Date.now() };
+
+    console.log(`[vendor-invoices] Returning ${vendorResults.length} vendors with ${totalFiles} total files`);
+    res.json(responseData);
+  } catch (error: any) {
+    console.error('Error fetching vendor invoices:', error);
+    res.status(500).json({
+      error: 'Failed to fetch vendor invoices',
+      message: error.message,
     });
   }
 });

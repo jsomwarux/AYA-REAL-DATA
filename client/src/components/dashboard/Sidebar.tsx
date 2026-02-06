@@ -14,6 +14,7 @@ import {
   Target,
   Ship,
   BedDouble,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,15 @@ const mainNavItems: NavItem[] = [
     icon: <BedDouble className="h-5 w-5" />,
     iconColor: "text-rose-400",
     description: "Room specifications and fact sheet",
+    managementOnly: true,
+    requiredAuth: "management",
+  },
+  {
+    title: "Vendor Invoices",
+    href: "/vendor-invoices",
+    icon: <FileText className="h-5 w-5" />,
+    iconColor: "text-yellow-400",
+    description: "Browse vendor documents and invoices",
     managementOnly: true,
     requiredAuth: "management",
   },

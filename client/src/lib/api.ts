@@ -470,3 +470,29 @@ export async function fetchRoomOverviewData(): Promise<RoomOverviewData> {
   const response = await fetch(`${API_BASE}/room-overview`);
   return handleResponse<RoomOverviewData>(response);
 }
+
+// ── Vendor Invoices ─────────────────────────────────────────────────────────
+
+export interface VendorFolder {
+  name: string;
+  folderId: string;
+  files: DriveFile[];
+  fileCount: number;
+}
+
+export interface VendorInvoicesSummary {
+  totalVendors: number;
+  totalFiles: number;
+  byMimeType: Record<string, number>;
+}
+
+export interface VendorInvoicesData {
+  vendors: VendorFolder[];
+  summary: VendorInvoicesSummary;
+  lastUpdated: string;
+}
+
+export async function fetchVendorInvoicesData(): Promise<VendorInvoicesData> {
+  const response = await fetch(`${API_BASE}/vendor-invoices`);
+  return handleResponse<VendorInvoicesData>(response);
+}

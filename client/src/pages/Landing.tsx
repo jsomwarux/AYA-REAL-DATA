@@ -10,6 +10,7 @@ import {
   Lock,
   LayoutDashboard,
   BedDouble,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -86,6 +87,16 @@ const tabs = [
     bgColor: "bg-rose-400/10",
     borderColor: "hover:border-rose-400/30",
     description: "Room specifications, features, and fact sheet for all hotel units",
+    authKey: "management" as const,
+  },
+  {
+    title: "Vendor Invoices",
+    href: "/vendor-invoices",
+    icon: FileText,
+    iconColor: "text-yellow-400",
+    bgColor: "bg-yellow-400/10",
+    borderColor: "hover:border-yellow-400/30",
+    description: "Browse vendor documents, invoices, and contracts from Google Drive",
     authKey: "management" as const,
   },
   {

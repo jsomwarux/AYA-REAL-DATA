@@ -75,6 +75,28 @@ function getGoogleDriveClient(): drive_v3.Drive {
   throw new Error('Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY or GOOGLE_API_KEY');
 }
 
+// List only immediate subfolders of a Drive folder (no recursion, folders only)
+export async function listDriveSubfolders(parentId: string): Promise<Array<{ id: string; name: string }>> {
+  const drive = getGoogleDriveClient();
+  const folders: Array<{ id: string; name: string }> = [];
+  let pageToken: string | undefined;
+
+  do {
+    const response = await drive.files.list({
+      q: `'${parentId}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
+      fields: 'nextPageToken, files(id, name)',
+      pageSize: 100,
+      pageToken,
+      orderBy: 'name',
+    });
+    const files = response.data.files || [];
+    folders.push(...files.map(f => ({ id: f.id!, name: f.name! })));
+    pageToken = response.data.nextPageToken || undefined;
+  } while (pageToken);
+
+  return folders;
+}
+
 // List all files in a Google Drive folder (recursively includes subfolders)
 export async function listDriveFiles(folderId: string): Promise<DriveFile[]> {
   const drive = getGoogleDriveClient();
