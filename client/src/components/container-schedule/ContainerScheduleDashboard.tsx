@@ -15,6 +15,10 @@ import {
   Image as ImageIcon,
   FileSpreadsheet,
   FileText,
+  Calendar,
+  Anchor,
+  X,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,36 +38,46 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ContainerScheduleItem, ContainerScheduleSummary } from "@/lib/api";
 
+// Status lifecycle order (for the step indicator)
+const STATUS_ORDER = [
+  "Ready to be shipped",
+  "Passed inspection",
+  "Shipped",
+  "Arrived NY Port",
+  "Warehouse",
+  "Arrived to hotel",
+];
+
 // Status color map - follows the shipment lifecycle
-const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  "Ready to be shipped": { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/30" },
-  "Passed inspection": { bg: "bg-sky-500/15", text: "text-sky-400", border: "border-sky-500/30" },
-  "Shipped": { bg: "bg-blue-500/15", text: "text-blue-400", border: "border-blue-500/30" },
-  "Arrived NY Port": { bg: "bg-violet-500/15", text: "text-violet-400", border: "border-violet-500/30" },
-  "Warehouse": { bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30" },
-  "Arrived to hotel": { bg: "bg-green-500/15", text: "text-green-400", border: "border-green-500/30" },
+const STATUS_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  "Ready to be shipped": { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/30", dot: "bg-amber-400" },
+  "Passed inspection": { bg: "bg-sky-500/15", text: "text-sky-400", border: "border-sky-500/30", dot: "bg-sky-400" },
+  "Shipped": { bg: "bg-blue-500/15", text: "text-blue-400", border: "border-blue-500/30", dot: "bg-blue-400" },
+  "Arrived NY Port": { bg: "bg-violet-500/15", text: "text-violet-400", border: "border-violet-500/30", dot: "bg-violet-400" },
+  "Warehouse": { bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30", dot: "bg-emerald-400" },
+  "Arrived to hotel": { bg: "bg-green-500/15", text: "text-green-400", border: "border-green-500/30", dot: "bg-green-400" },
 };
 
-const DEFAULT_STATUS_STYLE = { bg: "bg-gray-500/15", text: "text-gray-400", border: "border-gray-500/30" };
+const DEFAULT_STATUS_STYLE = { bg: "bg-gray-500/15", text: "text-gray-400", border: "border-gray-500/30", dot: "bg-gray-400" };
 
 // Factory colors for chips
-const FACTORY_COLORS: Record<string, { bg: string; text: string }> = {
-  IDM: { bg: "bg-teal-500/20", text: "text-teal-300" },
-  SESE: { bg: "bg-pink-500/20", text: "text-pink-300" },
-  ZHONGSHAN: { bg: "bg-amber-500/20", text: "text-amber-300" },
-  ORBITA: { bg: "bg-blue-500/20", text: "text-blue-300" },
-  DONGNA: { bg: "bg-indigo-500/20", text: "text-indigo-300" },
-  DONGFANG: { bg: "bg-orange-500/20", text: "text-orange-300" },
-  ZHONGBAI: { bg: "bg-violet-500/20", text: "text-violet-300" },
+const FACTORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  IDM: { bg: "bg-teal-500/15", text: "text-teal-300", border: "border-teal-500/25" },
+  SESE: { bg: "bg-pink-500/15", text: "text-pink-300", border: "border-pink-500/25" },
+  ZHONGSHAN: { bg: "bg-amber-500/15", text: "text-amber-300", border: "border-amber-500/25" },
+  ORBITA: { bg: "bg-blue-500/15", text: "text-blue-300", border: "border-blue-500/25" },
+  DONGNA: { bg: "bg-indigo-500/15", text: "text-indigo-300", border: "border-indigo-500/25" },
+  DONGFANG: { bg: "bg-orange-500/15", text: "text-orange-300", border: "border-orange-500/25" },
+  ZHONGBAI: { bg: "bg-violet-500/15", text: "text-violet-300", border: "border-violet-500/25" },
 };
 
-const DEFAULT_FACTORY_COLOR = { bg: "bg-gray-500/20", text: "text-gray-300" };
+const DEFAULT_FACTORY_COLOR = { bg: "bg-gray-500/15", text: "text-gray-300", border: "border-gray-500/25" };
 
 type SortField = "factory" | "containerLoaded" | "shipmentNumber" | "containerNumber" | "delivery" | "loadingDate" | "vesselDepartureDate" | "etaNYPort" | "etaWarehouse" | "status";
 type SortDirection = "asc" | "desc";
 
 function formatDate(dateStr: string): string {
-  if (!dateStr) return "";
+  if (!dateStr) return "—";
   try {
     const parts = dateStr.split("/");
     if (parts.length === 3) {
@@ -72,6 +86,23 @@ function formatDate(dateStr: string): string {
       const year = parseInt(parts[2]);
       const date = new Date(year, month - 1, day);
       return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatDateWithYear(dateStr: string): string {
+  if (!dateStr) return "—";
+  try {
+    const parts = dateStr.split("/");
+    if (parts.length === 3) {
+      const month = parseInt(parts[0]);
+      const day = parseInt(parts[1]);
+      const year = parseInt(parts[2]);
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     }
     return dateStr;
   } catch {
@@ -89,14 +120,11 @@ function isGoogleSheet(url: string): boolean {
 
 // Convert Google Drive share links to embeddable/thumbnail URLs
 function getGoogleDriveImageUrl(url: string): string | null {
-  // Google Photos album links can't be easily embedded - return null
   if (url.includes("photos.google.com")) return null;
-  // Google Drive file: https://drive.google.com/file/d/FILE_ID/view
   const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (driveMatch) {
     return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w400`;
   }
-  // Google Drive open: https://drive.google.com/open?id=FILE_ID
   const openMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
   if (openMatch) {
     return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w400`;
@@ -106,7 +134,7 @@ function getGoogleDriveImageUrl(url: string): string | null {
 
 function DocumentLink({ value, label, icon }: { value: string; label: string; icon?: React.ReactNode }) {
   if (!value || value === "N.A" || value === "N/A" || value === "-" || value === "") {
-    return <span className="text-muted-foreground/50 text-xs">-</span>;
+    return null;
   }
   if (isUrl(value)) {
     return (
@@ -114,11 +142,12 @@ function DocumentLink({ value, label, icon }: { value: string; label: string; ic
         href={value}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors group"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-blue-400/30 transition-all text-xs text-blue-400 group"
         onClick={(e) => e.stopPropagation()}
       >
-        {icon || <ExternalLink className="h-3 w-3 shrink-0" />}
+        {icon || <ExternalLink className="h-3.5 w-3.5 shrink-0" />}
         <span className="group-hover:underline">{label}</span>
+        <ExternalLink className="h-3 w-3 opacity-40 group-hover:opacity-70" />
       </a>
     );
   }
@@ -132,7 +161,6 @@ function PhotoGallery({ url, label }: { url: string; label: string }) {
 
   if (!url || !isUrl(url)) return null;
 
-  // If we can generate a thumbnail, show the image
   if (thumbnailUrl && !imageError) {
     return (
       <div className="space-y-1.5">
@@ -164,7 +192,6 @@ function PhotoGallery({ url, label }: { url: string; label: string }) {
     );
   }
 
-  // For Google Photos albums or failed thumbnails, show a link with photo icon
   return (
     <a
       href={url}
@@ -177,6 +204,42 @@ function PhotoGallery({ url, label }: { url: string; label: string }) {
       <span>{label}</span>
       <ExternalLink className="h-3 w-3 ml-1 opacity-50" />
     </a>
+  );
+}
+
+// Compact status step indicator
+function StatusStepIndicator({ status }: { status: string }) {
+  const currentIndex = STATUS_ORDER.indexOf(status);
+  const statusStyle = STATUS_STYLES[status] || DEFAULT_STATUS_STYLE;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-0.5">
+            {STATUS_ORDER.map((step, i) => {
+              const isReached = currentIndex >= 0 && i <= currentIndex;
+              const isCurrent = i === currentIndex;
+              return (
+                <div
+                  key={step}
+                  className={`h-1.5 rounded-full transition-all ${
+                    isCurrent
+                      ? `w-4 ${statusStyle.dot}`
+                      : isReached
+                      ? `w-1.5 ${statusStyle.dot} opacity-50`
+                      : "w-1.5 bg-white/10"
+                  }`}
+                />
+              );
+            })}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p>{status || "Unknown"}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -239,7 +302,8 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
         (c) =>
           c.factory.toLowerCase().includes(q) ||
           c.containerLoaded.toLowerCase().includes(q) ||
-          c.containerNumber.toLowerCase().includes(q)
+          c.containerNumber.toLowerCase().includes(q) ||
+          c.shipmentNumber.toLowerCase().includes(q)
       );
     }
 
@@ -267,7 +331,7 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
         return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
       }
 
-      // Numeric sorting for shipment/container numbers
+      // Numeric sorting for shipment numbers
       if (sortField === "shipmentNumber") {
         const aNum = parseFloat(aVal) || 0;
         const bNum = parseFloat(bVal) || 0;
@@ -285,6 +349,7 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
   const shippedCount = (summary.byStatus["Shipped"] || 0);
   const atPortCount = (summary.byStatus["Arrived NY Port"] || 0);
   const warehouseCount = (summary.byStatus["Warehouse"] || 0) + (summary.byStatus["Arrived to hotel"] || 0);
+  const hasActiveFilters = searchQuery !== "" || factoryFilter !== "all" || statusFilter !== "all";
 
   const handleSort = useCallback((field: SortField) => {
     if (sortField === field) {
@@ -295,26 +360,27 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
     }
   }, [sortField]);
 
+  const clearFilters = useCallback(() => {
+    setSearchQuery("");
+    setFactoryFilter("all");
+    setStatusFilter("all");
+  }, []);
+
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronsUpDown className="h-3 w-3 opacity-40" />;
+    if (sortField !== field) return <ChevronsUpDown className="h-3 w-3 opacity-30" />;
     return sortDirection === "asc" ? (
-      <ChevronUp className="h-3 w-3" />
+      <ChevronUp className="h-3 w-3 text-cyan-400" />
     ) : (
-      <ChevronDown className="h-3 w-3" />
+      <ChevronDown className="h-3 w-3 text-cyan-400" />
     );
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="space-y-4">
+        <div className="flex items-center gap-6 px-1">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="border-white/10 bg-[#12121a]">
-              <CardContent className="p-4">
-                <Skeleton className="h-4 w-20 mb-2" />
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
+            <Skeleton key={i} className="h-6 w-32" />
           ))}
         </div>
         <Card className="border-white/10 bg-[#12121a]">
@@ -330,79 +396,102 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
 
   // Expanded detail section for a container
   const renderExpandedDetail = (container: ContainerScheduleItem) => {
-    const hasBol = container.bolCopy && isUrl(container.bolCopy);
-    const hasInsurance = container.insurance && isUrl(container.insurance);
-    const hasProductPhotos = container.productListWithPhotos && isUrl(container.productListWithPhotos);
-    const hasPackingList = container.packingList && isUrl(container.packingList);
+    const documents = [
+      { value: container.bolCopy, label: "BOL Copy", icon: <ImageIcon className="h-3.5 w-3.5 shrink-0" />, isPhoto: true },
+      { value: container.insurance, label: "Insurance", icon: <ImageIcon className="h-3.5 w-3.5 shrink-0" />, isPhoto: true },
+      { value: container.productListWithPhotos, label: "Product List w/ Photos", icon: isGoogleSheet(container.productListWithPhotos || "") ? <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" /> : <ImageIcon className="h-3.5 w-3.5 shrink-0" />, isPhoto: false },
+      { value: container.packingList, label: "Packing List", icon: <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />, isPhoto: false },
+      { value: container.warehouseProofOfDelivery, label: "WH Proof of Delivery", icon: <FileText className="h-3.5 w-3.5 shrink-0" />, isPhoto: false },
+    ];
+
+    const availableDocs = documents.filter(d => d.value && d.value !== "-" && d.value !== "N.A" && d.value !== "N/A" && isUrl(d.value));
+    const photoDocs = availableDocs.filter(d => d.isPhoto);
+    const linkDocs = availableDocs.filter(d => !d.isPhoto);
     const hasProductDetails = container.productDetails && container.productDetails !== "-";
-    const hasWarehouseProof = container.warehouseProofOfDelivery && isUrl(container.warehouseProofOfDelivery);
 
     return (
       <div className="px-6 py-5 space-y-5" onClick={(e) => e.stopPropagation()}>
-        {/* Row 1: Key Dates & Product Details */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3">
-            <p className="text-[11px] text-muted-foreground mb-1">Delivery Date</p>
-            <p className="text-sm text-white font-medium">{formatDate(container.delivery) || "-"}</p>
+        {/* Timeline dates + Product Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Dates timeline */}
+          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Calendar className="h-3 w-3" />
+              Key Dates
+            </p>
+            <div className="space-y-2.5">
+              {[
+                { label: "Delivery", value: container.delivery },
+                { label: "Loading", value: container.loadingDate },
+                { label: "Departure", value: container.vesselDepartureDate },
+                { label: "ETA NY Port", value: container.etaNYPort },
+                { label: "ETA Warehouse", value: container.etaWarehouse },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                  <span className="text-sm text-white font-medium tabular-nums">
+                    {formatDateWithYear(value) || "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3">
-            <p className="text-[11px] text-muted-foreground mb-1">Loading Date</p>
-            <p className="text-sm text-white font-medium">{formatDate(container.loadingDate) || "-"}</p>
-          </div>
-          <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 md:col-span-2">
-            <p className="text-[11px] text-muted-foreground mb-1">Product Details</p>
-            <p className="text-sm text-white">{hasProductDetails ? container.productDetails : "-"}</p>
+
+          {/* Product Details */}
+          <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Package className="h-3 w-3" />
+              Product Details
+            </p>
+            <p className="text-sm text-white leading-relaxed">
+              {hasProductDetails ? container.productDetails : "No details available"}
+            </p>
           </div>
         </div>
 
-        {/* Row 2: Photos (BOL & Insurance - columns K & L) */}
-        {(hasBol || hasInsurance) && (
+        {/* Photos */}
+        {photoDocs.length > 0 && (
           <div>
-            <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider">Photos & Documents</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Photos</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {hasBol && (
-                <PhotoGallery url={container.bolCopy} label="BOL Copy" />
-              )}
-              {hasInsurance && (
-                <PhotoGallery url={container.insurance} label="Insurance" />
-              )}
+              {photoDocs.map((doc) => (
+                <PhotoGallery key={doc.label} url={doc.value} label={doc.label} />
+              ))}
             </div>
           </div>
         )}
 
-        {/* Row 3: Spreadsheet Links (columns M & N) + other docs */}
-        <div>
-          <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider">Spreadsheets & Documents</p>
-          <div className="flex flex-wrap gap-3">
-            {hasProductPhotos && (
-              <DocumentLink
-                value={container.productListWithPhotos}
-                label="Product List w/ Photos"
-                icon={isGoogleSheet(container.productListWithPhotos) ? <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" /> : <ImageIcon className="h-3.5 w-3.5 shrink-0" />}
-              />
-            )}
-            {hasPackingList && (
-              <DocumentLink
-                value={container.packingList}
-                label="Packing List"
-                icon={<FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />}
-              />
-            )}
-            {hasWarehouseProof && (
-              <DocumentLink
-                value={container.warehouseProofOfDelivery}
-                label="Warehouse Proof of Delivery"
-                icon={<FileText className="h-3.5 w-3.5 shrink-0" />}
-              />
-            )}
+        {/* Documents */}
+        {linkDocs.length > 0 && (
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Documents</p>
+            <div className="flex flex-wrap gap-2">
+              {linkDocs.map((doc) => (
+                <DocumentLink key={doc.label} value={doc.value} label={doc.label} icon={doc.icon} />
+              ))}
+            </div>
           </div>
-          {!hasProductPhotos && !hasPackingList && !hasWarehouseProof && (
-            <p className="text-xs text-muted-foreground/50">No documents available</p>
-          )}
-        </div>
+        )}
+
+        {availableDocs.length === 0 && (
+          <p className="text-xs text-muted-foreground/50 py-2">No documents or photos available for this container.</p>
+        )}
       </div>
     );
   };
+
+  // Column header helper
+  const ColHeader = ({ field, label, className = "" }: { field: SortField; label: string; className?: string }) => (
+    <th
+      className={`text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-white transition-colors select-none ${className}`}
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <SortIcon field={field} />
+      </div>
+    </th>
+  );
 
   // Table content (shared between normal and fullscreen modes)
   const tableContent = (
@@ -411,187 +500,163 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
       <div className="hidden lg:block overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/10">
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors"
-                onClick={() => handleSort("factory")}
-              >
-                <div className="flex items-center gap-1">
-                  Factory
-                  <SortIcon field="factory" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors min-w-[180px]"
-                onClick={() => handleSort("containerLoaded")}
-              >
-                <div className="flex items-center gap-1">
-                  Contents
-                  <SortIcon field="containerLoaded" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors w-[60px]"
-                onClick={() => handleSort("shipmentNumber")}
-              >
-                <div className="flex items-center gap-1">
-                  Ship #
-                  <SortIcon field="shipmentNumber" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors w-[80px]"
-                onClick={() => handleSort("containerNumber")}
-              >
-                <div className="flex items-center gap-1">
-                  Cont #
-                  <SortIcon field="containerNumber" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors w-[75px]"
-                onClick={() => handleSort("vesselDepartureDate")}
-              >
-                <div className="flex items-center gap-1">
-                  Departs
-                  <SortIcon field="vesselDepartureDate" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors w-[75px]"
-                onClick={() => handleSort("etaNYPort")}
-              >
-                <div className="flex items-center gap-1">
-                  ETA Port
-                  <SortIcon field="etaNYPort" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors w-[75px]"
-                onClick={() => handleSort("etaWarehouse")}
-              >
-                <div className="flex items-center gap-1">
-                  ETA WH
-                  <SortIcon field="etaWarehouse" />
-                </div>
-              </th>
-              <th
-                className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 cursor-pointer hover:text-white transition-colors w-[150px]"
-                onClick={() => handleSort("status")}
-              >
-                <div className="flex items-center gap-1">
-                  Status
-                  <SortIcon field="status" />
-                </div>
-              </th>
-              <th className="text-left text-[11px] font-medium text-muted-foreground px-3 py-3 w-[50px]">
-              </th>
+            <tr className="border-b border-white/10 bg-white/[0.02]">
+              <ColHeader field="factory" label="Factory" className="w-[100px]" />
+              <ColHeader field="containerLoaded" label="Contents" className="min-w-[200px]" />
+              <ColHeader field="shipmentNumber" label="Ship #" className="w-[70px]" />
+              <ColHeader field="containerNumber" label="Cont #" className="w-[90px]" />
+              <ColHeader field="vesselDepartureDate" label="Departs" className="w-[85px]" />
+              <ColHeader field="etaNYPort" label="ETA Port" className="w-[85px]" />
+              <ColHeader field="etaWarehouse" label="ETA WH" className="w-[85px]" />
+              <ColHeader field="status" label="Status" className="w-[170px]" />
+              <th className="w-[40px] px-2 py-3"></th>
             </tr>
           </thead>
-          {filteredContainers.length === 0 ? (
-            <tbody>
+          <tbody>
+            {filteredContainers.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No containers match your filters.
+                <td colSpan={9} className="px-4 py-16 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Package className="h-8 w-8 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">No containers match your filters</p>
+                    {hasActiveFilters && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-cyan-400 hover:text-cyan-300 mt-1">
+                        Clear all filters
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
-            </tbody>
-          ) : (
-            filteredContainers.map((container) => {
-              const factoryColor = FACTORY_COLORS[container.factory] || DEFAULT_FACTORY_COLOR;
-              const statusStyle = STATUS_STYLES[container.status] || DEFAULT_STATUS_STYLE;
-              const isExpanded = expandedRow === container.id;
-              const hasDocuments = [container.bolCopy, container.insurance, container.productListWithPhotos, container.packingList, container.warehouseProofOfDelivery].some(
-                (v) => v && isUrl(v)
-              );
+            ) : (
+              filteredContainers.map((container, index) => {
+                const factoryColor = FACTORY_COLORS[container.factory] || DEFAULT_FACTORY_COLOR;
+                const statusStyle = STATUS_STYLES[container.status] || DEFAULT_STATUS_STYLE;
+                const isExpanded = expandedRow === container.id;
+                const hasDocuments = [container.bolCopy, container.insurance, container.productListWithPhotos, container.packingList, container.warehouseProofOfDelivery].some(
+                  (v) => v && isUrl(v)
+                );
 
-              return (
-                <tbody key={container.id}>
-                  <tr
-                    className="border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
-                    onClick={() => setExpandedRow(isExpanded ? null : container.id)}
-                  >
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${factoryColor.bg} ${factoryColor.text}`}
-                      >
-                        {container.factory}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <TooltipProvider>
+                return (
+                  <TooltipProvider key={container.id}>
+                    <tr
+                      className={`border-b border-white/[0.04] transition-colors cursor-pointer ${
+                        isExpanded
+                          ? "bg-white/[0.04]"
+                          : index % 2 === 0
+                          ? "hover:bg-white/[0.03]"
+                          : "bg-white/[0.015] hover:bg-white/[0.04]"
+                      }`}
+                      onClick={() => setExpandedRow(isExpanded ? null : container.id)}
+                    >
+                      {/* Factory */}
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold border ${factoryColor.bg} ${factoryColor.text} ${factoryColor.border}`}>
+                          {container.factory}
+                        </span>
+                      </td>
+
+                      {/* Contents */}
+                      <td className="px-4 py-3">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="text-sm text-white line-clamp-1 block max-w-[220px]">
+                            <span className="text-[13px] text-white leading-tight line-clamp-2 block">
                               {container.containerLoaded}
                             </span>
                           </TooltipTrigger>
-                          {container.containerLoaded.length > 35 && (
-                            <TooltipContent side="top" className="max-w-sm">
+                          {container.containerLoaded.length > 50 && (
+                            <TooltipContent side="top" className="max-w-md">
                               <p className="text-sm">{container.containerLoaded}</p>
                             </TooltipContent>
                           )}
                         </Tooltip>
-                      </TooltipProvider>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-sm text-muted-foreground">{container.shipmentNumber}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-sm text-muted-foreground">{container.containerNumber}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs text-muted-foreground">{formatDate(container.vesselDepartureDate)}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs text-muted-foreground">{formatDate(container.etaNYPort)}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs text-muted-foreground">{formatDate(container.etaWarehouse)}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {container.status ? (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
-                        >
-                          {container.status}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        {hasDocuments && (
-                          <span className="text-[10px] text-muted-foreground/60">
-                            {[container.bolCopy, container.insurance, container.productListWithPhotos, container.packingList, container.warehouseProofOfDelivery].filter(v => v && isUrl(v)).length}
-                          </span>
-                        )}
-                        <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground/50 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                      </div>
-                    </td>
-                  </tr>
-                  {/* Expanded Detail Row */}
-                  {isExpanded && (
-                    <tr className="border-b border-white/5 bg-white/[0.015]">
-                      <td colSpan={9} className="p-0">
-                        {renderExpandedDetail(container)}
+                      </td>
+
+                      {/* Ship # */}
+                      <td className="px-4 py-3">
+                        <span className="text-[13px] text-white tabular-nums font-medium">{container.shipmentNumber}</span>
+                      </td>
+
+                      {/* Cont # */}
+                      <td className="px-4 py-3">
+                        <span className="text-[13px] text-muted-foreground font-mono text-[12px]">{container.containerNumber || "—"}</span>
+                      </td>
+
+                      {/* Departs */}
+                      <td className="px-4 py-3">
+                        <span className="text-[13px] text-muted-foreground tabular-nums">{formatDate(container.vesselDepartureDate)}</span>
+                      </td>
+
+                      {/* ETA Port */}
+                      <td className="px-4 py-3">
+                        <span className="text-[13px] text-muted-foreground tabular-nums">{formatDate(container.etaNYPort)}</span>
+                      </td>
+
+                      {/* ETA WH */}
+                      <td className="px-4 py-3">
+                        <span className="text-[13px] text-muted-foreground tabular-nums">{formatDate(container.etaWarehouse)}</span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1.5">
+                          {container.status ? (
+                            <>
+                              <span className={`text-[12px] font-medium ${statusStyle.text}`}>
+                                {container.status}
+                              </span>
+                              <StatusStepIndicator status={container.status} />
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Expand */}
+                      <td className="px-2 py-3">
+                        <div className="flex items-center gap-1">
+                          {hasDocuments && (
+                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-400/10">
+                              <span className="text-[10px] text-blue-400 font-medium">
+                                {[container.bolCopy, container.insurance, container.productListWithPhotos, container.packingList, container.warehouseProofOfDelivery].filter(v => v && isUrl(v)).length}
+                              </span>
+                            </div>
+                          )}
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground/40 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+                        </div>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              );
-            })
-          )}
+
+                    {/* Expanded Detail Row */}
+                    {isExpanded && (
+                      <tr className="bg-white/[0.02]">
+                        <td colSpan={9} className="p-0 border-b border-white/[0.04]">
+                          <div className="border-l-2 border-cyan-400/30 ml-4">
+                            {renderExpandedDetail(container)}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </TooltipProvider>
+                );
+              })
+            )}
+          </tbody>
         </table>
       </div>
 
       {/* Mobile Card Layout */}
-      <div className="lg:hidden space-y-3 p-4">
+      <div className="lg:hidden space-y-2 p-3">
         {filteredContainers.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-8">
-            No containers match your filters.
-          </p>
+          <div className="flex flex-col items-center gap-2 py-12">
+            <Package className="h-8 w-8 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">No containers match your filters</p>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-cyan-400 hover:text-cyan-300 mt-1">
+                Clear all filters
+              </Button>
+            )}
+          </div>
         ) : (
           filteredContainers.map((container) => {
             const factoryColor = FACTORY_COLORS[container.factory] || DEFAULT_FACTORY_COLOR;
@@ -601,50 +666,59 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
             return (
               <div
                 key={container.id}
-                className="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden"
+                className={`rounded-lg border overflow-hidden transition-colors ${
+                  isExpanded ? "border-cyan-400/20 bg-white/[0.03]" : "border-white/[0.06] bg-white/[0.015]"
+                }`}
               >
                 <div
-                  className="p-4 space-y-3 cursor-pointer"
+                  className="p-3.5 cursor-pointer"
                   onClick={() => setExpandedRow(isExpanded ? null : container.id)}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white">{container.containerLoaded}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${factoryColor.bg} ${factoryColor.text}`}
-                        >
-                          {container.factory}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          Ship #{container.shipmentNumber}
-                        </span>
-                      </div>
+                  {/* Top row: Factory + Status + Chevron */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${factoryColor.bg} ${factoryColor.text} ${factoryColor.border}`}>
+                        {container.factory}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        #{container.shipmentNumber}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {container.status && (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0 ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
-                        >
+                        <span className={`text-[10px] font-medium ${statusStyle.text}`}>
                           {container.status}
                         </span>
                       )}
-                      <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground/50 transition-transform shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
+                      <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground/40 transition-transform shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  {/* Contents */}
+                  <p className="text-[13px] font-medium text-white mb-2.5 leading-tight line-clamp-2">
+                    {container.containerLoaded}
+                  </p>
+
+                  {/* Status step indicator */}
+                  {container.status && (
+                    <div className="mb-2.5">
+                      <StatusStepIndicator status={container.status} />
+                    </div>
+                  )}
+
+                  {/* Date grid */}
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-1">
                     <div>
-                      <p className="text-muted-foreground">Departs</p>
-                      <p className="text-white">{formatDate(container.vesselDepartureDate) || "-"}</p>
+                      <p className="text-[10px] text-muted-foreground/70">Departs</p>
+                      <p className="text-[12px] text-white tabular-nums">{formatDate(container.vesselDepartureDate)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">ETA Port</p>
-                      <p className="text-white">{formatDate(container.etaNYPort) || "-"}</p>
+                      <p className="text-[10px] text-muted-foreground/70">ETA Port</p>
+                      <p className="text-[12px] text-white tabular-nums">{formatDate(container.etaNYPort)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">ETA WH</p>
-                      <p className="text-white">{formatDate(container.etaWarehouse) || "-"}</p>
+                      <p className="text-[10px] text-muted-foreground/70">ETA WH</p>
+                      <p className="text-[12px] text-white tabular-nums">{formatDate(container.etaWarehouse)}</p>
                     </div>
                   </div>
                 </div>
@@ -663,47 +737,68 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
     </>
   );
 
-  // Filters section
+  // Compact inline filters
   const filtersSection = (
-    <div className="flex flex-col sm:flex-row gap-3">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+      <div className="relative flex-1 min-w-0">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <input
           type="text"
-          placeholder="Search factory, contents, or container..."
+          placeholder="Search factory, contents, container #..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 rounded-md bg-white/5 border border-white/10 text-white placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/50"
+          className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-muted-foreground/50 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/40 focus:border-cyan-400/30 transition-all"
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10"
+          >
+            <X className="h-3 w-3 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
-      <Select value={factoryFilter} onValueChange={setFactoryFilter}>
-        <SelectTrigger className="w-full sm:w-[160px] bg-white/5 border-white/10 text-white">
-          <SelectValue placeholder="Factory" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Factories</SelectItem>
-          {factories.map((f) => (
-            <SelectItem key={f} value={f}>
-              {f}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex gap-2">
+        <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+          <SelectTrigger className="w-full sm:w-[140px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
+            <SelectValue placeholder="Factory" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Factories</SelectItem>
+            {factories.map((f) => (
+              <SelectItem key={f} value={f}>
+                {f}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-full sm:w-[200px] bg-white/5 border-white/10 text-white">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
-          {statuses.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[180px] bg-white/[0.04] border-white/[0.08] text-white h-9 text-sm">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {statuses.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="text-xs text-muted-foreground hover:text-white h-9 px-2 shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 
@@ -712,37 +807,45 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col">
         {/* Fullscreen Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#12121a] shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-white">Containers ({filteredContainers.length})</h2>
-            {(searchQuery || factoryFilter !== "all" || statusFilter !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setFactoryFilter("all");
-                  setStatusFilter("all");
-                }}
-                className="text-xs text-muted-foreground hover:text-white"
-              >
-                Clear filters
-              </Button>
-            )}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-[#12121a] shrink-0">
+          <div className="flex items-center gap-6">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+              <Package className="h-4 w-4 text-cyan-400" />
+              Containers
+              <span className="text-muted-foreground font-normal text-sm ml-1">({filteredContainers.length})</span>
+            </h2>
+
+            {/* Inline summary stats */}
+            <div className="hidden md:flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-blue-400">
+                <Ship className="h-3.5 w-3.5" />
+                <span className="font-medium">{shippedCount}</span> shipped
+              </span>
+              <span className="text-white/10">|</span>
+              <span className="flex items-center gap-1.5 text-violet-400">
+                <Anchor className="h-3.5 w-3.5" />
+                <span className="font-medium">{atPortCount}</span> at port
+              </span>
+              <span className="text-white/10">|</span>
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <Warehouse className="h-3.5 w-3.5" />
+                <span className="font-medium">{warehouseCount}</span> delivered
+              </span>
+            </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsFullscreen(false)}
-            className="text-xs text-muted-foreground hover:text-white gap-1.5 h-7 px-2"
+            className="text-xs text-muted-foreground hover:text-white gap-1.5 h-8 px-2.5"
           >
             <Minimize2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Exit Fullscreen</span>
+            <span className="hidden sm:inline">Exit</span>
           </Button>
         </div>
 
         {/* Fullscreen Filters */}
-        <div className="px-6 py-3 border-b border-white/10 bg-[#12121a] shrink-0">
+        <div className="px-6 py-2.5 border-b border-white/[0.06] bg-[#12121a]/80 shrink-0">
           {filtersSection}
         </div>
 
@@ -755,106 +858,64 @@ export function ContainerScheduleDashboard({ containers, summary, isLoading }: C
   }
 
   return (
-    <div className="space-y-6">
-      {/* Summary Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-white/10 bg-[#12121a]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-400/10">
-                <Package className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Containers</p>
-                <p className="text-2xl font-bold text-white">{summary.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      {/* Compact Summary Stats - inline row instead of separate cards */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-1">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-400/10">
+            <Package className="h-3.5 w-3.5 text-cyan-400" />
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-white tabular-nums">{summary.total}</span>
+            <span className="text-xs text-muted-foreground">containers</span>
+          </div>
+        </div>
 
-        <Card className="border-white/10 bg-[#12121a]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-400/10">
-                <Ship className="h-5 w-5 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Shipped</p>
-                <p className="text-2xl font-bold text-blue-400">{shippedCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="h-5 w-px bg-white/10 hidden sm:block" />
 
-        <Card className="border-white/10 bg-[#12121a]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-400/10">
-                <MapPin className="h-5 w-5 text-violet-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">At Port</p>
-                <p className="text-2xl font-bold text-violet-400">{atPortCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-1.5">
+          <Ship className="h-3.5 w-3.5 text-blue-400" />
+          <span className="text-sm font-semibold text-blue-400 tabular-nums">{shippedCount}</span>
+          <span className="text-xs text-muted-foreground">shipped</span>
+        </div>
 
-        <Card className="border-white/10 bg-[#12121a]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-400/10">
-                <Warehouse className="h-5 w-5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Delivered</p>
-                <p className="text-2xl font-bold text-emerald-400">{warehouseCount}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-1.5">
+          <Anchor className="h-3.5 w-3.5 text-violet-400" />
+          <span className="text-sm font-semibold text-violet-400 tabular-nums">{atPortCount}</span>
+          <span className="text-xs text-muted-foreground">at port</span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Warehouse className="h-3.5 w-3.5 text-emerald-400" />
+          <span className="text-sm font-semibold text-emerald-400 tabular-nums">{warehouseCount}</span>
+          <span className="text-xs text-muted-foreground">delivered</span>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card className="border-white/10 bg-[#12121a]">
-        <CardContent className="p-4">
+      {/* Main Table Card - filters integrated into header */}
+      <Card className="border-white/[0.08] bg-[#12121a] overflow-hidden">
+        <CardHeader className="pb-0 pt-4 px-4">
+          <div className="flex items-center justify-between mb-3">
+            <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              {hasActiveFilters
+                ? `${filteredContainers.length} of ${containers.length} containers`
+                : `All ${containers.length} containers`
+              }
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFullscreen(true)}
+              className="text-xs text-muted-foreground hover:text-white gap-1.5 h-7 px-2"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Expand</span>
+            </Button>
+          </div>
           {filtersSection}
-        </CardContent>
-      </Card>
-
-      {/* Containers Table */}
-      <Card className="border-white/10 bg-[#12121a]">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base text-white flex items-center justify-between">
-            <span>Containers ({filteredContainers.length})</span>
-            <div className="flex items-center gap-2">
-              {(searchQuery || factoryFilter !== "all" || statusFilter !== "all") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setFactoryFilter("all");
-                    setStatusFilter("all");
-                  }}
-                  className="text-xs text-muted-foreground hover:text-white"
-                >
-                  Clear filters
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFullscreen(true)}
-                className="text-xs text-muted-foreground hover:text-white gap-1.5 h-7 px-2"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Fullscreen</span>
-              </Button>
-            </div>
-          </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 mt-3">
           {tableContent}
         </CardContent>
       </Card>
