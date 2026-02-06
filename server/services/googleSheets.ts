@@ -117,6 +117,30 @@ export async function listDriveFiles(folderId: string): Promise<DriveFile[]> {
   return allFiles;
 }
 
+// Get a readable stream for a Drive file (for proxying content)
+export async function getDriveFileStream(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string; size: string | null; name: string }> {
+  const drive = getGoogleDriveClient();
+
+  // Get file metadata first
+  const meta = await drive.files.get({
+    fileId,
+    fields: 'name, mimeType, size',
+  });
+
+  // Download the file content as a stream
+  const response = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'stream' }
+  );
+
+  return {
+    stream: response.data as unknown as NodeJS.ReadableStream,
+    mimeType: meta.data.mimeType || 'application/octet-stream',
+    size: meta.data.size || null,
+    name: meta.data.name || 'file',
+  };
+}
+
 // Fetch data from a Google Sheet
 export async function fetchSheetData(
   spreadsheetId: string,

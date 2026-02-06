@@ -76,9 +76,9 @@ function getDriveThumbnailUrl(file: DriveFile, size: 'thumb' | 'preview' = 'thum
   return `https://drive.google.com/thumbnail?id=${file.id}&sz=${sz}`;
 }
 
-// Get video embed URL for playback
-function getVideoEmbedUrl(file: DriveFile): string {
-  return `https://drive.google.com/file/d/${file.id}/preview`;
+// Get proxied video URL for direct playback through our server
+function getVideoProxyUrl(file: DriveFile): string {
+  return `/api/sheets/drive-file/${file.id}`;
 }
 
 export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps) {
@@ -442,12 +442,12 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
                 className="max-w-full max-h-[80vh] object-contain rounded-lg"
               />
             ) : (
-              <iframe
+              <video
                 key={mediaFiles[lightboxIndex].id}
-                src={getVideoEmbedUrl(mediaFiles[lightboxIndex])}
-                className="w-[80vw] h-[70vh] max-w-4xl rounded-lg border-0"
-                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                allowFullScreen
+                src={getVideoProxyUrl(mediaFiles[lightboxIndex])}
+                controls
+                autoPlay
+                className="max-w-[80vw] max-h-[70vh] rounded-lg"
               />
             )}
             <div className="mt-3 text-center">

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, listDriveFiles, SheetRow as GoogleSheetRow } from '../services/googleSheets';
+import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getSpreadsheetInfo, listDriveFiles, getDriveFileStream, SheetRow as GoogleSheetRow } from '../services/googleSheets';
 import { db } from '../db';
 import { sheetRows } from '@shared/schema';
 import { eq, and, inArray } from 'drizzle-orm';
@@ -620,6 +620,34 @@ router.get('/drive-files', async (req, res) => {
     console.error('Error listing drive files:', error);
     res.status(500).json({
       error: 'Failed to list drive files',
+      message: error.message
+    });
+  }
+});
+
+// Proxy a Google Drive file (stream content through our server for authenticated access)
+router.get('/drive-file/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId is required' });
+    }
+
+    const { stream, mimeType, size, name } = await getDriveFileStream(fileId);
+
+    res.setHeader('Content-Type', mimeType);
+    if (size) {
+      res.setHeader('Content-Length', size);
+    }
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(name)}"`);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    (stream as any).pipe(res);
+  } catch (error: any) {
+    console.error('Error proxying drive file:', error);
+    res.status(500).json({
+      error: 'Failed to fetch drive file',
       message: error.message
     });
   }
