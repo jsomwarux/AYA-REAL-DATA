@@ -1188,12 +1188,17 @@ router.get('/room-overview', async (req, res) => {
     }
 
     // Fetch sheet info to find exact tab name
-    let tabName = 'Sheet1';
+    let tabName = 'ROOM FEATURES';
     try {
       const info = await getSpreadsheetInfo(spreadsheetId);
-      if (info.sheets && info.sheets.length > 0) {
-        tabName = info.sheets[0].title || tabName;
-        console.log('[room-overview] Using tab name:', JSON.stringify(tabName));
+      const matchingSheet = info.sheets?.find(
+        (s: any) => s.title?.toLowerCase().trim() === 'room features'
+      );
+      if (matchingSheet?.title) {
+        tabName = matchingSheet.title;
+        console.log('[room-overview] Found exact tab name:', JSON.stringify(tabName));
+      } else {
+        console.log('[room-overview] "ROOM FEATURES" tab not found, available tabs:', info.sheets?.map((s: any) => s.title));
       }
     } catch (infoErr: any) {
       console.warn('[room-overview] Could not fetch sheet info:', infoErr.message);
