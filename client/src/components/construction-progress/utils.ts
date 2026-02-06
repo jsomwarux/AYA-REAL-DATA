@@ -50,8 +50,8 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
   },
   'Bathroom_Soap Niche Built': {
     type: 'dropdown',
-    completeValues: ['Done', 'Not required', 'Not Required'],
-    naValues: []
+    completeValues: ['Done'],
+    naValues: ['Not required', 'Not Required']
   },
   'Bathroom_Tile %': {
     type: 'percentage',
@@ -60,8 +60,8 @@ export const BATHROOM_FIELDS: Record<string, { type: string; completeValues: str
   },
   'Bathroom_Linear Drain Installed': {
     type: 'dropdown',
-    completeValues: ['Done', 'Not required', 'Not Required'],
-    naValues: []
+    completeValues: ['Done'],
+    naValues: ['Not required', 'Not Required']
   },
 };
 
