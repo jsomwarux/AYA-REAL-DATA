@@ -9,6 +9,7 @@ import {
   Radar,
   Lock,
   LayoutDashboard,
+  BedDouble,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -75,6 +76,16 @@ const tabs = [
     bgColor: "bg-cyan-400/10",
     borderColor: "hover:border-cyan-400/30",
     description: "Track shipments from factory to warehouse with delivery status",
+    authKey: "management" as const,
+  },
+  {
+    title: "Room Specs",
+    href: "/room-specs",
+    icon: BedDouble,
+    iconColor: "text-rose-400",
+    bgColor: "bg-rose-400/10",
+    borderColor: "hover:border-rose-400/30",
+    description: "Room specifications, features, and fact sheet for all hotel units",
     authKey: "management" as const,
   },
   {

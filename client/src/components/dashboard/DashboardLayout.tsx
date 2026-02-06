@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Sidebar, SidebarProvider, useSidebar } from "./Sidebar";
-import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Radar, Lock } from "lucide-react";
+import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Radar, Lock, BedDouble } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -30,6 +30,7 @@ const mobileNavItems: MobileNavItem[] = [
   { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400", requiredAuth: "construction" },
   { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true, requiredAuth: "management" },
   { title: "Timeline", href: "/timeline", icon: <Calendar className="h-5 w-5" />, iconColor: "text-amber-400", managementOnly: true, requiredAuth: "management" },
+  { title: "Room Specs", href: "/room-specs", icon: <BedDouble className="h-5 w-5" />, iconColor: "text-rose-400", managementOnly: true, requiredAuth: "management" },
   { title: "Deal Intelligence", href: "/deals", icon: <Radar className="h-5 w-5" />, iconColor: "text-purple-400", managementOnly: true, requiredAuth: "deals" },
 ];
 

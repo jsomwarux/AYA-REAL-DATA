@@ -13,6 +13,7 @@ import {
   Calendar,
   Target,
   Ship,
+  BedDouble,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,15 @@ const mainNavItems: NavItem[] = [
     icon: <Ship className="h-5 w-5" />,
     iconColor: "text-cyan-400",
     description: "Shipment tracking from factory to warehouse",
+    managementOnly: true,
+    requiredAuth: "management",
+  },
+  {
+    title: "Room Specs",
+    href: "/room-specs",
+    icon: <BedDouble className="h-5 w-5" />,
+    iconColor: "text-rose-400",
+    description: "Room specifications and fact sheet",
     managementOnly: true,
     requiredAuth: "management",
   },

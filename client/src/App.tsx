@@ -12,6 +12,7 @@ import Timeline from "@/pages/Timeline";
 import Deals from "@/pages/Deals";
 import WeeklyGoals from "@/pages/WeeklyGoals";
 import ContainerSchedule from "@/pages/ContainerSchedule";
+import RoomSpecs from "@/pages/RoomSpecs";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
@@ -70,6 +71,13 @@ function Router() {
         <Route path="/container-schedule">
           <TabPasswordGate tab="budget" title="Container Schedule">
             <ContainerSchedule />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Room Specs - MANAGEMENT_PASSWORD_GATE */}
+        <Route path="/room-specs">
+          <TabPasswordGate tab="budget" title="Room Specs">
+            <RoomSpecs />
           </TabPasswordGate>
         </Route>
 

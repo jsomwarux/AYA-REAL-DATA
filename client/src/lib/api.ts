@@ -421,3 +421,52 @@ export async function fetchContainerScheduleData(): Promise<ContainerScheduleDat
   const response = await fetch(`${API_BASE}/container-schedule`);
   return handleResponse<ContainerScheduleData>(response);
 }
+
+// Room Overview / Specs Types
+export interface RoomOverviewItem {
+  id: number;
+  floor: number;
+  roomNumber: number;
+  area: number;
+  sizeCategory: string;
+  roomType: string;
+  bedSize: string;
+  ada: string;
+  connectingDoor: string;
+  sinkStyle: string;
+  sinkSize: string;
+  showerWithGlassDoor: string;
+  showerWindow: string;
+  mossWall: string;
+  mirrorSlidingDoor: string;
+  moxyBar: string;
+  miniBarSize: string;
+  speakeasy: string;
+  partyBoxHeadboard: string;
+  curtainType: string;
+  nightStands: string;
+  tvSize: string;
+}
+
+export interface RoomOverviewSummary {
+  total: number;
+  floors: number[];
+  floorCount: number;
+  adaCount: number;
+  byFloor: Record<number, number>;
+  byRoomType: Record<string, number>;
+  bySizeCategory: Record<string, number>;
+  byBedSize: Record<string, number>;
+}
+
+export interface RoomOverviewData {
+  rooms: RoomOverviewItem[];
+  summary: RoomOverviewSummary;
+  lastUpdated: string;
+}
+
+// Fetch Room Overview data
+export async function fetchRoomOverviewData(): Promise<RoomOverviewData> {
+  const response = await fetch(`${API_BASE}/room-overview`);
+  return handleResponse<RoomOverviewData>(response);
+}

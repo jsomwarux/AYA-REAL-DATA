@@ -1172,4 +1172,155 @@ router.get('/container-schedule', async (req, res) => {
   }
 });
 
+// Get Room Overview / Fact Sheet data
+router.get('/room-overview', async (req, res) => {
+  console.log('[room-overview] Endpoint called');
+  try {
+    const spreadsheetId = process.env.ROOM_OVERVIEW_SHEET_ID;
+    console.log('[room-overview] Sheet ID configured:', spreadsheetId ? 'YES' : 'NO');
+
+    if (!spreadsheetId) {
+      console.error('[room-overview] ROOM_OVERVIEW_SHEET_ID not set');
+      return res.status(400).json({
+        error: 'Room Overview sheet ID not configured',
+        message: 'Please set ROOM_OVERVIEW_SHEET_ID in environment variables'
+      });
+    }
+
+    // Fetch sheet info to find exact tab name
+    let tabName = 'Sheet1';
+    try {
+      const info = await getSpreadsheetInfo(spreadsheetId);
+      if (info.sheets && info.sheets.length > 0) {
+        tabName = info.sheets[0].title || tabName;
+        console.log('[room-overview] Using tab name:', JSON.stringify(tabName));
+      }
+    } catch (infoErr: any) {
+      console.warn('[room-overview] Could not fetch sheet info:', infoErr.message);
+    }
+
+    // Row 1 is a title/spacer, Row 2 has headers, Row 3+ has data
+    // fetchSheetData treats first row of range as headers
+    const range = `'${tabName}'!A2:U500`;
+    const data = await fetchSheetData(spreadsheetId, range);
+
+    let rooms: GoogleSheetRow[] = [];
+
+    if (data && data.rawValues && data.rawValues.length > 0) {
+      const headers = data.rawValues[0] as string[];
+      const dataRows = data.rawValues.slice(1);
+
+      // Case-insensitive column finder
+      const findCol = (keyword: string) => headers.findIndex(h =>
+        h?.toLowerCase().trim().includes(keyword.toLowerCase())
+      );
+
+      const floorIdx = findCol('floor');
+      const roomIdx = findCol('room');
+      const areaIdx = findCol('area');
+      const sizeCatIdx = findCol('size category');
+      const roomTypeIdx = findCol('room type');
+      const bedSizeIdx = findCol('bed size');
+      const adaIdx = findCol('ada');
+      const connectDoorIdx = findCol('connecting door');
+      const sinkStyleIdx = findCol('sink style');
+      const sinkSizeIdx = findCol('sink size');
+      const showerGlassIdx = findCol('shower with glass');
+      const showerWindowIdx = findCol('shower window');
+      const mossWallIdx = findCol('moss wall');
+      const mirrorSlidingIdx = findCol('mirror sliding');
+      const moxyBarIdx = findCol('moxy bar');
+      const miniBarIdx = findCol('mini bar');
+      const speakeasyIdx = findCol('speakeasy');
+      const partyBoxIdx = findCol('party box');
+      const curtainIdx = findCol('curtain');
+      const nightStandsIdx = findCol('night stand');
+      const tvSizeIdx = findCol('tv size');
+
+      console.log('[room-overview] Column indices:', {
+        floorIdx, roomIdx, areaIdx, sizeCatIdx, roomTypeIdx, bedSizeIdx,
+        adaIdx, connectDoorIdx, sinkStyleIdx, sinkSizeIdx, showerGlassIdx,
+        showerWindowIdx, mossWallIdx, mirrorSlidingIdx, moxyBarIdx,
+        miniBarIdx, speakeasyIdx, partyBoxIdx, curtainIdx, nightStandsIdx, tvSizeIdx
+      });
+
+      const getValue = (row: any[], idx: number): string => {
+        if (idx < 0 || idx >= row.length) return '';
+        return (row[idx] || '').toString().trim();
+      };
+
+      rooms = dataRows.map((row, index) => ({
+        id: index + 3,
+        floor: parseInt(getValue(row, floorIdx)) || 0,
+        roomNumber: parseInt(getValue(row, roomIdx)) || 0,
+        area: parseInt(getValue(row, areaIdx)) || 0,
+        sizeCategory: getValue(row, sizeCatIdx),
+        roomType: getValue(row, roomTypeIdx),
+        bedSize: getValue(row, bedSizeIdx),
+        ada: getValue(row, adaIdx),
+        connectingDoor: getValue(row, connectDoorIdx),
+        sinkStyle: getValue(row, sinkStyleIdx),
+        sinkSize: getValue(row, sinkSizeIdx),
+        showerWithGlassDoor: getValue(row, showerGlassIdx),
+        showerWindow: getValue(row, showerWindowIdx),
+        mossWall: getValue(row, mossWallIdx),
+        mirrorSlidingDoor: getValue(row, mirrorSlidingIdx),
+        moxyBar: getValue(row, moxyBarIdx),
+        miniBarSize: getValue(row, miniBarIdx),
+        speakeasy: getValue(row, speakeasyIdx),
+        partyBoxHeadboard: getValue(row, partyBoxIdx),
+        curtainType: getValue(row, curtainIdx),
+        nightStands: getValue(row, nightStandsIdx),
+        tvSize: getValue(row, tvSizeIdx),
+      })).filter(r => (r.roomNumber as number) > 0);
+    }
+
+    // Compute summary statistics
+    const floors = [...new Set(rooms.map(r => r.floor as number))].sort((a, b) => a - b);
+    const adaCount = rooms.filter(r => (r.ada as string).toLowerCase() === 'yes').length;
+
+    const byFloor: Record<number, number> = {};
+    const byRoomType: Record<string, number> = {};
+    const bySizeCategory: Record<string, number> = {};
+    const byBedSize: Record<string, number> = {};
+
+    for (const room of rooms) {
+      const floor = room.floor as number;
+      byFloor[floor] = (byFloor[floor] || 0) + 1;
+
+      const type = (room.roomType as string) || 'Unknown';
+      byRoomType[type] = (byRoomType[type] || 0) + 1;
+
+      const size = (room.sizeCategory as string) || 'Unknown';
+      bySizeCategory[size] = (bySizeCategory[size] || 0) + 1;
+
+      const bed = (room.bedSize as string) || 'Unknown';
+      byBedSize[bed] = (byBedSize[bed] || 0) + 1;
+    }
+
+    console.log(`[room-overview] Returning ${rooms.length} rooms across ${floors.length} floors`);
+
+    res.json({
+      rooms,
+      summary: {
+        total: rooms.length,
+        floors,
+        floorCount: floors.length,
+        adaCount,
+        byFloor,
+        byRoomType,
+        bySizeCategory,
+        byBedSize,
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error fetching room overview data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch room overview data',
+      message: error.message
+    });
+  }
+});
+
 export default router;
