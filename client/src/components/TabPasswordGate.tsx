@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock, Loader2, AlertCircle, Shield } from "lucide-react";
 
-type TabName = "construction" | "budget" | "timeline" | "deals";
+type TabName = "construction" | "budget" | "timeline";
 
 export interface TabAuthStatus {
   construction: boolean;
   management: boolean;
-  deals: boolean;
   anyAuthenticated: boolean;
 }
 
@@ -108,7 +107,7 @@ export function TabPasswordGate({ tab, title, children, requireAny }: TabPasswor
   }
 
   // Management tabs (budget, timeline, deals) get pink/purple styling
-  const isManagementGate = tab === "budget" || tab === "timeline" || tab === "deals";
+  const isManagementGate = tab === "budget" || tab === "timeline";
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">

@@ -9,7 +9,6 @@ import Overview from "@/pages/Overview";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
 import Timeline from "@/pages/Timeline";
-import Deals from "@/pages/Deals";
 import WeeklyGoals from "@/pages/WeeklyGoals";
 import ContainerSchedule from "@/pages/ContainerSchedule";
 import RoomSpecs from "@/pages/RoomSpecs";
@@ -86,13 +85,6 @@ function Router() {
         <Route path="/vendor-invoices">
           <TabPasswordGate tab="budget" title="Vendor Invoices">
             <VendorInvoices />
-          </TabPasswordGate>
-        </Route>
-
-        {/* Deals - DEALS_PASSWORD */}
-        <Route path="/deals">
-          <TabPasswordGate tab="deals" title="Deal Intelligence">
-            <Deals />
           </TabPasswordGate>
         </Route>
 

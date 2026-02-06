@@ -6,7 +6,6 @@ import {
   Calendar,
   Target,
   Ship,
-  Radar,
   Lock,
   LayoutDashboard,
   BedDouble,
@@ -18,7 +17,6 @@ import { useQuery } from "@tanstack/react-query";
 interface TabAuthStatus {
   construction: boolean;
   management: boolean;
-  deals: boolean;
   anyAuthenticated: boolean;
 }
 
@@ -98,16 +96,6 @@ const tabs = [
     borderColor: "hover:border-yellow-400/30",
     description: "Browse vendor documents, invoices, and contracts from Google Drive",
     authKey: "management" as const,
-  },
-  {
-    title: "Deal Intelligence",
-    href: "/deals",
-    icon: Radar,
-    iconColor: "text-purple-400",
-    bgColor: "bg-purple-400/10",
-    borderColor: "hover:border-purple-400/30",
-    description: "AI-scored distressed property analysis and recommendations",
-    authKey: "deals" as const,
   },
 ];
 

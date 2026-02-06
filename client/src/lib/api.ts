@@ -27,13 +27,6 @@ export async function fetchConstructionData(range?: string): Promise<SheetData> 
   return handleResponse<SheetData>(response);
 }
 
-// Fetch Deal Intelligence data
-export async function fetchDealsData(range?: string): Promise<SheetData> {
-  const params = range ? `?range=${encodeURIComponent(range)}` : '';
-  const response = await fetch(`${API_BASE}/deals${params}`);
-  return handleResponse<SheetData>(response);
-}
-
 // Fetch data from any sheet
 export async function fetchSheetData(spreadsheetId: string, range?: string): Promise<SheetData> {
   const params = range ? `?range=${encodeURIComponent(range)}` : '';

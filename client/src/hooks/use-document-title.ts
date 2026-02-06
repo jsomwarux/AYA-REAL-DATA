@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 const pageTitles: Record<string, string> = {
   "/": "Overview",
   "/construction": "Construction Oversight",
-  "/deals": "Deal Intelligence",
   "/settings": "Settings",
 };
 

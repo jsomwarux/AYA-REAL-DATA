@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   HardHat,
-  Radar,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -115,16 +114,6 @@ const mainNavItems: NavItem[] = [
     description: "Browse vendor documents and invoices",
     managementOnly: true,
     requiredAuth: "management",
-  },
-  {
-    title: "Deal Intelligence",
-    href: "/deals",
-    icon: <Radar className="h-5 w-5" />,
-    iconColor: "text-purple-400",
-    description: "Score distressed properties",
-    badge: "Protected",
-    managementOnly: true,
-    requiredAuth: "deals",
   },
 ];
 

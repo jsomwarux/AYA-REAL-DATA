@@ -138,65 +138,6 @@ router.get('/construction', async (req, res) => {
   }
 });
 
-// Mock deal data for demo/development mode
-const MOCK_DEALS_ROWS = [
-  { bbl: "1-00845-0021", address: "123 W 57th St", borough: "MANHATTAN", final_score: 87, recommendation: "STRONG BUY", upside_score: 92, risk_score: 78, execution_score: 88, investment_thesis: "Prime Midtown location with significant value-add potential through renovation. Below-market rents offer 40%+ upside upon lease turnover.", estimated_price_range: "$4.2M - $4.8M", estimated_roi: "18-22%", key_due_diligence: "Verify zoning compliance, environmental Phase I, tenant lease expiration schedule" },
-  { bbl: "3-01234-0055", address: "456 Atlantic Ave", borough: "BROOKLYN", final_score: 74, recommendation: "BUY", upside_score: 80, risk_score: 65, execution_score: 76, investment_thesis: "Emerging corridor with strong residential conversion potential. Recent rezoning supports mixed-use development.", estimated_price_range: "$2.8M - $3.2M", estimated_roi: "14-18%", key_due_diligence: "Structural assessment, rezoning confirmation, market rent comparables" },
-  { bbl: "2-03456-0012", address: "789 Grand Concourse", borough: "BRONX", final_score: 68, recommendation: "BUY", upside_score: 72, risk_score: 60, execution_score: 70, investment_thesis: "Distressed asset in rapidly improving neighborhood. Metro-North expansion will drive significant appreciation.", estimated_price_range: "$1.5M - $1.9M", estimated_roi: "12-16%", key_due_diligence: "Title search, building violations review, capital expenditure assessment" },
-  { bbl: "4-05678-0033", address: "321 Queens Blvd", borough: "QUEENS", final_score: 55, recommendation: "HOLD", upside_score: 58, risk_score: 50, execution_score: 56, investment_thesis: "Stable cash-flowing asset with modest upside. Limited value-add opportunities but strong tenant base provides reliable income.", estimated_price_range: "$3.1M - $3.5M", estimated_roi: "8-11%", key_due_diligence: "Tenant creditworthiness, deferred maintenance audit, insurance review" },
-  { bbl: "5-07890-0044", address: "654 Victory Blvd", borough: "STATEN ISLAND", final_score: 42, recommendation: "PASS", upside_score: 38, risk_score: 35, execution_score: 50, investment_thesis: "Limited growth potential in current market cycle. High vacancy risk and declining neighborhood metrics suggest better opportunities elsewhere.", estimated_price_range: "$900K - $1.1M", estimated_roi: "5-7%", key_due_diligence: "Environmental concerns, flood zone assessment, market demand analysis" },
-  { bbl: "1-01122-0066", address: "88 Essex St", borough: "MANHATTAN", final_score: 91, recommendation: "STRONG BUY", upside_score: 95, risk_score: 82, execution_score: 93, investment_thesis: "LES opportunity zone property with historic tax credits available. Rapid gentrification and new subway access create exceptional upside.", estimated_price_range: "$5.5M - $6.2M", estimated_roi: "22-28%", key_due_diligence: "Historic preservation requirements, opportunity zone compliance, community board review" },
-  { bbl: "3-03344-0077", address: "200 Flatbush Ave", borough: "BROOKLYN", final_score: 63, recommendation: "HOLD", upside_score: 65, risk_score: 58, execution_score: 64, investment_thesis: "Well-located but fully priced asset. Current cap rate reflects market value with limited near-term catalysts for appreciation.", estimated_price_range: "$3.8M - $4.3M", estimated_roi: "9-12%", key_due_diligence: "Rent stabilization audit, comparable sales analysis, operating expense review" },
-  { bbl: "2-05566-0088", address: "500 E Tremont Ave", borough: "BRONX", final_score: 79, recommendation: "BUY", upside_score: 83, risk_score: 70, execution_score: 81, investment_thesis: "Multi-family conversion opportunity in improving area. Strong rental demand and below-replacement-cost basis create favorable risk/reward.", estimated_price_range: "$2.1M - $2.5M", estimated_roi: "15-20%", key_due_diligence: "Conversion feasibility study, HPD violations check, utility infrastructure assessment" },
-];
-
-// Get Deal Intelligence data
-router.get('/deals', async (req, res) => {
-  try {
-    // Check if mock mode is enabled
-    const mockMode = process.env.DEALS_MOCK_MODE?.toLowerCase() === 'true';
-
-    if (mockMode) {
-      const now = new Date().toISOString();
-      const headers = ['bbl', 'address', 'borough', 'final_score', 'recommendation', 'upside_score', 'risk_score', 'execution_score', 'investment_thesis', 'estimated_price_range', 'estimated_roi', 'key_due_diligence', 'retrieved_at'];
-      const rows = MOCK_DEALS_ROWS.map(row => ({ ...row, retrieved_at: now }));
-      return res.json({ headers, rows });
-    }
-
-    const spreadsheetId = process.env.DEALS_SHEET_ID;
-
-    if (!spreadsheetId) {
-      return res.status(400).json({
-        error: 'Deals sheet ID not configured',
-        message: 'Please set DEALS_SHEET_ID in environment variables'
-      });
-    }
-
-    const range = (req.query.range as string) || 'Sheet1!A:BZ';
-    const data = await fetchSheetData(spreadsheetId, range);
-
-    // Add timestamps (preserving existing ones for known rows)
-    const rowsWithTimestamp = await addTimestampsToRows(data.rows, 'deals');
-
-    // Add retrieved_at to headers if not already present
-    const headers = data.headers.includes('retrieved_at')
-      ? data.headers
-      : [...data.headers, 'retrieved_at'];
-
-    res.json({
-      ...data,
-      headers,
-      rows: rowsWithTimestamp,
-    });
-  } catch (error: any) {
-    console.error('Error fetching deals data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch deals data',
-      message: error.message
-    });
-  }
-});
-
 // Get data from any sheet (with spreadsheet ID)
 router.get('/sheet/:spreadsheetId', async (req, res) => {
   try {

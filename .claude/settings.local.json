@@ -24,7 +24,15 @@
       "Bash(npx tsx --eval \"import ''./server/index.ts''\")",
       "Bash(python3:*)",
       "Bash(pip3 install:*)",
-      "Bash(xargs basename:*)"
+      "Bash(xargs basename:*)",
+      "Bash(node:*)",
+      "Bash(npx vite build:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(brew install:*)",
+      "Bash(gh auth:*)"
     ]
   }
 }

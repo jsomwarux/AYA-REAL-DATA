@@ -19,7 +19,6 @@ declare module "express-session" {
   interface SessionData {
     authenticated: boolean;
     role: "management" | "default";
-    dealsAuthenticated: boolean;
     constructionAuthenticated: boolean;
     managementAuthenticated: boolean;
   }
@@ -111,8 +110,6 @@ app.post("/api/auth/tab-login", (req: Request, res: Response) => {
   const { password, tab } = req.body;
   const gatePassword = process.env.PASSWORD_GATE;
   const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
-  const dealsPassword = process.env.DEALS_PASSWORD;
-
   if (tab === "construction") {
     if (!gatePassword || password === gatePassword) {
       req.session.constructionAuthenticated = true;
@@ -134,62 +131,22 @@ app.post("/api/auth/tab-login", (req: Request, res: Response) => {
     return res.status(401).json({ message: "Incorrect password" });
   }
 
-  if (tab === "deals") {
-    if (!dealsPassword || password === dealsPassword) {
-      req.session.dealsAuthenticated = true;
-      req.session.authenticated = true;
-      req.session.role = "management";
-      return res.json({ success: true, tab: "deals" });
-    }
-    return res.status(401).json({ message: "Incorrect password" });
-  }
-
   return res.status(400).json({ message: "Invalid tab" });
 });
 
 app.get("/api/auth/tab-check", (req: Request, res: Response) => {
   const gatePassword = process.env.PASSWORD_GATE;
   const managementPassword = process.env.MANAGEMENT_PASSWORD_GATE;
-  const dealsPassword = process.env.DEALS_PASSWORD;
 
   const management = !managementPassword || !!req.session.managementAuthenticated;
   const construction = !gatePassword || !!req.session.constructionAuthenticated || management;
-  const deals = !dealsPassword || !!req.session.dealsAuthenticated;
-  const anyAuthenticated = construction || management || deals;
+  const anyAuthenticated = construction || management;
 
   return res.json({
     construction,
     management,
-    deals,
     anyAuthenticated,
   });
-});
-
-// Deals-specific auth endpoints
-app.post("/api/auth/deals-login", (req: Request, res: Response) => {
-  const { password } = req.body;
-  const dealsPassword = process.env.DEALS_PASSWORD;
-
-  if (!dealsPassword) {
-    // No password configured — allow access
-    req.session.dealsAuthenticated = true;
-    return res.json({ success: true });
-  }
-
-  if (password === dealsPassword) {
-    req.session.dealsAuthenticated = true;
-    return res.json({ success: true });
-  }
-
-  return res.status(401).json({ message: "Incorrect password" });
-});
-
-app.get("/api/auth/deals-check", (req: Request, res: Response) => {
-  const dealsPassword = process.env.DEALS_PASSWORD;
-  if (!dealsPassword) {
-    return res.json({ authenticated: true });
-  }
-  return res.json({ authenticated: !!req.session.dealsAuthenticated });
 });
 
 app.post("/api/auth/logout", (req: Request, res: Response) => {
