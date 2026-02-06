@@ -70,18 +70,13 @@ function isVideoFile(file: DriveFile): boolean {
   return file.mimeType.startsWith('video/');
 }
 
-// Generate a displayable URL for a Drive file
-function getDriveFileUrl(file: DriveFile, size: 'thumb' | 'preview' = 'thumb'): string {
-  // Use the Google Drive thumbnail API for images
-  if (isImageFile(file)) {
-    const sz = size === 'thumb' ? 'w400' : 'w1200';
-    return `https://drive.google.com/thumbnail?id=${file.id}&sz=${sz}`;
-  }
-  // For videos, return the webViewUrl (opens in Drive viewer)
-  return file.webViewUrl || `https://drive.google.com/file/d/${file.id}/view`;
+// Generate a thumbnail URL for any Drive file (images and videos)
+function getDriveThumbnailUrl(file: DriveFile, size: 'thumb' | 'preview' = 'thumb'): string {
+  const sz = size === 'thumb' ? 'w400' : 'w1200';
+  return `https://drive.google.com/thumbnail?id=${file.id}&sz=${sz}`;
 }
 
-// Get video embed URL for preview
+// Get video embed URL for playback
 function getVideoEmbedUrl(file: DriveFile): string {
   return `https://drive.google.com/file/d/${file.id}/preview`;
 }
@@ -371,21 +366,12 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
                     onClick={() => openLightbox(index)}
                     className="group relative aspect-square rounded-lg overflow-hidden bg-white/5 border border-white/10 hover:border-teal-500/50 transition-all hover:scale-[1.02]"
                   >
-                    {isImageFile(file) ? (
-                      <img
-                        src={getDriveFileUrl(file, 'thumb')}
-                        alt={file.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-white/5">
-                        <Video className="h-8 w-8 text-teal-400" />
-                        <span className="text-[10px] text-muted-foreground px-2 text-center truncate w-full">
-                          {file.name}
-                        </span>
-                      </div>
-                    )}
+                    <img
+                      src={getDriveThumbnailUrl(file, 'thumb')}
+                      alt={file.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                     {/* Hover overlay */}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end">
                       <div className="w-full p-1.5 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
@@ -393,8 +379,8 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
                       </div>
                     </div>
                     {isVideoFile(file) && (
-                      <div className="absolute top-1 right-1">
-                        <Video className="h-3.5 w-3.5 text-white drop-shadow-lg" />
+                      <div className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60">
+                        <Video className="h-3.5 w-3.5 text-white" />
                       </div>
                     )}
                   </button>
@@ -451,16 +437,17 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
           >
             {isImageFile(mediaFiles[lightboxIndex]) ? (
               <img
-                src={getDriveFileUrl(mediaFiles[lightboxIndex], 'preview')}
+                src={getDriveThumbnailUrl(mediaFiles[lightboxIndex], 'preview')}
                 alt={mediaFiles[lightboxIndex].name}
                 className="max-w-full max-h-[80vh] object-contain rounded-lg"
               />
             ) : (
               <iframe
                 src={getVideoEmbedUrl(mediaFiles[lightboxIndex])}
-                className="w-[80vw] h-[70vh] max-w-4xl rounded-lg"
-                allow="autoplay; encrypted-media"
+                className="w-[80vw] h-[70vh] max-w-4xl rounded-lg border-0"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                 allowFullScreen
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
               />
             )}
             <div className="mt-3 text-center">
