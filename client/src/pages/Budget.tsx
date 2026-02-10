@@ -63,12 +63,12 @@ function formatCurrency(value: number): string {
 }
 
 // Format currency compact
-function formatCurrencyCompact(value: number): string {
+function formatCurrencyCompact(value: number, decimals: number = 0): string {
   if (value >= 1000000) {
     return `$${(value / 1000000).toFixed(1)}M`;
   }
   if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
+    return `$${(value / 1000).toFixed(decimals)}K`;
   }
   return formatCurrency(value);
 }
@@ -268,7 +268,7 @@ export default function Budget() {
         />
         <StatCard
           title="Cost Per Bedroom"
-          value={formatCurrencyCompact(data?.totals?.costPerBedroom || 0)}
+          value={formatCurrencyCompact(data?.totals?.costPerBedroom || 0, 1)}
           change={`${data?.totals?.totalRooms || 166} units`}
           changeType="neutral"
           icon={<BedDouble className="h-5 w-5" />}
@@ -276,7 +276,7 @@ export default function Budget() {
         />
         <StatCard
           title="Cost Per Bathroom"
-          value={formatCurrencyCompact(data?.totals?.costPerBathroom || 0)}
+          value={formatCurrencyCompact(data?.totals?.costPerBathroom || 0, 1)}
           change={`${data?.totals?.totalRooms || 166} units`}
           changeType="neutral"
           icon={<Bath className="h-5 w-5" />}
