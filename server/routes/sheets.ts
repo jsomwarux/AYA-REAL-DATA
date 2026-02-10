@@ -739,6 +739,21 @@ router.get('/budget', async (req, res) => {
 
       console.log('[budget] Column indices:', { categoryIdx, paymentsIdx, projectIdx, statusIdx, subtotalIdx });
 
+      // Forward-fill CATEGORY column: Google Sheets merged cells only return a value
+      // for the first cell in the merge. Subsequent rows get empty strings.
+      // We carry the last non-empty category value forward to fill the gaps.
+      if (categoryIdx >= 0) {
+        let lastCategory = '';
+        for (const row of dataRows) {
+          const val = row[categoryIdx]?.toString().trim() || '';
+          if (val) {
+            lastCategory = val;
+          } else if (lastCategory) {
+            row[categoryIdx] = lastCategory;
+          }
+        }
+      }
+
       // Process each row
       dataRows.forEach((row, rowIndex) => {
         const category = row[categoryIdx]?.toString().trim() || '';
@@ -1145,8 +1160,8 @@ router.get('/room-overview', async (req, res) => {
       console.warn('[room-overview] Could not fetch sheet info:', infoErr.message);
     }
 
-    // Row 2 has headers, Row 3+ has data
-    // Fetch starting from row 3 (data only) to avoid header-parsing issues.
+    // Row 1 has headers, Row 2+ has data
+    // Fetch starting from row 2 (data only) to avoid header-parsing issues.
     // We use fixed column positions since we know the exact layout:
     // A(0)=FLOOR, B(1)=ROOM#, C(2)=AREA, D(3)=SIZE CATEGORY, E(4)=ROOM TYPE,
     // F(5)=BED SIZE, G(6)=ADA, H(7)=Connecting Door, I(8)=Sink Style, J(9)=Sink Size,
@@ -1154,7 +1169,7 @@ router.get('/room-overview', async (req, res) => {
     // N(13)=Mirror Sliding Door, O(14)=Moxy Bar, P(15)=Mini Bar Size,
     // Q(16)=Speakeasy, R(17)=Party Box Headboard, S(18)=Curtain Type,
     // T(19)=NIGHT STANDS, U(20)=TV Size
-    const range = `'${tabName}'!A3:U500`;
+    const range = `'${tabName}'!A2:U500`;
     console.log('[room-overview] Fetching range:', range);
     const data = await fetchSheetData(spreadsheetId, range);
 
@@ -1172,7 +1187,7 @@ router.get('/room-overview', async (req, res) => {
     };
 
     let rooms: GoogleSheetRow[] = allRows.map((row, index) => ({
-      id: index + 3,
+      id: index + 2,
       floor: parseInt(getValue(row, 0)) || 0,       // A - FLOOR
       roomNumber: parseInt(getValue(row, 1)) || 0,   // B - ROOM #
       area: parseInt(getValue(row, 2)) || 0,         // C - AREA (Sq ft)
