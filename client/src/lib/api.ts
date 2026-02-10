@@ -153,6 +153,8 @@ export interface BudgetTotals {
   softCosts: number;
   paidThusFar: number;
   costPerRoom: number;
+  costPerBedroom: number;
+  costPerBathroom: number;
   totalRooms: number;
 }
 

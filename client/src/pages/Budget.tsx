@@ -35,7 +35,8 @@ import {
   PieChart,
   ChevronDown,
   ChevronUp,
-  Home,
+  BedDouble,
+  Bath,
 } from "lucide-react";
 import {
   BarChart,
@@ -232,7 +233,7 @@ export default function Budget() {
       isLoading={isLoading}
     >
       {/* Stats Grid */}
-      <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Total Budget"
           value={formatCurrencyCompact(data?.totals?.totalBudget || 0)}
@@ -266,11 +267,19 @@ export default function Budget() {
           accentColor="purple"
         />
         <StatCard
-          title="Cost Per Room"
-          value={formatCurrencyCompact(data?.totals?.costPerRoom || 0)}
-          change={`${data?.totals?.totalRooms || 166} rooms`}
+          title="Cost Per Bedroom"
+          value={formatCurrencyCompact(data?.totals?.costPerBedroom || 0)}
+          change={`${data?.totals?.totalRooms || 166} units`}
           changeType="neutral"
-          icon={<Home className="h-5 w-5" />}
+          icon={<BedDouble className="h-5 w-5" />}
+          accentColor="amber"
+        />
+        <StatCard
+          title="Cost Per Bathroom"
+          value={formatCurrencyCompact(data?.totals?.costPerBathroom || 0)}
+          change={`${data?.totals?.totalRooms || 166} units`}
+          changeType="neutral"
+          icon={<Bath className="h-5 w-5" />}
           accentColor="amber"
         />
       </div>

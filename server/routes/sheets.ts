@@ -629,6 +629,8 @@ router.get('/budget', async (req, res) => {
       softCosts: 0,
       paidThusFar: 0,
       costPerRoom: 0,
+      costPerBedroom: 0,
+      costPerBathroom: 0,
       totalRooms: 166,
     };
     const categoryTotals: Record<string, number> = {};
@@ -848,6 +850,22 @@ router.get('/budget', async (req, res) => {
     // Calculate cost per room
     if (totals.totalBudget > 0 && totals.totalRooms > 0) {
       totals.costPerRoom = Math.round(totals.totalBudget / totals.totalRooms);
+    }
+
+    // Calculate cost per bedroom and cost per bathroom from category totals
+    if (totals.totalRooms > 0) {
+      const bedroomTotal = Object.entries(categoryTotals).find(
+        ([name]) => name.toLowerCase() === 'bedrooms'
+      );
+      const bathroomTotal = Object.entries(categoryTotals).find(
+        ([name]) => name.toLowerCase() === 'bathrooms'
+      );
+      if (bedroomTotal) {
+        totals.costPerBedroom = Math.round(bedroomTotal[1] / totals.totalRooms);
+      }
+      if (bathroomTotal) {
+        totals.costPerBathroom = Math.round(bathroomTotal[1] / totals.totalRooms);
+      }
     }
 
     // Sort category totals by amount (descending) and include paid amounts
