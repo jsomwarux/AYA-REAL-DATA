@@ -305,6 +305,16 @@ router.get('/construction-progress', async (req, res) => {
     // Process Rooms Progress data (roomsData already fetched above for hyperlink matching)
     const recapData = data.get(recapRange);
 
+    // Diagnostic logging: what did we get back from the API?
+    console.log('[construction-progress] roomsData exists:', !!roomsData);
+    console.log('[construction-progress] roomsData rawValues length:', roomsData?.rawValues?.length || 0);
+    if (roomsData?.rawValues && roomsData.rawValues.length > 0) {
+      console.log('[construction-progress] First row (raw headers):', JSON.stringify(roomsData.rawValues[0]));
+      if (roomsData.rawValues.length > 1) {
+        console.log('[construction-progress] Second row (first data row):', JSON.stringify(roomsData.rawValues[1]?.slice(0, 5)));
+      }
+    }
+
     // Transform rooms data - need special handling for the merged BATHROOM/BEDROOM headers
     // Row 3 (index 0 in our fetch since we start at A3) contains the actual column headers
     let processedRooms: GoogleSheetRow[] = [];
@@ -388,17 +398,34 @@ router.get('/construction-progress', async (req, res) => {
           }
         });
         return obj;
-      }).filter(row => {
+      });
+
+      // Log before filtering to diagnose potential column name mismatches
+      console.log('[construction-progress] Rows before room# filter:', processedRooms.length);
+      if (processedRooms.length > 0) {
+        const sampleKeys = Object.keys(processedRooms[0]);
+        console.log('[construction-progress] Available keys in first row:', JSON.stringify(sampleKeys));
+        console.log('[construction-progress] First row values:', JSON.stringify(processedRooms[0]));
+      }
+
+      // Find the room number key dynamically — resilient to column renames
+      const roomNumKey = roomHeaders.find(h => {
+        const lower = h.toLowerCase().trim();
+        return lower === 'room #' || lower === 'room#' || lower === 'room' || lower === 'rooms' || lower === 'rm #' || lower === 'rm#';
+      }) || 'ROOM #';
+      console.log('[construction-progress] Using room number key:', roomNumKey);
+
+      processedRooms = processedRooms.filter(row => {
         // Filter out empty rows (rows without a room number)
-        const roomNum = row['ROOM #'] || row['Room #'] || row['ROOM'] || row['room'];
+        const roomNum = row[roomNumKey];
         return roomNum !== null && roomNum !== undefined && roomNum !== '';
       });
 
-      // Deduplicate rooms by ROOM # — keep the last occurrence (most recent data)
+      // Deduplicate rooms by room number — keep the last occurrence (most recent data)
       const beforeDedup = processedRooms.length;
       const roomMap = new Map<string, GoogleSheetRow>();
       for (const room of processedRooms) {
-        const roomNum = String(room['ROOM #'] || room['Room #'] || room['ROOM'] || room['room']);
+        const roomNum = String(room[roomNumKey] || '');
         roomMap.set(roomNum, room);
       }
       processedRooms = Array.from(roomMap.values());
@@ -409,7 +436,7 @@ router.get('/construction-progress', async (req, res) => {
 
       // Attach Google Drive folder URLs to each room
       for (const room of processedRooms) {
-        const roomNum = String(room['ROOM #'] || room['Room #'] || room['ROOM'] || room['room']);
+        const roomNum = String(room[roomNumKey] || '');
         const driveUrl = roomDriveFolderMap.get(roomNum);
         if (driveUrl) {
           room['_driveFolderUrl'] = driveUrl;
