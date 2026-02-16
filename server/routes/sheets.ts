@@ -238,16 +238,33 @@ router.get('/construction-progress', async (req, res) => {
       });
     }
 
-    // Fetch both the A.I Rooms Progress data and RECAP data
-    const roomsRange = "'A.I Rooms Progress'!A3:Z500"; // Row 3 has headers, row 4+ has data
-    const recapRange = "'RECAP'!A:Z";
+    // Dynamically find the Rooms Progress tab name (resilient to renames)
+    const spreadsheetInfo = await getSpreadsheetInfo(spreadsheetId);
+    const availableTabs = spreadsheetInfo.sheets?.map(s => s.title) || [];
+    console.log('[construction-progress] Available tabs:', availableTabs);
+
+    // Find the rooms progress tab by checking common name patterns
+    const roomsTab = availableTabs.find(t =>
+      t?.toLowerCase().includes('rooms progress')
+    ) || 'A.I Rooms Progress'; // fallback to original name
+
+    // Find the recap tab similarly
+    const recapTab = availableTabs.find(t =>
+      t?.toLowerCase().trim() === 'recap'
+    ) || 'RECAP';
+
+    console.log('[construction-progress] Using rooms tab:', roomsTab, '| recap tab:', recapTab);
+
+    // Fetch both the Rooms Progress data and RECAP data
+    const roomsRange = `'${roomsTab}'!A3:Z500`; // Row 3 has headers, row 4+ has data
+    const recapRange = `'${recapTab}'!A:Z`;
 
     console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
     // Fetch values and hyperlinks in parallel
     const [data, hyperlinkData] = await Promise.all([
       fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]),
       // Fetch Column B hyperlinks (ROOM # links to Google Drive folders)
-      fetchSheetDataWithHyperlinks(spreadsheetId, 'A.I Rooms Progress', 3, 500, 'B'),
+      fetchSheetDataWithHyperlinks(spreadsheetId, roomsTab, 3, 500, 'B'),
     ]);
     console.log('[construction-progress] Data fetched successfully');
 
