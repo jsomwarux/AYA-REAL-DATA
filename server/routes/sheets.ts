@@ -324,42 +324,58 @@ router.get('/construction-progress', async (req, res) => {
       // First row of our fetch is the column headers (Row 3 in sheet)
       const rawHeaders = roomsData.rawValues[0] as string[];
 
-      // Column positions (0-indexed based on A3:Z500 range):
-      // A=0 (empty), B=1 (ROOM #), C-N=2-13 (Bathroom, 12 cols), O-Z=14-25 (Bedroom, 12 cols)
-      // Bathroom columns: indices 2-13 (C through N)
-      // Bedroom columns: indices 14-25 (O through Z)
-      const BATHROOM_START = 2;  // Column C
-      const BATHROOM_END = 13;   // Column N
-      const BEDROOM_START = 14;  // Column O
-      const BEDROOM_END = 25;    // Column Z
+      // Dynamically detect column layout instead of hardcoding positions.
+      // The sheet has: some leading columns (may include empty cols + ROOM #),
+      // then a Bathroom section, then a Bedroom section.
+      // Bathroom and Bedroom sections have duplicate sub-header names (e.g. both
+      // have "Electrical Wiring", "Speaker Line", "Sheetrock", etc.).
+      // We detect sections by finding the first duplicate header — everything
+      // before the first duplicate belongs to section 1 (Bathroom), everything
+      // from the first duplicate onward belongs to section 2 (Bedroom).
 
-      // Track column names to detect duplicates and prefix them appropriately
-      const seenHeaders = new Map<string, number>(); // header -> first index seen
+      // Find the ROOM # column index (before any prefixing)
+      const roomColIndex = rawHeaders.findIndex(h =>
+        h && h.trim().toLowerCase().replace(/\s+/g, ' ') === 'room #'
+      );
+      console.log('[construction-progress] ROOM # column found at index:', roomColIndex);
 
-      // Process headers, prefixing duplicates based on section
+      // The data columns start right after ROOM #
+      const dataColStart = roomColIndex >= 0 ? roomColIndex + 1 : 2;
+
+      // Detect where section 2 (Bedroom) starts by finding the first repeated header
+      // after the data columns begin
+      const seenDataHeaders = new Set<string>();
+      let bedroomStart = -1;
+      for (let i = dataColStart; i < rawHeaders.length; i++) {
+        const h = (rawHeaders[i] || '').trim();
+        if (!h) continue;
+        if (seenDataHeaders.has(h)) {
+          bedroomStart = i;
+          break;
+        }
+        seenDataHeaders.add(h);
+      }
+      console.log('[construction-progress] Bedroom section starts at index:', bedroomStart);
+
+      // Process headers: prefix data columns with Bathroom_ or Bedroom_,
+      // but leave ROOM # and any leading columns unprefixed
       roomHeaders = rawHeaders.map((header, index) => {
         if (!header || header.trim() === '') return '';
-
         const trimmedHeader = header.trim();
 
-        // Check if this header was seen before
-        if (seenHeaders.has(trimmedHeader)) {
-          // This is a duplicate - prefix based on section
-          if (index >= BEDROOM_START && index <= BEDROOM_END) {
-            return `Bedroom_${trimmedHeader}`;
-          } else if (index >= BATHROOM_START && index <= BATHROOM_END) {
-            return `Bathroom_${trimmedHeader}`;
-          }
+        // Leading columns (ROOM # and anything before it) — no prefix
+        if (index <= roomColIndex) {
+          return trimmedHeader;
         }
 
-        // Mark this header as seen at this index
-        seenHeaders.set(trimmedHeader, index);
-
-        // First occurrence - prefix based on section for consistency
-        if (index >= BATHROOM_START && index <= BATHROOM_END) {
-          return `Bathroom_${trimmedHeader}`;
-        } else if (index >= BEDROOM_START && index <= BEDROOM_END) {
+        // Bedroom section (from the first duplicate onward)
+        if (bedroomStart >= 0 && index >= bedroomStart) {
           return `Bedroom_${trimmedHeader}`;
+        }
+
+        // Bathroom section (between ROOM # and Bedroom start)
+        if (index > roomColIndex) {
+          return `Bathroom_${trimmedHeader}`;
         }
 
         return trimmedHeader;
