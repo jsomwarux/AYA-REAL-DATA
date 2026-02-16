@@ -146,7 +146,7 @@ router.post('/import', async (req, res) => {
     console.log('[timeline-import] Using sheet:', sheetName);
 
     // Fetch the timeline sheet data
-    const range = `'${sheetName}'!A:AB`;
+    const range = `'${sheetName}'!A:AZ`;
     const data = await fetchSheetData(spreadsheetId, range);
 
     if (!data || !data.rawValues || data.rawValues.length < 2) {
@@ -166,7 +166,7 @@ router.post('/import', async (req, res) => {
 
     // Parse week dates from headers (columns C onwards = index 2+)
     const weekDateColumns: { index: number; date: string }[] = [];
-    for (let i = 2; i < headers.length && i < 28; i++) {
+    for (let i = 2; i < headers.length; i++) {
       const dateStr = headers[i];
       if (dateStr) {
         // Try to parse the date - format like "Nov 14" or "11/14"
