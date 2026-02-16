@@ -63,18 +63,19 @@ router.get('/', async (req, res) => {
       .orderBy(asc(timelineEvents.startDate));
 
     // Derive week dates from actual event data instead of using hardcoded dates.
-    // We collect all unique startDate and endDate values from events — these are the
-    // exact week column dates that were parsed from the Google Sheet headers during import.
+    // We find the earliest startDate and latest endDate, then generate every 7-day
+    // interval between them. This ensures all intermediate weeks (including months
+    // with no events) appear as columns in the timeline.
     let weekDates: string[] = WEEK_DATES; // fallback
     if (events.length > 0) {
-      const dateSet = new Set<string>();
+      let minDate: string | null = null;
+      let maxDate: string | null = null;
       for (const event of events) {
-        dateSet.add(event.startDate);
-        dateSet.add(event.endDate);
+        if (!minDate || event.startDate < minDate) minDate = event.startDate;
+        if (!maxDate || event.endDate > maxDate) maxDate = event.endDate;
       }
-      const sortedDates = Array.from(dateSet).sort();
-      if (sortedDates.length > 0) {
-        weekDates = sortedDates;
+      if (minDate && maxDate) {
+        weekDates = generateWeeklyDates(minDate, maxDate);
       }
     }
 
