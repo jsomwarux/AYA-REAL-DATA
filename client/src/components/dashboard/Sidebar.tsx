@@ -14,6 +14,7 @@ import {
   Ship,
   BedDouble,
   FileText,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -191,6 +192,40 @@ function NavLink({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean })
   return linkContent;
 }
 
+function UsefulLinksButton({ isCollapsed }: { isCollapsed: boolean }) {
+  const [location] = useLocation();
+  const isActive = location === "/useful-links";
+
+  const linkContent = (
+    <Link
+      href="/useful-links"
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-all duration-200",
+        isCollapsed ? "justify-center" : "",
+        isActive
+          ? "bg-white/10 text-white"
+          : "text-muted-foreground hover:text-white hover:bg-white/5"
+      )}
+    >
+      <Link2 className={cn("h-4 w-4", isActive ? "text-teal-400" : "")} />
+      {!isCollapsed && <span>Useful Links</span>}
+    </Link>
+  );
+
+  if (isCollapsed) {
+    return (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+        <TooltipContent side="right">
+          <span className="font-medium">Useful Links</span>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return linkContent;
+}
+
 export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
 
@@ -252,6 +287,9 @@ export function Sidebar() {
           {bottomNavItems.map((item) => (
             <NavLink key={item.href} item={item} isCollapsed={isCollapsed} />
           ))}
+
+          {/* Useful Links */}
+          <UsefulLinksButton isCollapsed={isCollapsed} />
 
           {/* Collapse Toggle */}
           <div className={cn("mt-3", isCollapsed ? "flex justify-center" : "")}>

@@ -14,6 +14,7 @@ import ContainerSchedule from "@/pages/ContainerSchedule";
 import RoomSpecs from "@/pages/RoomSpecs";
 import VendorInvoices from "@/pages/VendorInvoices";
 import Settings from "@/pages/Settings";
+import UsefulLinks from "@/pages/UsefulLinks";
 import NotFound from "@/pages/not-found";
 
 function ScrollToTop() {
@@ -92,6 +93,13 @@ function Router() {
         <Route path="/settings">
           <TabPasswordGate tab="budget" title="Settings">
             <Settings />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Useful Links - accessible once any tab is authenticated */}
+        <Route path="/useful-links">
+          <TabPasswordGate tab="construction" title="Useful Links" requireAny>
+            <UsefulLinks />
           </TabPasswordGate>
         </Route>
 

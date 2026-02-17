@@ -491,3 +491,19 @@ export async function fetchVendorInvoicesData(): Promise<VendorInvoicesData> {
   const response = await fetch(`${API_BASE}/vendor-invoices`);
   return handleResponse<VendorInvoicesData>(response);
 }
+
+// Useful Links
+export interface UsefulLink {
+  label: string;
+  url: string;
+  page: string;
+}
+
+export interface UsefulLinksData {
+  links: UsefulLink[];
+}
+
+export async function fetchUsefulLinks(): Promise<UsefulLinksData> {
+  const response = await fetch(`${API_BASE}/useful-links`);
+  return handleResponse<UsefulLinksData>(response);
+}

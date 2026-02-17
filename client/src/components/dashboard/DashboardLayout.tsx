@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Sidebar, SidebarProvider, useSidebar } from "./Sidebar";
-import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Lock, BedDouble, FileText } from "lucide-react";
+import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Lock, BedDouble, FileText, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -209,6 +209,23 @@ function MobileSidebar({ onClose }: { onClose: () => void }) {
           );
         })}
       </nav>
+
+      {/* Useful Links - bottom of mobile sidebar */}
+      <div className="border-t border-white/10 p-3">
+        <Link
+          href="/useful-links"
+          onClick={onClose}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition-all duration-200",
+            location === "/useful-links"
+              ? "bg-white/10 text-white"
+              : "text-muted-foreground hover:bg-white/5 hover:text-white"
+          )}
+        >
+          <Link2 className={cn("h-4 w-4", location === "/useful-links" ? "text-teal-400" : "")} />
+          <span>Useful Links</span>
+        </Link>
+      </div>
     </div>
   );
 }

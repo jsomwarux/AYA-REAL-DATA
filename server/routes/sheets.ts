@@ -1452,4 +1452,26 @@ router.get('/vendor-invoices', async (req, res) => {
   }
 });
 
+// GET /api/sheets/useful-links - Return Google Sheet URLs for all configured sheets
+router.get('/useful-links', (_req, res) => {
+  const sheetUrl = (id: string | undefined) =>
+    id ? `https://docs.google.com/spreadsheets/d/${id}` : null;
+
+  const driveUrl = (id: string | undefined) =>
+    id ? `https://drive.google.com/drive/folders/${id}` : null;
+
+  const links = [
+    { label: 'Construction Progress', url: sheetUrl(process.env.CONSTRUCTION_PROGRESS_SHEET_ID), page: '/construction' },
+    { label: 'Construction Oversight', url: sheetUrl(process.env.CONSTRUCTION_SHEET_ID), page: '/construction' },
+    { label: 'Budget', url: sheetUrl(process.env.BUDGET_SHEET_ID), page: '/budget' },
+    { label: 'Timeline', url: sheetUrl(process.env.TIMELINE_SHEET_ID), page: '/timeline' },
+    { label: 'Weekly Goals', url: sheetUrl(process.env.WEEKLY_GOALS_SHEET_ID), page: '/weekly-goals' },
+    { label: 'Container Schedule', url: sheetUrl(process.env.CONTAINER_SCHEDULE_SHEET_ID), page: '/container-schedule' },
+    { label: 'Room Specs', url: sheetUrl(process.env.ROOM_OVERVIEW_SHEET_ID), page: '/room-specs' },
+    { label: 'Vendor Invoices (Drive)', url: driveUrl(process.env.VENDOR_INVOICES_DRIVE_ID), page: '/vendor-invoices' },
+  ].filter(link => link.url !== null);
+
+  res.json({ links });
+});
+
 export default router;
