@@ -1462,7 +1462,6 @@ router.get('/useful-links', (_req, res) => {
 
   const links = [
     { label: 'Construction Progress', url: sheetUrl(process.env.CONSTRUCTION_PROGRESS_SHEET_ID), page: '/construction' },
-    { label: 'Construction Oversight', url: sheetUrl(process.env.CONSTRUCTION_SHEET_ID), page: '/construction' },
     { label: 'Budget', url: sheetUrl(process.env.BUDGET_SHEET_ID), page: '/budget' },
     { label: 'Timeline', url: sheetUrl(process.env.TIMELINE_SHEET_ID), page: '/timeline' },
     { label: 'Weekly Goals', url: sheetUrl(process.env.WEEKLY_GOALS_SHEET_ID), page: '/weekly-goals' },
