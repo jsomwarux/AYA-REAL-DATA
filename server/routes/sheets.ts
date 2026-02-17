@@ -256,8 +256,8 @@ router.get('/construction-progress', async (req, res) => {
     console.log('[construction-progress] Using rooms tab:', roomsTab, '| recap tab:', recapTab);
 
     // Fetch both the Rooms Progress data and RECAP data
-    const roomsRange = `'${roomsTab}'!A3:Z500`; // Row 3 has headers, row 4+ has data
-    const recapRange = `'${recapTab}'!A:Z`;
+    const roomsRange = `'${roomsTab}'!A3:AZ500`; // Row 3 has headers, row 4+ has data
+    const recapRange = `'${recapTab}'!A:AZ`;
 
     console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
     // Fetch values and hyperlinks in parallel
