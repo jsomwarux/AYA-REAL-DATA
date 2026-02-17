@@ -342,18 +342,32 @@ router.get('/construction-progress', async (req, res) => {
       // The data columns start right after ROOM #
       const dataColStart = roomColIndex >= 0 ? roomColIndex + 1 : 2;
 
-      // Detect where section 2 (Bedroom) starts by finding the first repeated header
-      // after the data columns begin
+      // Detect where section 2 (Bedroom) starts by finding the first repeated or
+      // near-duplicate header after the data columns begin. Near-duplicates like
+      // "Electrical Wiring" vs "Electric Wiring" should also trigger the split.
+      // We check for: exact match, same last word (e.g. both end in "Wiring"),
+      // or same normalized form.
+      function getLastWord(h: string): string {
+        const words = h.toLowerCase().trim().split(/\s+/);
+        return words[words.length - 1] || '';
+      }
       const seenDataHeaders = new Set<string>();
+      const seenLastWords = new Set<string>();
       let bedroomStart = -1;
       for (let i = dataColStart; i < rawHeaders.length; i++) {
         const h = (rawHeaders[i] || '').trim();
         if (!h) continue;
-        if (seenDataHeaders.has(h)) {
+        const lastWord = getLastWord(h);
+        // Exact match or same distinguishing last word (skip generic single-word headers
+        // like "%" that could false-positive — only match multi-word last words or
+        // meaningful single words with 4+ chars)
+        const lastWordMatch = lastWord.length >= 4 && seenLastWords.has(lastWord);
+        if (seenDataHeaders.has(h) || lastWordMatch) {
           bedroomStart = i;
           break;
         }
         seenDataHeaders.add(h);
+        seenLastWords.add(lastWord);
       }
       console.log('[construction-progress] Bedroom section starts at index:', bedroomStart);
 
