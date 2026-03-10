@@ -63,7 +63,7 @@ export function ProgressStatsCards({ rooms }: ProgressStatsCardsProps) {
     {
       title: "Whitebox Ready",
       value: `${whiteboxStats.ready}/${whiteboxStats.total}`,
-      subtitle: `${whiteboxStats.percentage}% ready for furniture`,
+      subtitle: `${whiteboxStats.percentage}% furniture ready`,
       icon: <PackageCheck className="h-5 w-5" />,
       iconColor: "text-amber-400",
       bgGradient: "from-amber-500/20 to-amber-600/5",
@@ -116,7 +116,7 @@ export function ProgressStatsCards({ rooms }: ProgressStatsCardsProps) {
                 <p className={`text-2xl sm:text-3xl font-bold ${getCompletionColor(stat.progress || 100)}`}>
                   {stat.value}
                 </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{stat.subtitle}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{stat.subtitle}</p>
               </div>
               <div className={`p-1.5 sm:p-2 rounded-lg bg-white/5 ${stat.iconColor} flex-shrink-0`}>
                 {stat.icon}
