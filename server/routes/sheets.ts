@@ -261,39 +261,30 @@ router.get('/construction-progress', async (req, res) => {
 
     console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
     // Fetch values and hyperlinks in parallel
+    // Fetch hyperlinks up to column E to be resilient to column insertions
     const [data, hyperlinkData] = await Promise.all([
       fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]),
-      // Fetch Column B hyperlinks (ROOM # links to Google Drive folders)
-      fetchSheetDataWithHyperlinks(spreadsheetId, roomsTab, 3, 500, 'B'),
+      fetchSheetDataWithHyperlinks(spreadsheetId, roomsTab, 3, 500, 'E'),
     ]);
     console.log('[construction-progress] Data fetched successfully');
 
     // Build a map of room number → Google Drive folder URL from hyperlinks
-    const roomDriveFolderMap = new Map<string, string>();
-    if (hyperlinkData && hyperlinkData.rawValues && hyperlinkData.rawValues.length > 1) {
-      const hlRows = hyperlinkData.rawValues.slice(1); // Skip header row
-      for (const row of hlRows) {
-        const roomNum = (row[0] || '').trim(); // Column A = empty in our range, but we fetched A:B
-        const roomLink = (row[1] || '').trim(); // Column B = ROOM # with hyperlink
-        // The hyperlink fetcher returns the URL as the value when a hyperlink exists
-        // Column A is empty, Column B has the room number text or its hyperlink URL
-        // Since we fetch A3:B500, row[0] = Col A (empty), row[1] = Col B (room # or URL)
-        // If col B has a hyperlink, the value will be the URL, and we need to match by row position
-      }
-    }
-    // Better approach: match hyperlink data by row index to room data
-    // The hyperlink fetch returns Col A and Col B values where hyperlinks replace display text
-    // We need to compare the displayed room numbers with the URLs
-    // Since fetchSheetDataWithHyperlinks returns hyperlink as value, Col B cells that have
-    // a hyperlink will show the URL, not the room number. We need the formattedValue too.
-    // Let's build the map differently - iterate the hyperlink rawValues and use the values data for room numbers
+    // First, find which column ROOM # is in from the values data
     const roomsData = data.get(roomsRange);
-    if (hyperlinkData && hyperlinkData.rawValues && roomsData && roomsData.rawValues) {
+    const earlyHeaders = (roomsData?.rawValues?.[0] as string[]) || [];
+    const roomColIndex = earlyHeaders.findIndex(h =>
+      h && h.trim().toLowerCase().replace(/\s+/g, ' ') === 'room #'
+    );
+    console.log('[construction-progress] ROOM # column detected at index:', roomColIndex);
+
+    const roomDriveFolderMap = new Map<string, string>();
+    if (hyperlinkData && hyperlinkData.rawValues && roomsData && roomsData.rawValues && roomColIndex >= 0) {
       const hlRows = hyperlinkData.rawValues.slice(1); // skip header
       const valRows = roomsData.rawValues.slice(1); // skip header
       for (let i = 0; i < Math.min(hlRows.length, valRows.length); i++) {
-        const roomNum = String(valRows[i][1] || '').trim(); // Column B from values data (index 1)
-        const hlValue = (hlRows[i][1] || '').trim(); // Column B from hyperlink data
+        // Use dynamic roomColIndex to find room number and its hyperlink
+        const roomNum = String(valRows[i][roomColIndex] || '').trim();
+        const hlValue = (hlRows[i][roomColIndex] || '').trim();
         // If the hyperlink value is a URL (starts with http), it's the Drive folder link
         if (roomNum && hlValue && hlValue.startsWith('http')) {
           roomDriveFolderMap.set(roomNum, hlValue);
@@ -333,11 +324,8 @@ router.get('/construction-progress', async (req, res) => {
       // before the first duplicate belongs to section 1 (Bathroom), everything
       // from the first duplicate onward belongs to section 2 (Bedroom).
 
-      // Find the ROOM # column index (before any prefixing)
-      const roomColIndex = rawHeaders.findIndex(h =>
-        h && h.trim().toLowerCase().replace(/\s+/g, ' ') === 'room #'
-      );
-      console.log('[construction-progress] ROOM # column found at index:', roomColIndex);
+      // roomColIndex was already computed above (before hyperlink mapping)
+      // Reuse it here for section detection
 
       // The data columns start right after ROOM #
       const dataColStart = roomColIndex >= 0 ? roomColIndex + 1 : 2;
@@ -683,15 +671,29 @@ router.get('/budget', async (req, res) => {
       });
     }
 
-    // Fetch both Budget Details and Budget Summary data
-    const detailsRange = "'Budget Details'!A:G";
-    const summaryRange = "'Budget Summary'!A:G";
+    // Dynamically find tab names to handle client renaming
+    const spreadsheetInfo = await getSpreadsheetInfo(spreadsheetId);
+    const availableTabs = spreadsheetInfo.sheets?.map(s => s.title) || [];
+    console.log('[budget] Available tabs:', availableTabs);
+
+    const detailsTab = availableTabs.find(t =>
+      t?.toLowerCase().includes('budget') && t?.toLowerCase().includes('detail')
+    ) || 'Budget Details';
+    const summaryTab = availableTabs.find(t =>
+      t?.toLowerCase().includes('budget') && t?.toLowerCase().includes('summar')
+    ) || 'Budget Summary';
+
+    console.log('[budget] Resolved tab names - Details:', detailsTab, '| Summary:', summaryTab);
+
+    // Fetch both Budget Details and Budget Summary data (A:AZ for future column additions)
+    const detailsRange = `'${detailsTab}'!A:AZ`;
+    const summaryRange = `'${summaryTab}'!A:AZ`;
 
     console.log('[budget] Fetching data from sheet:', spreadsheetId);
     const allData = await fetchMultipleRanges(spreadsheetId, [detailsRange, summaryRange]);
     const data = allData.get(detailsRange);
     const summaryData = allData.get(summaryRange);
-    console.log('[budget] Data fetched successfully');
+    console.log('[budget] Details data rows:', data?.rawValues?.length || 0, '| Summary data rows:', summaryData?.rawValues?.length || 0);
 
     // Process Budget Details data
     let budgetItems: GoogleSheetRow[] = [];
@@ -803,7 +805,9 @@ router.get('/budget', async (req, res) => {
       const headers = data.rawValues[0] as string[];
       const dataRows = data.rawValues.slice(1);
 
-      // Find column indices
+      console.log('[budget] Details headers:', headers);
+
+      // Find column indices dynamically by keyword
       const categoryIdx = headers.findIndex(h => h?.toLowerCase().includes('category'));
       const paymentsIdx = headers.findIndex(h => {
         const lower = h?.toLowerCase() || '';
@@ -814,6 +818,7 @@ router.get('/budget', async (req, res) => {
       const subtotalIdx = headers.findIndex(h => h?.toLowerCase().includes('subtotal'));
 
       console.log('[budget] Column indices:', { categoryIdx, paymentsIdx, projectIdx, statusIdx, subtotalIdx });
+      console.log('[budget] Data rows count:', dataRows.length);
 
       // Forward-fill CATEGORY column: Google Sheets merged cells only return a value
       // for the first cell in the merge. Subsequent rows get empty strings.

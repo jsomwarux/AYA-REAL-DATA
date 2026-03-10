@@ -16,6 +16,7 @@ import {
   formatFieldValue,
   getCompletionColor,
   getFloorFromRoom,
+  isWhiteboxReady,
 } from "./utils";
 
 // Helper to get field value with case-insensitive lookup
@@ -51,6 +52,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderOpen,
+  PackageCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -178,17 +180,28 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-background border-white/10">
           <DialogHeader className="border-b border-white/10 pb-4">
-            <DialogTitle className="flex items-center gap-3 text-xl">
+            <DialogTitle className="flex items-center gap-3 text-xl flex-wrap">
               <Building className="h-6 w-6 text-teal-400" />
               <span>Room {room['ROOM #']}</span>
               <span className="text-sm font-normal text-muted-foreground">
                 Floor {floor}
               </span>
+              {isWhiteboxReady(room) ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                  <PackageCheck className="h-3.5 w-3.5" />
+                  Whitebox Ready
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
+                  <PackageCheck className="h-3.5 w-3.5" />
+                  Whitebox Pending
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
 
           {/* Overall Progress */}
-          <div className="grid grid-cols-3 gap-4 py-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4">
             <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">
               <p className="text-sm text-muted-foreground mb-1">Overall</p>
               <p className={cn("text-2xl font-bold", getCompletionColor(completion.overall.percentage))}>
@@ -196,6 +209,15 @@ export function RoomDetailModal({ room, isOpen, onClose }: RoomDetailModalProps)
               </p>
               <p className="text-xs text-muted-foreground">
                 {completion.overall.completed}/{completion.overall.total} tasks
+              </p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">
+              <p className="text-sm text-muted-foreground mb-1">Whitebox</p>
+              <p className={cn("text-2xl font-bold", isWhiteboxReady(room) ? "text-green-400" : "text-amber-400")}>
+                {isWhiteboxReady(room) ? "Ready" : "Pending"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Furniture delivery
               </p>
             </div>
             <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">

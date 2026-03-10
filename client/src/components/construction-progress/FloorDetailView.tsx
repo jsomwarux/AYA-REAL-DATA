@@ -9,8 +9,9 @@ import {
   calculateTaskCompletion,
   getCompletionColor,
   getCompletionBgColor,
+  isWhiteboxReady,
 } from "./utils";
-import { ArrowLeft, Bath, BedDouble, Building } from "lucide-react";
+import { ArrowLeft, Bath, BedDouble, Building, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FloorDetailViewProps {
@@ -63,7 +64,7 @@ export function FloorDetailView({ rooms, floor, onBack, onRoomClick }: FloorDeta
       </CardHeader>
       <CardContent className="pt-6">
         {/* Floor Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="p-4 rounded-lg bg-white/5 border border-white/10">
             <div className="flex items-center gap-2 mb-2">
               <Building className="h-4 w-4 text-teal-400" />
@@ -71,6 +72,15 @@ export function FloorDetailView({ rooms, floor, onBack, onRoomClick }: FloorDeta
             </div>
             <p className={cn("text-2xl font-bold", getCompletionColor(floorCompletion.overall))}>
               {floorCompletion.overall}%
+            </p>
+          </div>
+          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center gap-2 mb-2">
+              <PackageCheck className="h-4 w-4 text-amber-400" />
+              <span className="text-sm text-muted-foreground">Whitebox</span>
+            </div>
+            <p className="text-2xl font-bold text-amber-400">
+              {floorRooms.filter(r => isWhiteboxReady(r)).length}/{floorRooms.length}
             </p>
           </div>
           <div className="p-4 rounded-lg bg-white/5 border border-white/10">
@@ -118,6 +128,12 @@ export function FloorDetailView({ rooms, floor, onBack, onRoomClick }: FloorDeta
 
                   {/* Completion breakdown */}
                   <div className="mt-2 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">WB</span>
+                      <span className={isWhiteboxReady(room) ? "text-green-400" : "text-gray-500"}>
+                        {isWhiteboxReady(room) ? "Ready" : "---"}
+                      </span>
+                    </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Bath</span>
                       <span className={getCompletionColor(completion.bathroom.percentage)}>

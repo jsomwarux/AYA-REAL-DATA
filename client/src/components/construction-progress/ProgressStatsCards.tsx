@@ -4,6 +4,7 @@ import { RoomProgress } from "@/lib/api";
 import {
   calculateRoomCompletion,
   calculateTaskCompletion,
+  calculateWhiteboxStats,
   getCompletionColor,
 } from "./utils";
 import {
@@ -11,7 +12,7 @@ import {
   Bath,
   BedDouble,
   CheckCircle2,
-  TrendingUp,
+  PackageCheck,
 } from "lucide-react";
 
 interface ProgressStatsCardsProps {
@@ -45,6 +46,9 @@ export function ProgressStatsCards({ rooms }: ProgressStatsCardsProps) {
     Object.values(bathroomTasks).reduce((sum, t) => sum + t.completed, 0) +
     Object.values(bedroomTasks).reduce((sum, t) => sum + t.completed, 0);
 
+  // Whitebox readiness stats
+  const whiteboxStats = calculateWhiteboxStats(rooms);
+
   const stats = [
     {
       title: "Overall Progress",
@@ -55,6 +59,16 @@ export function ProgressStatsCards({ rooms }: ProgressStatsCardsProps) {
       bgGradient: "from-teal-500/20 to-teal-600/5",
       progress: overallCompletion,
       progressColor: "bg-teal-500",
+    },
+    {
+      title: "Whitebox Ready",
+      value: `${whiteboxStats.ready}/${whiteboxStats.total}`,
+      subtitle: `${whiteboxStats.percentage}% ready for furniture`,
+      icon: <PackageCheck className="h-5 w-5" />,
+      iconColor: "text-amber-400",
+      bgGradient: "from-amber-500/20 to-amber-600/5",
+      progress: whiteboxStats.percentage,
+      progressColor: "bg-amber-500",
     },
     {
       title: "Bathrooms",
@@ -89,7 +103,7 @@ export function ProgressStatsCards({ rooms }: ProgressStatsCardsProps) {
   ];
 
   return (
-    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
       {stats.map((stat, index) => (
         <Card
           key={index}

@@ -6,6 +6,7 @@ import {
   calculateFloorCompletion,
   getCompletionColor,
   getCompletionBgColor,
+  isWhiteboxReady,
 } from "./utils";
 import { Building, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,11 @@ export function FloorOverview({ rooms, onFloorClick, selectedFloor }: FloorOverv
                 {/* Room count */}
                 <span className="text-xs text-muted-foreground">
                   {floorRooms.length} units
+                </span>
+
+                {/* Whitebox ready count */}
+                <span className="text-[10px] text-amber-400">
+                  {floorRooms.filter(r => isWhiteboxReady(r)).length} WB
                 </span>
 
                 {/* Progress bar at bottom */}

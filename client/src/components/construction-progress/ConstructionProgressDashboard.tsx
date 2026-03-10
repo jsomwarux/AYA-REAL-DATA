@@ -45,8 +45,8 @@ export function ConstructionProgressDashboard({
     return (
       <div className="space-y-6">
         {/* Loading skeleton */}
-        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
+          {[...Array(5)].map((_, i) => (
             <div
               key={i}
               className="h-28 sm:h-32 rounded-lg bg-white/5 animate-pulse"

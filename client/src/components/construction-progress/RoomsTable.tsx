@@ -25,6 +25,7 @@ import {
   getFloorFromRoom,
   getCompletionColor,
   getCompletionBgColor,
+  isWhiteboxReady,
 } from "./utils";
 import {
   Search,
@@ -34,6 +35,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +63,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
       room,
       completion: calculateRoomCompletion(room),
       floor: getFloorFromRoom(room['ROOM #']),
+      isWhitebox: isWhiteboxReady(room),
     }));
 
     // Apply search filter
@@ -91,6 +95,10 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
             return pct < 50;
           case "above-75":
             return pct >= 75;
+          case "whitebox-ready":
+            return r.isWhitebox;
+          case "whitebox-pending":
+            return !r.isWhitebox;
           default:
             return true;
         }
@@ -115,6 +123,9 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
           break;
         case "bedroom":
           comparison = a.completion.bedroom.percentage - b.completion.bedroom.percentage;
+          break;
+        case "whitebox":
+          comparison = (a.isWhitebox ? 1 : 0) - (b.isWhitebox ? 1 : 0);
           break;
       }
       return sortOrder === "asc" ? comparison : -comparison;
@@ -199,6 +210,8 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
               <SelectItem value="in-progress">In Progress</SelectItem>
               <SelectItem value="below-50">Below 50%</SelectItem>
               <SelectItem value="not-started">Not Started</SelectItem>
+              <SelectItem value="whitebox-ready">Whitebox Ready</SelectItem>
+              <SelectItem value="whitebox-pending">Whitebox Pending</SelectItem>
             </SelectContent>
           </Select>
 
@@ -212,6 +225,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
             <SelectContent>
               <SelectItem value="room">Room #</SelectItem>
               <SelectItem value="floor">Floor</SelectItem>
+              <SelectItem value="whitebox">Whitebox</SelectItem>
               <SelectItem value="overall">Overall %</SelectItem>
               <SelectItem value="bathroom">Bathroom %</SelectItem>
               <SelectItem value="bedroom">Bedroom %</SelectItem>
@@ -236,6 +250,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
               <TableRow className="border-white/10 hover:bg-transparent">
                 <TableHead className="text-muted-foreground text-xs sm:text-sm">Room</TableHead>
                 <TableHead className="text-muted-foreground text-xs sm:text-sm">Floor</TableHead>
+                <TableHead className="text-muted-foreground text-xs sm:text-sm">WB</TableHead>
                 <TableHead className="text-muted-foreground text-xs sm:text-sm hidden sm:table-cell">Bathroom</TableHead>
                 <TableHead className="text-muted-foreground text-xs sm:text-sm hidden sm:table-cell">Bedroom</TableHead>
                 <TableHead className="text-muted-foreground text-xs sm:text-sm">Overall</TableHead>
@@ -243,7 +258,7 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedRooms.map(({ room, completion, floor }) => (
+              {paginatedRooms.map(({ room, completion, floor, isWhitebox }) => (
                 <TableRow
                   key={String(room['ROOM #'])}
                   onClick={() => onRoomClick(room)}
@@ -254,6 +269,19 @@ export function RoomsTable({ rooms, onRoomClick }: RoomsTableProps) {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs sm:text-sm py-2.5 sm:py-4">
                     {floor}
+                  </TableCell>
+                  <TableCell className="py-2.5 sm:py-4">
+                    {isWhitebox ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-green-500/20 text-green-400">
+                        <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        <span className="hidden sm:inline">Ready</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-gray-500/20 text-gray-400">
+                        <Circle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        <span className="hidden sm:inline">Pending</span>
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell py-2.5 sm:py-4">
                     <div className="flex items-center gap-2">

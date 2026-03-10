@@ -423,3 +423,29 @@ export function getFieldConfig(fieldName: string): { type: string; completeValue
   }
   return null;
 }
+
+// Check if a room is whitebox-ready (complete work, ready for furniture delivery)
+export function isWhiteboxReady(room: RoomProgress): boolean {
+  const val = room['WHITEBOX'];
+  if (val === true || val === 1) return true;
+  if (typeof val === 'string') {
+    const upper = val.trim().toUpperCase();
+    return upper === 'TRUE' || upper === '1';
+  }
+  return false;
+}
+
+// Calculate whitebox readiness stats across all rooms
+export function calculateWhiteboxStats(rooms: RoomProgress[]): {
+  ready: number;
+  total: number;
+  percentage: number;
+} {
+  const ready = rooms.filter(r => isWhiteboxReady(r)).length;
+  const total = rooms.length;
+  return {
+    ready,
+    total,
+    percentage: total > 0 ? Math.round((ready / total) * 100) : 0,
+  };
+}
