@@ -195,6 +195,17 @@ export function getFieldValue(room: RoomProgress, fieldName: string): any {
     }
   }
 
+  // Fallback: prefix match for truncated sheet headers (e.g., "Thermost" vs "Thermostat")
+  // Only match when the shorter string is >80% of the longer and at least 12 chars
+  for (const key of Object.keys(room)) {
+    const nk = normalizeKey(key);
+    const shorter = nk.length < normalizedTarget.length ? nk : normalizedTarget;
+    const longer = nk.length < normalizedTarget.length ? normalizedTarget : nk;
+    if (shorter.length >= 12 && longer.startsWith(shorter) && shorter.length / longer.length > 0.8) {
+      return room[key];
+    }
+  }
+
   return undefined;
 }
 
