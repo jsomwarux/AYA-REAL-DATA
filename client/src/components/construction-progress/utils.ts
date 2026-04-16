@@ -174,6 +174,11 @@ export function isFieldComplete(
   return false;
 }
 
+// Normalize a key for fuzzy matching: lowercase, collapse whitespace, trim
+function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 // Get a field value from a room, trying multiple possible key formats
 export function getFieldValue(room: RoomProgress, fieldName: string): any {
   // Try exact match first
@@ -181,12 +186,11 @@ export function getFieldValue(room: RoomProgress, fieldName: string): any {
     return room[fieldName];
   }
 
-  // Try with different cases
-  const lowerKey = fieldName.toLowerCase();
-  const upperKey = fieldName.toUpperCase();
+  // Try case-insensitive + whitespace-normalized match
+  const normalizedTarget = normalizeKey(fieldName);
 
   for (const key of Object.keys(room)) {
-    if (key.toLowerCase() === lowerKey || key.toUpperCase() === upperKey) {
+    if (normalizeKey(key) === normalizedTarget) {
       return room[key];
     }
   }

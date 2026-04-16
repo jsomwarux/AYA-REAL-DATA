@@ -396,27 +396,32 @@ router.get('/construction-progress', async (req, res) => {
       processedRooms = dataRows.map((row) => {
         const obj: GoogleSheetRow = {};
         roomHeaders.forEach((header, index) => {
-          const value = row[index];
+          const value: unknown = row[index]; // API may return string, boolean, or number
           if (header && header.trim() !== '') {
-            // Handle checkbox values (TRUE/FALSE from Google Sheets)
-            // Google Sheets API returns checkbox values as strings "TRUE" or "FALSE"
-            // Also handle "1"/"0" which some sheet configurations use for checkboxes
-            const strValue = String(value).trim();
-            if (strValue === 'TRUE' || strValue === '1') {
-              obj[header.trim()] = true;
-            } else if (strValue === 'FALSE' || strValue === '0') {
-              obj[header.trim()] = false;
-            } else if (value !== undefined && value !== '') {
-              // Try to parse numbers, but keep percentages as strings
-              const isPercentage = typeof value === 'string' && value.includes('%');
-              if (!isPercentage) {
-                const num = Number(value);
-                obj[header.trim()] = isNaN(num) ? value : num;
-              } else {
-                obj[header.trim()] = value;
-              }
+            // Handle boolean values directly (API may return JS booleans)
+            if (typeof value === 'boolean') {
+              obj[header.trim()] = value;
             } else {
-              obj[header.trim()] = null;
+              // Handle checkbox values (TRUE/FALSE from Google Sheets)
+              // Use case-insensitive comparison — API may return "TRUE", "true", or "True"
+              const strValue = String(value).trim();
+              const upper = strValue.toUpperCase();
+              if (upper === 'TRUE' || strValue === '1') {
+                obj[header.trim()] = true;
+              } else if (upper === 'FALSE' || strValue === '0') {
+                obj[header.trim()] = false;
+              } else if (value !== undefined && value !== null && value !== '') {
+                // Try to parse numbers, but keep percentages as strings
+                const isPercentage = typeof value === 'string' && value.includes('%');
+                if (!isPercentage) {
+                  const num = Number(value);
+                  obj[header.trim()] = isNaN(num) ? String(value) : num;
+                } else {
+                  obj[header.trim()] = String(value);
+                }
+              } else {
+                obj[header.trim()] = null;
+              }
             }
           }
         });
@@ -470,15 +475,34 @@ router.get('/construction-progress', async (req, res) => {
       const checkboxFields = roomHeaders.filter(h => h.includes('Bathroom_') || h.includes('Bedroom_'));
       for (const field of checkboxFields) {
         let trueCount = 0, falseCount = 0, nullCount = 0, otherCount = 0;
+        const otherSamples: string[] = [];
         for (const room of processedRooms) {
           const val = room[field];
           if (val === true) trueCount++;
           else if (val === false) falseCount++;
           else if (val === null || val === undefined) nullCount++;
-          else otherCount++;
+          else {
+            otherCount++;
+            if (otherSamples.length < 3) otherSamples.push(`${typeof val}:${JSON.stringify(val)}`);
+          }
         }
-        if (otherCount > 0 || trueCount + falseCount + nullCount !== processedRooms.length) {
-          console.log(`[construction-progress] Field "${field}": true=${trueCount}, false=${falseCount}, null=${nullCount}, other=${otherCount} (total rooms: ${processedRooms.length})`);
+        // Always log bedroom fields (to catch silent 0% issues), and any field with anomalies
+        const isBedroom = field.includes('Bedroom_');
+        if (isBedroom || otherCount > 0 || trueCount + falseCount + nullCount !== processedRooms.length) {
+          console.log(`[construction-progress] Field "${field}": true=${trueCount}, false=${falseCount}, null=${nullCount}, other=${otherCount}${otherSamples.length ? ` samples=[${otherSamples.join(', ')}]` : ''} (total: ${processedRooms.length})`);
+        }
+      }
+
+      // Log raw values for first data row to diagnose column alignment
+      if (dataRows.length > 0) {
+        const firstRow = dataRows[0];
+        console.log(`[construction-progress] First data row length: ${firstRow.length}, headers length: ${roomHeaders.length}`);
+        // Log raw values for bedroom columns specifically
+        const bedroomHeaderIndices = roomHeaders
+          .map((h, i) => h.includes('Bedroom_') ? i : -1)
+          .filter(i => i >= 0);
+        for (const idx of bedroomHeaderIndices.slice(0, 6)) {
+          console.log(`[construction-progress] Raw col[${idx}] "${roomHeaders[idx]}": value=${JSON.stringify(firstRow[idx])} type=${typeof firstRow[idx]}`);
         }
       }
     }
