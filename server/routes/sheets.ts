@@ -318,7 +318,11 @@ router.get('/construction-progress', async (req, res) => {
 
     if (roomsData && roomsData.rawValues && roomsData.rawValues.length > 0) {
       // First row of our fetch is the column headers (Row 3 in sheet)
-      const rawHeaders = roomsData.rawValues[0] as string[];
+      // Normalize headers: collapse newlines and multiple spaces to a single space
+      // (Google Sheets cells can contain line breaks that break field matching)
+      const rawHeaders = (roomsData.rawValues[0] as string[]).map(h =>
+        typeof h === 'string' ? h.replace(/\s+/g, ' ').trim() : h
+      );
 
       // Dynamically detect column layout instead of hardcoding positions.
       // The sheet has: some leading columns (may include empty cols + ROOM #),
