@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ConstructionProgressDashboard } from "@/components/construction-progress/ConstructionProgressDashboard";
-import { fetchConstructionProgressData, RoomProgress, RecapSection } from "@/lib/api";
+import { fetchConstructionProgressData, RoomProgress, RecapSection, RecapRow } from "@/lib/api";
+import { calculateTaskCompletion, BATHROOM_FIELDS, BEDROOM_FIELDS } from "@/components/construction-progress/utils";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { AlertCircle } from "lucide-react";
@@ -28,7 +30,42 @@ export default function ConstructionProgress() {
 
   // Transform API data to match RoomProgress structure
   const rooms: RoomProgress[] = data?.rooms?.rows || [];
-  const recapSections: RecapSection[] = data?.recap?.sections || [];
+  const apiRecapSections: RecapSection[] = data?.recap?.sections || [];
+
+  // Generate live recap from rooms data when RECAP tab is missing
+  const recapSections: RecapSection[] = useMemo(() => {
+    if (apiRecapSections.length > 0 || rooms.length === 0) {
+      return apiRecapSections;
+    }
+
+    const today = new Date().toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    function buildSection(
+      name: string,
+      fields: Record<string, { type: string; completeValues: string[]; naValues: string[] }>,
+      type: "bathroom" | "bedroom"
+    ): RecapSection {
+      const taskCompletion = calculateTaskCompletion(rooms, type);
+      const prefix = type === "bathroom" ? "Bathroom_" : "Bedroom_";
+      const shortNames = Object.keys(fields).map((k) => k.replace(prefix, ""));
+      const headers = ["DATE", ...shortNames];
+      const row: RecapRow = { _section: name, DATE: today };
+      for (const [fullKey, stats] of Object.entries(taskCompletion)) {
+        const shortName = fullKey.replace(prefix, "");
+        row[shortName] = stats.completed;
+      }
+      return { section: name, headers, rows: [row] };
+    }
+
+    return [
+      buildSection("BATHROOM", BATHROOM_FIELDS, "bathroom"),
+      buildSection("BEDROOM", BEDROOM_FIELDS, "bedroom"),
+    ];
+  }, [apiRecapSections, rooms]);
 
   // Get last updated time
   const lastUpdated = data?.lastUpdated

@@ -88,7 +88,7 @@ export const BEDROOM_FIELDS: Record<string, { type: string; completeValues: stri
     completeValues: ['TRUE', 'true'],
     naValues: []
   },
-  'Bedroom_New HVAC Unit': {
+  'Bedroom_New HVAC Unit+Thermostat': {
     type: 'checkbox',
     completeValues: ['TRUE', 'true'],
     naValues: []
@@ -119,8 +119,8 @@ export const BEDROOM_FIELDS: Record<string, { type: string; completeValues: stri
     naValues: []
   },
   'Bedroom_Finish Paint': {
-    type: 'checkbox',
-    completeValues: ['TRUE', 'true'],
+    type: 'dropdown',
+    completeValues: ['DONE'],
     naValues: []
   },
   'Bedroom_Flooring': {

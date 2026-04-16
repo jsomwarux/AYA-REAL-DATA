@@ -248,22 +248,27 @@ router.get('/construction-progress', async (req, res) => {
       t?.toLowerCase().includes('rooms progress')
     ) || 'A.I Rooms Progress'; // fallback to original name
 
-    // Find the recap tab similarly
+    // Find the recap tab similarly — check if it actually exists
     const recapTab = availableTabs.find(t =>
       t?.toLowerCase().trim() === 'recap'
-    ) || 'RECAP';
+    );
+    const hasRecapTab = !!recapTab;
 
-    console.log('[construction-progress] Using rooms tab:', roomsTab, '| recap tab:', recapTab);
+    console.log('[construction-progress] Using rooms tab:', roomsTab, '| recap tab:', recapTab || '(not found)');
 
-    // Fetch both the Rooms Progress data and RECAP data
+    // Fetch rooms data (always) and RECAP data (only if tab exists)
     const roomsRange = `'${roomsTab}'!A3:AZ500`; // Row 3 has headers, row 4+ has data
-    const recapRange = `'${recapTab}'!A:AZ`;
+    const rangesToFetch = [roomsRange];
+    const recapRange = hasRecapTab ? `'${recapTab}'!A:AZ` : null;
+    if (recapRange) {
+      rangesToFetch.push(recapRange);
+    }
 
     console.log('[construction-progress] Fetching data from sheet:', spreadsheetId);
     // Fetch values and hyperlinks in parallel
     // Fetch hyperlinks up to column E to be resilient to column insertions
     const [data, hyperlinkData] = await Promise.all([
-      fetchMultipleRanges(spreadsheetId, [roomsRange, recapRange]),
+      fetchMultipleRanges(spreadsheetId, rangesToFetch),
       fetchSheetDataWithHyperlinks(spreadsheetId, roomsTab, 3, 500, 'E'),
     ]);
     console.log('[construction-progress] Data fetched successfully');
@@ -294,7 +299,7 @@ router.get('/construction-progress', async (req, res) => {
     }
 
     // Process Rooms Progress data (roomsData already fetched above for hyperlink matching)
-    const recapData = data.get(recapRange);
+    const recapData = recapRange ? data.get(recapRange) : null;
 
     // Diagnostic logging: what did we get back from the API?
     console.log('[construction-progress] roomsData exists:', !!roomsData);
