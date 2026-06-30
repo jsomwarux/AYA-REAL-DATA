@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import sheetsRouter from "./routes/sheets";
 import timelineRouter from "./routes/timeline";
+import expansionRouter from "./routes/expansion";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -14,6 +15,9 @@ export async function registerRoutes(
 
   // Timeline routes (local database storage)
   app.use("/api/timeline", timelineRouter);
+
+  // Dashboard expansion routes (7 new tabs — additive, read-only)
+  app.use("/api/expansion", expansionRouter);
 
   // Health check endpoint
   app.get("/api/health", (req, res) => {
