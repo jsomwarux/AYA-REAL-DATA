@@ -79,6 +79,69 @@ export async function fetchExpansionExceptions(): Promise<ExceptionsResponse> {
   return handleResponse<ExceptionsResponse>(response);
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard Expansion — Floor → Room rollup (§9 item 2)
+// ---------------------------------------------------------------------------
+
+export type UrgencyBucket =
+  | 'received' | 'incoming' | 'upstream' | 'problem'
+  | 'attention' | 'unrecorded' | 'excluded' | 'other';
+
+export interface RollupPart {
+  header: string;
+  rawValue: string;
+  bucket: UrgencyBucket;
+  weight: number;
+  isBlank: boolean;
+}
+
+export interface RollupPackageSide {
+  name: string;
+  recomputedPct: number;       // engine-recomputed (primary)
+  manualPct: number | null;    // sheet's manual % (secondary)
+  mismatch: boolean;           // recomputed ≠ manual (§3.2)
+  unrecordedCount: number;     // blank parts (gap indicator)
+  parts: RollupPart[];
+}
+
+export interface RollupPackage {
+  name: string;
+  received: RollupPackageSide | null;   // from the tower's Containers tab
+  installed: RollupPackageSide | null;  // from the Installation tab
+}
+
+export interface RollupRoom {
+  roomNo: string;
+  floor: string;
+  line: string;
+  type: string;
+  packages: RollupPackage[];
+}
+
+export interface RollupFloor {
+  floor: string;
+  rooms: RollupRoom[];
+}
+
+export interface RollupTower {
+  tower: 'HR' | 'LR';
+  containersTab: string;
+  installationTab: string;
+  floors: RollupFloor[];
+}
+
+export interface RollupResponse {
+  generatedAt: string;
+  towers: RollupTower[];
+  missingTabs: string[];
+}
+
+// Fetch the joined Floor → Room rollup (both towers)
+export async function fetchExpansionRollup(): Promise<RollupResponse> {
+  const response = await fetch('/api/expansion/rollup');
+  return handleResponse<RollupResponse>(response);
+}
+
 // Construction Progress Types
 // Field names match exactly what's in Row 3 of the Google Sheet
 export interface RoomProgress {

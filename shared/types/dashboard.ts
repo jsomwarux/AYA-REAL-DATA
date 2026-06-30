@@ -109,9 +109,43 @@ export interface PackageResult {
 /** One room's row across a room tab. */
 export interface RoomRow {
   roomNo: string;
+  floor: string;       // Floor (carried forward across merged cells; falls back to room #)
   line: string;        // Room Line, e.g. "LR-LINE1" (blank-header leading column)
   type: string;        // Room Type, e.g. "King", "LR-CAVE", "King ADA"
   packages: PackageResult[];
+}
+
+// ---------------------------------------------------------------------------
+// Floor → Room rollup (§9 item 2) — join of a tower's Containers + Installation
+// ---------------------------------------------------------------------------
+
+/** One package within a room, joined across both source tabs by package name.
+ *  `received` comes from the tower's Containers tab, `installed` from the
+ *  Installation tab. Either side may be null if that tab lacks the package. */
+export interface RollupPackage {
+  name: string;
+  received: PackageResult | null;
+  installed: PackageResult | null;
+}
+
+export interface RollupRoom {
+  roomNo: string;
+  floor: string;
+  line: string;
+  type: string;
+  packages: RollupPackage[];
+}
+
+export interface RollupFloor {
+  floor: string;
+  rooms: RollupRoom[];
+}
+
+export interface RollupTower {
+  tower: Tower;
+  containersTab: string;
+  installationTab: string;
+  floors: RollupFloor[];
 }
 
 // ---------------------------------------------------------------------------

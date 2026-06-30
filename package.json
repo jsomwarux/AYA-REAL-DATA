@@ -8,7 +8,7 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "test": "node --import tsx --test shared/lib/__tests__/engine.test.ts shared/lib/__tests__/discovery.test.ts",
+    "test": "node --import tsx --test shared/lib/__tests__/*.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

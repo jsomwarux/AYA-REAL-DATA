@@ -19,8 +19,10 @@ import {
   commonAreaCompletion,
   exceptionSeverityForValue,
   exceptionReason,
+  buildTowerRollup,
   type ExceptionSeverity,
 } from '@shared/lib';
+import type { RoomRow, RoomTab, Tower } from '@shared/types/dashboard';
 
 const router = Router();
 
@@ -258,6 +260,67 @@ router.get('/exceptions', async (_req, res) => {
   } catch (err) {
     console.error('[expansion] exceptions error:', err);
     res.status(500).json({ error: 'Failed to build exceptions', message: String(err) });
+  }
+});
+
+/** Read + recompute one room tab's rows, or null if the tab can't be resolved. */
+async function readRoomTabRows(
+  tab: RoomTab,
+  spreadsheetId: string,
+  availableTitles: string[],
+): Promise<{ rows: RoomRow[]; resolvedTitle: string } | null> {
+  const resolvedTitle = resolveActualTitle(tab.sheetName, availableTitles);
+  if (!resolvedTitle) return null;
+  const grid = await readGrid(spreadsheetId, resolvedTitle);
+  const structure = discoverRoomTabStructure(grid, getExpectedTaxonomy(tab.sheetName));
+  return { rows: buildRoomRows(grid, structure, tab), resolvedTitle };
+}
+
+/**
+ * GET /api/expansion/rollup — Floor → Room rollup (§9 item 2). For each tower,
+ * JOINs the Containers + Installation tabs by Room # + package name and returns
+ * Tower → Floor → Room → package{received, installed}. All %s come from the
+ * engine; manual %s ride along for the mismatch flag. Ordered before /:tab.
+ */
+router.get('/rollup', async (_req, res) => {
+  const spreadsheetId = getSpreadsheetId();
+  if (!spreadsheetId) {
+    return res.status(400).json({ error: 'CONSTRUCTION_PROGRESS_SHEET_ID not configured' });
+  }
+
+  try {
+    const info = await getSpreadsheetInfo(spreadsheetId);
+    const availableTitles = (info.sheets?.map((s) => s.title).filter(Boolean) as string[]) || [];
+
+    const towers: Tower[] = ['HR', 'LR'];
+    const missingTabs: string[] = [];
+
+    const built = await Promise.all(
+      towers.map(async (tower) => {
+        const containersTab = ROOM_TABS.find((t) => t.tower === tower && t.type === 'containers')!;
+        const installationTab = ROOM_TABS.find((t) => t.tower === tower && t.type === 'installation')!;
+
+        const [c, i] = await Promise.all([
+          readRoomTabRows(containersTab, spreadsheetId, availableTitles),
+          readRoomTabRows(installationTab, spreadsheetId, availableTitles),
+        ]);
+        if (!c) missingTabs.push(containersTab.sheetName);
+        if (!i) missingTabs.push(installationTab.sheetName);
+
+        return buildTowerRollup(
+          tower,
+          containersTab.sheetName,
+          installationTab.sheetName,
+          c?.rows ?? [],
+          i?.rows ?? [],
+        );
+      }),
+    );
+
+    res.json({ generatedAt: new Date().toISOString(), towers: built, missingTabs });
+  } catch (err) {
+    console.error('[expansion] rollup error:', err);
+    res.status(500).json({ error: 'Failed to build rollup', message: String(err) });
   }
 });
 

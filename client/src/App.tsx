@@ -7,6 +7,7 @@ import { TabPasswordGate } from "@/components/TabPasswordGate";
 import Landing from "@/pages/Landing";
 import Overview from "@/pages/Overview";
 import ExceptionsPanel from "@/pages/ExceptionsPanel";
+import FloorRoomRollup from "@/pages/FloorRoomRollup";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
 import Timeline from "@/pages/Timeline";
@@ -45,6 +46,13 @@ function Router() {
         <Route path="/exceptions">
           <TabPasswordGate tab="construction" title="Exceptions">
             <ExceptionsPanel />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Floor → Room Rollup - received vs installed per package */}
+        <Route path="/rollup">
+          <TabPasswordGate tab="construction" title="Floor → Room Rollup">
+            <FloorRoomRollup />
           </TabPasswordGate>
         </Route>
 

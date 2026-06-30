@@ -235,6 +235,7 @@ export function buildRoomRows(
   const mode = recomputeModeFor(tab);
   const { leading } = structure;
   const rows: RoomRow[] = [];
+  let currentFloor = ''; // carried forward across merged Floor cells
 
   for (let r = structure.firstDataRowIndex; r < grid.length; r++) {
     if (leading.roomNo < 0 || isBlank(cell(grid, r, leading.roomNo))) continue;
@@ -242,6 +243,13 @@ export function buildRoomRows(
     const roomNo = cell(grid, r, leading.roomNo).trim();
     const line = leading.roomLine !== undefined ? cell(grid, r, leading.roomLine).trim() : '';
     const type = leading.roomType !== undefined ? cell(grid, r, leading.roomType).trim() : '';
+
+    // Floor: the sheet merges the Floor cell across a floor's rooms, so the value
+    // only appears on the first room — carry it forward. Fall back to deriving it
+    // from the room number (drop the last two digits: 2701→27, 701→7).
+    const floorCell = leading.floor !== undefined ? cell(grid, r, leading.floor).trim() : '';
+    if (floorCell) currentFloor = floorCell;
+    const floor = currentFloor || deriveFloorFromRoomNo(roomNo);
 
     const packages: PackageResult[] = structure.packages.map((pkg) => {
       const rawParts = pkg.parts.map((p) => cell(grid, r, p.colIndex));
@@ -275,10 +283,17 @@ export function buildRoomRows(
       };
     });
 
-    rows.push({ roomNo, line, type, packages });
+    rows.push({ roomNo, floor, line, type, packages });
   }
 
   return rows;
+}
+
+/** Derive a floor label from a room number by dropping the last two digits
+ *  (2701 → "27", 701 → "7"). Returns '' for non-numeric room numbers. */
+export function deriveFloorFromRoomNo(roomNo: string): string {
+  const digits = (roomNo || '').replace(/\D/g, '');
+  return digits.length > 2 ? digits.slice(0, -2) : '';
 }
 
 // ---------------------------------------------------------------------------

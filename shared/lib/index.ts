@@ -7,3 +7,4 @@ export * from './containers';
 export * from './buckets';
 export * from './recompute';
 export * from './discovery';
+export * from './rollup';

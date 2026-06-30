@@ -1,0 +1,402 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import {
+  fetchExpansionRollup,
+  type RollupTower,
+  type RollupFloor,
+  type RollupRoom,
+  type RollupPackage,
+  type RollupPackageSide,
+  type RollupPart,
+  type UrgencyBucket,
+} from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { toastSuccess, toastError } from "@/hooks/use-toast";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { AlertCircle, ChevronRight, Loader2, Building2, Layers, DoorClosed, PackageOpen } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Styling helpers
+// ---------------------------------------------------------------------------
+
+const BUCKET_CLASS: Record<UrgencyBucket, string> = {
+  received: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  incoming: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  upstream: "bg-amber-500/15 text-amber-200 border-amber-500/30",
+  problem: "bg-red-500/15 text-red-300 border-red-500/30",
+  attention: "bg-orange-500/15 text-orange-200 border-orange-500/30",
+  unrecorded: "bg-fuchsia-500/10 text-fuchsia-300/80 border-fuchsia-500/20",
+  excluded: "bg-white/5 text-muted-foreground border-white/10",
+  other: "bg-white/5 text-slate-300 border-white/10",
+};
+
+function pctText(pct: number): string {
+  if (pct >= 67) return "text-emerald-300";
+  if (pct >= 34) return "text-amber-300";
+  if (pct > 0) return "text-orange-300";
+  return "text-muted-foreground";
+}
+function pctBar(pct: number): string {
+  if (pct >= 67) return "bg-emerald-500";
+  if (pct >= 34) return "bg-amber-500";
+  if (pct > 0) return "bg-orange-500";
+  return "bg-white/20";
+}
+
+function normVal(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** In-room actionable parts (Installation side): HR → "In Room Not Installed";
+ *  LR → "In-Room" or "In Room Not Installed". */
+function inRoomItems(room: RollupRoom, tower: "HR" | "LR") {
+  const targets = tower === "HR" ? ["in room not installed"] : ["in-room", "in room not installed"];
+  const out: { pkg: string; part: string; raw: string }[] = [];
+  for (const pkg of room.packages) {
+    for (const p of pkg.installed?.parts ?? []) {
+      if (targets.includes(normVal(p.rawValue))) out.push({ pkg: pkg.name, part: p.header, raw: p.rawValue });
+    }
+  }
+  return out;
+}
+
+function roomMismatchCount(room: RollupRoom): number {
+  let n = 0;
+  for (const pkg of room.packages) {
+    if (pkg.received?.mismatch) n++;
+    if (pkg.installed?.mismatch) n++;
+  }
+  return n;
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default function FloorRoomRollup() {
+  useDocumentTitle("Floor → Room Rollup");
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["expansion-rollup"],
+    queryFn: fetchExpansionRollup,
+    retry: false,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const [openFloors, setOpenFloors] = useState<Set<string>>(new Set());
+  const [openRooms, setOpenRooms] = useState<Set<string>>(new Set());
+  const [openPkgs, setOpenPkgs] = useState<Set<string>>(new Set());
+
+  const toggle = (set: Set<string>, key: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    next.has(key) ? next.delete(key) : next.add(key);
+    setter(next);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toastSuccess("Refreshed", "Rollup re-joined from Containers + Installation tabs.");
+    } catch {
+      toastError("Refresh Failed", "Could not refresh the rollup. Please try again.");
+    }
+  };
+
+  const lastUpdated = data?.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : null;
+
+  return (
+    <DashboardLayout
+      title="Floor → Room Rollup"
+      subtitle={lastUpdated ? `Received vs Installed · synced ${lastUpdated}` : "Per-package received vs installed, by tower → floor → room"}
+      onRefresh={handleRefresh}
+      isLoading={isLoading}
+    >
+      {error && (
+        <Card className="mb-6 border-red-500/30 bg-red-500/10">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertCircle className="h-5 w-5 text-red-400" />
+            <div>
+              <p className="font-medium text-white">Couldn't load rollup</p>
+              <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoading && !data && (
+        <div className="flex items-center justify-center gap-3 py-24 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Joining Containers + Installation tabs…
+        </div>
+      )}
+
+      {data && (
+        <>
+          {data.missingTabs.length > 0 && (
+            <Card className="mb-5 border-amber-500/30 bg-amber-500/10">
+              <CardContent className="flex items-center gap-3 p-3 text-sm">
+                <AlertCircle className="h-4 w-4 text-amber-300" />
+                <span className="text-amber-100">Could not read: {data.missingTabs.join(", ")}.</span>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Legend */}
+          <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>Each package shows <span className="font-semibold text-white">recomputed %</span> (primary) and the sheet's manual % as a badge.</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-amber-200">sheet 50% ≠</span> mismatch
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-fuchsia-300/80">n blank</span> unrecorded gap
+            </span>
+          </div>
+
+          <div className="space-y-8">
+            {data.towers.map((tower) => (
+              <TowerSection
+                key={tower.tower}
+                tower={tower}
+                openFloors={openFloors}
+                openRooms={openRooms}
+                openPkgs={openPkgs}
+                onToggleFloor={(k) => toggle(openFloors, k, setOpenFloors)}
+                onToggleRoom={(k) => toggle(openRooms, k, setOpenRooms)}
+                onTogglePkg={(k) => toggle(openPkgs, k, setOpenPkgs)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </DashboardLayout>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tower → Floor → Room → Package
+// ---------------------------------------------------------------------------
+
+interface ToggleProps {
+  openFloors: Set<string>;
+  openRooms: Set<string>;
+  openPkgs: Set<string>;
+  onToggleFloor: (k: string) => void;
+  onToggleRoom: (k: string) => void;
+  onTogglePkg: (k: string) => void;
+}
+
+function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
+  const roomCount = tower.floors.reduce((s, f) => s + f.rooms.length, 0);
+  const towerColor = tower.tower === "HR" ? "text-blue-300" : "text-purple-300";
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <Building2 className={cn("h-5 w-5", towerColor)} />
+        <h2 className="text-lg font-semibold text-white">{tower.tower} Tower</h2>
+        <span className="text-xs text-muted-foreground">
+          {tower.floors.length} floors · {roomCount} rooms
+        </span>
+      </div>
+      <div className="space-y-2">
+        {tower.floors.map((floor) => (
+          <FloorRow key={floor.floor} tower={tower} floor={floor} {...t} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FloorRow({ tower, floor, ...t }: { tower: RollupTower; floor: RollupFloor } & ToggleProps) {
+  const key = `${tower.tower}:${floor.floor}`;
+  const open = t.openFloors.has(key);
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.02]">
+      <button
+        onClick={() => t.onToggleFloor(key)}
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-white/5"
+      >
+        <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <Layers className="h-4 w-4 text-teal-400" />
+        <span className="font-medium text-white">Floor {floor.floor}</span>
+        <span className="ml-auto text-xs text-muted-foreground">{floor.rooms.length} rooms</span>
+      </button>
+      {open && (
+        <div className="space-y-1.5 border-t border-white/10 p-2">
+          {floor.rooms.map((room) => (
+            <RoomRow key={room.roomNo} tower={tower} room={room} {...t} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom } & ToggleProps) {
+  const key = `${tower.tower}:${room.roomNo}`;
+  const open = t.openRooms.has(key);
+  const mismatches = roomMismatchCount(room);
+  const inRoom = inRoomItems(room, tower.tower);
+
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02]">
+      <button
+        onClick={() => t.onToggleRoom(key)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-white/5"
+      >
+        <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <DoorClosed className="h-4 w-4 text-muted-foreground" />
+        <span className="font-semibold text-white">Room {room.roomNo}</span>
+        {(room.line || room.type) && (
+          <span className="truncate text-xs text-muted-foreground">{[room.line, room.type].filter(Boolean).join(" · ")}</span>
+        )}
+        <span className="ml-auto flex items-center gap-1.5">
+          {mismatches > 0 && (
+            <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200">
+              {mismatches} mismatch{mismatches > 1 ? "es" : ""}
+            </span>
+          )}
+          {inRoom.length > 0 && (
+            <span className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300">
+              {inRoom.length} in-room
+            </span>
+          )}
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 border-t border-white/10 p-3">
+          {/* In-room actionable list */}
+          <InRoomSection tower={tower.tower} items={inRoom} />
+
+          {/* Packages */}
+          <div className="space-y-1.5">
+            {room.packages.map((pkg) => (
+              <PackageRow key={pkg.name} towerName={tower.tower} roomNo={room.roomNo} pkg={pkg} {...t} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InRoomSection({ tower, items }: { tower: "HR" | "LR"; items: { pkg: string; part: string; raw: string }[] }) {
+  const title = tower === "HR" ? "In Room Not Installed" : "In-Room / In Room Not Installed";
+  return (
+    <div className="rounded-md border border-sky-500/20 bg-sky-500/[0.04] p-2.5">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-sky-300">
+        <PackageOpen className="h-3.5 w-3.5" />
+        {title}
+        <span className="text-muted-foreground">({items.length})</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">None in this room.</p>
+      ) : (
+        <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {items.map((it, i) => (
+            <li key={i} className="flex items-center gap-1.5 text-xs">
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-sky-400" />
+              <span className="text-muted-foreground">{it.pkg}</span>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="truncate text-white/90">{it.part}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function PackageRow({
+  towerName,
+  roomNo,
+  pkg,
+  ...t
+}: { towerName: string; roomNo: string; pkg: RollupPackage } & ToggleProps) {
+  const key = `${towerName}:${roomNo}:${pkg.name}`;
+  const open = t.openPkgs.has(key);
+  return (
+    <div className="rounded border border-white/10 bg-white/[0.02]">
+      <button
+        onClick={() => t.onTogglePkg(key)}
+        className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left hover:bg-white/5 sm:grid-cols-[180px_1fr_1fr]"
+      >
+        <span className="flex items-center gap-1.5">
+          <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", open && "rotate-90")} />
+          <span className="text-sm font-medium text-white">{pkg.name}</span>
+        </span>
+        <PctCell label="Received" side={pkg.received} />
+        <PctCell label="Installed" side={pkg.installed} />
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 gap-4 border-t border-white/10 p-3 sm:grid-cols-2">
+          <PartList title="Received · Containers" side={pkg.received} />
+          <PartList title="Installed · Installation" side={pkg.installed} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PctCell({ label, side }: { label: string; side: RollupPackageSide | null }) {
+  if (!side) {
+    return <div className="text-xs text-muted-foreground">{label}: <span className="text-muted-foreground/60">—</span></div>;
+  }
+  return (
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-baseline gap-1.5">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className={cn("text-sm font-semibold", pctText(side.recomputedPct))}>{side.recomputedPct}%</span>
+        {side.manualPct !== null && (
+          <span
+            title={side.mismatch ? "Sheet's manual % differs from recomputed" : "Matches recomputed"}
+            className={cn(
+              "rounded border px-1 py-0 text-[10px]",
+              side.mismatch
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+                : "border-white/10 text-muted-foreground",
+            )}
+          >
+            sheet {side.manualPct}%{side.mismatch ? " ≠" : ""}
+          </span>
+        )}
+        {side.unrecordedCount > 0 && (
+          <span className="text-[10px] text-fuchsia-300/80">{side.unrecordedCount} blank</span>
+        )}
+      </div>
+      <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/10">
+        <div className={cn("h-full rounded", pctBar(side.recomputedPct))} style={{ width: `${side.recomputedPct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function PartList({ title, side }: { title: string; side: RollupPackageSide | null }) {
+  if (!side) {
+    return <div className="text-xs text-muted-foreground">{title}: <span className="text-muted-foreground/60">not on this tab</span></div>;
+  }
+  return (
+    <div>
+      <h5 className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{title}</h5>
+      <ul className="space-y-1">
+        {side.parts.map((p, i) => (
+          <li key={i} className="flex items-center justify-between gap-2 text-xs">
+            <span className="min-w-0 truncate text-white/90">{p.header}</span>
+            <BucketChip part={p} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BucketChip({ part }: { part: RollupPart }) {
+  const label = part.isBlank ? "blank" : part.rawValue || "—";
+  return (
+    <span className={cn("flex-shrink-0 rounded border px-1.5 py-0.5 text-[10px]", BUCKET_CLASS[part.bucket])}>
+      {label}
+    </span>
+  );
+}

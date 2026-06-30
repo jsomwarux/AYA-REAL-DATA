@@ -16,6 +16,7 @@ import {
   FileText,
   Link2,
   ShieldAlert,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,14 @@ const mainNavItems: NavItem[] = [
     icon: <Building2 className="h-5 w-5" />,
     iconColor: "text-blue-400",
     description: "Room-by-room progress tracking",
+    requiredAuth: "construction",
+  },
+  {
+    title: "Floor → Room",
+    href: "/rollup",
+    icon: <Layers className="h-5 w-5" />,
+    iconColor: "text-indigo-400",
+    description: "Received vs installed per package, by floor & room",
     requiredAuth: "construction",
   },
   {

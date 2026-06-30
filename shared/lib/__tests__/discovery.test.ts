@@ -132,6 +132,7 @@ test('buildRoomRows: recomputes %, flags stale manual %, buckets parts (received
   assert.equal(rows.length, 1);
   const room = rows[0];
   assert.equal(room.roomNo, '2701');
+  assert.equal(room.floor, '7'); // from the Floor leading column
   assert.equal(room.line, 'HR-LINE1');
   assert.equal(room.type, 'King');
 
@@ -147,6 +148,21 @@ test('buildRoomRows: recomputes %, flags stale manual %, buckets parts (received
   assert.equal(pkg.parts[2].bucket, 'excluded'); // N/A
   assert.equal(pkg.parts[3].bucket, 'unrecorded'); // blank
   assert.equal(pkg.parts[3].isBlank, true);
+});
+
+test('buildRoomRows: floor carries forward across merged (blank) Floor cells', () => {
+  const containersTab = getTab('HR Containers Distribution') as Tab;
+  const header = ['Floor', '', 'Room Type', 'WHITE BOX', 'Room #', 'HEADBOARD PACKAGE', 'Panel', 'Completion %'];
+  const grid = [
+    header,
+    ['27', 'L1', 'King', 'TRUE', '2701', '0%', 'In China'],
+    ['', 'L2', 'King', 'TRUE', '2702', '0%', 'In China'], // merged Floor cell → blank, inherits 27
+  ];
+  const struct = discoverRoomTabStructure(grid);
+  const rows = buildRoomRows(grid, struct, containersTab);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].floor, '27');
+  assert.equal(rows[1].floor, '27'); // carried forward
 });
 
 // ---------------------------------------------------------------------------
