@@ -166,12 +166,50 @@ export interface ContainerBlockedPart {
   tab: string; // first (preferring Containers) tab the ref was seen on
   sources: ('containers' | 'installation')[];
   roomNo: string;
+  floor: string;
   line: string;
   type: string;
   package: string;
   part: string;
   rawValue: string;
   partial: boolean; // "Container X & In China" — this container arrived, rest upstream
+}
+
+// ---------------------------------------------------------------------------
+// Outstanding parts by delivery stage (the reframed, data-backed primary view).
+// The sheet tracks delivery PER PART via the location vocab (§6.1), not a
+// per-container arrived flag — so the real signal is parts at each stage.
+// ---------------------------------------------------------------------------
+
+export type DeliveryStage =
+  | 'received'          // LOCAL or a full "Container N" (the "Container N = landed" convention)
+  | 'in-ny-port'
+  | 'in-transit'
+  | 'partial-china'     // "Container X & In China" — started, pieces still missing
+  | 'in-china'          // In China / Remaining
+  | 'in-production'
+  | 'production-needed'
+  | 'unrecorded'        // blank cell — no status recorded
+  | 'problem'           // Not Found / Damaged — belongs to Exceptions, excluded here
+  | 'excluded'          // N/A
+  | 'other';            // anything unrecognized (never crash)
+
+export interface OutstandingPart {
+  tower: Tower;
+  roomNo: string;
+  floor: string;
+  line: string;
+  type: string;
+  package: string;
+  part: string;
+  rawValue: string;
+  stage: DeliveryStage;
+}
+
+export interface StageGroup {
+  stage: DeliveryStage;
+  count: number;
+  parts: OutstandingPart[];
 }
 
 /** All rooms/parts tied to one container number, with arrived/pending status. */

@@ -22,8 +22,10 @@ import {
   exceptionReason,
   buildTowerRollup,
   buildContainerIndex,
+  buildOutstanding,
   type ExceptionSeverity,
   type ContainerIndexInput,
+  type OutstandingInput,
 } from '@shared/lib';
 import type { RoomRow, RoomTab, Tower } from '@shared/types/dashboard';
 
@@ -328,11 +330,11 @@ router.get('/rollup', async (_req, res) => {
 });
 
 /**
- * GET /api/expansion/containers — Container view (§9 item 3). Inverts the room
- * tabs into container # → the rooms/parts that reference it, with arrived/pending
- * per ARRIVED_CONTAINERS and partial ("& In China") flags. Primary source is the
- * two Containers tabs; Installation "Container N" refs are folded in (tagged by
- * source). Ordered before /:tab.
+ * GET /api/expansion/containers — delivery view (§9 item 3, reframed).
+ * PRIMARY: outstanding parts grouped by delivery stage (location vocab §6.1) from
+ * the Containers tabs — the data-backed "what's still incoming" signal, with no
+ * dependence on a per-container arrived flag. SECONDARY: the container lens
+ * (container # → rooms/parts it covers). Ordered before /:tab.
  */
 router.get('/containers', async (_req, res) => {
   const spreadsheetId = getSpreadsheetId();
@@ -350,32 +352,42 @@ router.get('/containers', async (_req, res) => {
     );
 
     const missingTabs: string[] = [];
-    const inputs: ContainerIndexInput[] = [];
+    const indexInputs: ContainerIndexInput[] = [];
+    const outstandingInputs: OutstandingInput[] = [];
     for (const { tab, read } of results) {
       if (!read) {
         missingTabs.push(tab.sheetName);
         continue;
       }
-      inputs.push({
+      indexInputs.push({
         tower: tab.tower,
         tab: tab.sheetName,
         source: tab.type === 'containers' ? 'containers' : 'installation',
         rooms: read.rows,
       });
+      // Delivery stage is tracked on the Containers tabs (location vocab §6.1).
+      if (tab.type === 'containers') {
+        outstandingInputs.push({ tower: tab.tower, tab: tab.sheetName, rooms: read.rows });
+      }
     }
 
-    const containers = buildContainerIndex(inputs, ARRIVED_CONTAINERS);
+    // PRIMARY: outstanding parts by delivery stage (data-backed, no arrived flag).
+    const outstanding = buildOutstanding(outstandingInputs);
+    // SECONDARY: the container lens (which rooms/parts each container covers).
+    const containers = buildContainerIndex(indexInputs, ARRIVED_CONTAINERS);
     const arrivedConfig = ARRIVED_CONTAINERS === 'ALL' ? 'ALL' : [...ARRIVED_CONTAINERS].sort((a, b) => a - b);
 
     res.json({
       generatedAt: new Date().toISOString(),
       arrivedConfig,
       summary: {
+        incoming: outstanding.summary.incoming,
+        received: outstanding.summary.received,
+        problems: outstanding.summary.problems, // → link to Exceptions
+        partials: outstanding.stages.find((s) => s.stage === 'partial-china')?.count ?? 0,
         containers: containers.length,
-        arrived: containers.filter((g) => g.arrived).length,
-        pending: containers.filter((g) => !g.arrived).length,
-        partialParts: containers.reduce((s, g) => s + g.partialCount, 0),
       },
+      stages: outstanding.stages,
       containers,
       missingTabs,
     });

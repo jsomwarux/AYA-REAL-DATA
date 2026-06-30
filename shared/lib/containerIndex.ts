@@ -58,6 +58,7 @@ export function buildContainerIndex(
                 tab: input.tab,
                 sources: [input.source],
                 roomNo: room.roomNo,
+                floor: room.floor,
                 line: room.line,
                 type: room.type,
                 package: pkg.name,

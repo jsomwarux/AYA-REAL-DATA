@@ -144,12 +144,35 @@ export async function fetchExpansionRollup(): Promise<RollupResponse> {
   return handleResponse<RollupResponse>(response);
 }
 
-// --- Container view (§9 item 3) ---
+// --- Delivery view (§9 item 3, reframed around outstanding parts by stage) ---
+export type DeliveryStage =
+  | 'received' | 'in-ny-port' | 'in-transit' | 'partial-china' | 'in-china'
+  | 'in-production' | 'production-needed' | 'unrecorded' | 'problem' | 'excluded' | 'other';
+
+export interface OutstandingPart {
+  tower: 'HR' | 'LR';
+  roomNo: string;
+  floor: string;
+  line: string;
+  type: string;
+  package: string;
+  part: string;
+  rawValue: string;
+  stage: DeliveryStage;
+}
+
+export interface StageGroup {
+  stage: DeliveryStage;
+  count: number;
+  parts: OutstandingPart[];
+}
+
 export interface ContainerBlockedPart {
   tower: 'HR' | 'LR';
   tab: string;
   sources: ('containers' | 'installation')[];
   roomNo: string;
+  floor: string;
   line: string;
   type: string;
   package: string;
@@ -170,7 +193,8 @@ export interface ContainerGroup {
 export interface ContainersResponse {
   generatedAt: string;
   arrivedConfig: 'ALL' | number[];
-  summary: { containers: number; arrived: number; pending: number; partialParts: number };
+  summary: { incoming: number; received: number; problems: number; partials: number; containers: number };
+  stages: StageGroup[];      // outstanding parts, ordered closest → furthest
   containers: ContainerGroup[];
   missingTabs: string[];
 }
