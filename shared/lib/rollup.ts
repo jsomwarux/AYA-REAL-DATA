@@ -26,10 +26,34 @@ function findPackage(room: RoomRow | undefined, name: string): PackageResult | n
 }
 
 /**
+ * Key rooms by "roomNo#occurrence" so sub-rooms that share a Room # are kept
+ * distinct. Some suites span two rows under one number (a main row + an "LV"
+ * row) and Type strings drift across tabs, so occurrence order — consistent
+ * across the parallel-maintained tabs — is the reliable join discriminator.
+ */
+function keyByRoomOccurrence(rooms: RoomRow[]): Map<string, RoomRow> {
+  const counts = new Map<string, number>();
+  const map = new Map<string, RoomRow>();
+  for (const r of rooms) {
+    const occ = counts.get(r.roomNo) ?? 0;
+    counts.set(r.roomNo, occ + 1);
+    map.set(`${r.roomNo}#${occ}`, r);
+  }
+  return map;
+}
+
+/** Room #s appearing on more than one row. */
+function duplicatedRoomNos(rooms: RoomRow[]): string[] {
+  const counts = new Map<string, number>();
+  for (const r of rooms) counts.set(r.roomNo, (counts.get(r.roomNo) ?? 0) + 1);
+  return [...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k);
+}
+
+/**
  * Join one tower's Containers + Installation room rows into the rollup structure.
- * Rooms are the ordered union of room numbers across both tabs; packages are the
- * ordered union of package names. Floors are grouped and sorted high→low; rooms
- * within a floor sorted low→high.
+ * Rooms are keyed by Room # + occurrence (so duplicate/suite rows survive and pair
+ * main↔main / LV↔LV across tabs); packages are the ordered union of package names.
+ * Floors are grouped and sorted high→low; rooms within a floor sorted low→high.
  */
 export function buildTowerRollup(
   tower: Tower,
@@ -38,16 +62,16 @@ export function buildTowerRollup(
   containersRooms: RoomRow[],
   installationRooms: RoomRow[],
 ): RollupTower {
-  const byRoomC = new Map(containersRooms.map((r) => [r.roomNo, r]));
-  const byRoomI = new Map(installationRooms.map((r) => [r.roomNo, r]));
+  const byRoomC = keyByRoomOccurrence(containersRooms);
+  const byRoomI = keyByRoomOccurrence(installationRooms);
 
-  // Ordered union of room numbers: Containers order first, then Installation-only.
-  const roomNos: string[] = [];
+  // Ordered union of room keys: Containers order first, then Installation-only.
+  const roomKeys: string[] = [];
   const seenRooms = new Set<string>();
-  for (const r of [...containersRooms, ...installationRooms]) {
-    if (!seenRooms.has(r.roomNo)) {
-      seenRooms.add(r.roomNo);
-      roomNos.push(r.roomNo);
+  for (const k of [...byRoomC.keys(), ...byRoomI.keys()]) {
+    if (!seenRooms.has(k)) {
+      seenRooms.add(k);
+      roomKeys.push(k);
     }
   }
 
@@ -64,10 +88,10 @@ export function buildTowerRollup(
     }
   }
 
-  const rollupRooms: RollupRoom[] = roomNos.map((roomNo) => {
-    const rc = byRoomC.get(roomNo);
-    const ri = byRoomI.get(roomNo);
-    const meta = rc ?? ri!; // at least one exists since roomNo came from the union
+  const rollupRooms: RollupRoom[] = roomKeys.map((key) => {
+    const rc = byRoomC.get(key);
+    const ri = byRoomI.get(key);
+    const meta = rc ?? ri!; // at least one exists since key came from the union
 
     const packages: RollupPackage[] = pkgNames
       .map((name) => ({
@@ -77,10 +101,10 @@ export function buildTowerRollup(
       }))
       .filter((p) => p.received || p.installed);
 
-    return { roomNo, floor: meta.floor, line: meta.line, type: meta.type, packages };
+    return { key, roomNo: meta.roomNo, floor: meta.floor, line: meta.line, type: meta.type, packages };
   });
 
-  // Group by floor, sort floors high→low, rooms low→high.
+  // Group by floor, sort floors high→low, rooms low→high (stable on key for dups).
   const floorMap = new Map<string, RollupRoom[]>();
   for (const room of rollupRooms) {
     const list = floorMap.get(room.floor);
@@ -91,9 +115,13 @@ export function buildTowerRollup(
   const floors: RollupFloor[] = [...floorMap.entries()]
     .map(([floor, rooms]) => ({
       floor,
-      rooms: rooms.slice().sort((a, b) => num(a.roomNo) - num(b.roomNo)),
+      rooms: rooms.slice().sort((a, b) => num(a.roomNo) - num(b.roomNo) || a.key.localeCompare(b.key)),
     }))
     .sort((a, b) => num(b.floor) - num(a.floor));
 
-  return { tower, containersTab, installationTab, floors };
+  const duplicateRooms = [
+    ...new Set([...duplicatedRoomNos(containersRooms), ...duplicatedRoomNos(installationRooms)]),
+  ].sort((a, b) => num(a) - num(b));
+
+  return { tower, containersTab, installationTab, floors, duplicateRooms };
 }

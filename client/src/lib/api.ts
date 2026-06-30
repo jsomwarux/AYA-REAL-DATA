@@ -111,6 +111,7 @@ export interface RollupPackage {
 }
 
 export interface RollupRoom {
+  key: string;   // unique within tower ("roomNo#occurrence") — distinguishes suite sub-rooms
   roomNo: string;
   floor: string;
   line: string;
@@ -128,6 +129,7 @@ export interface RollupTower {
   containersTab: string;
   installationTab: string;
   floors: RollupFloor[];
+  duplicateRooms: string[];   // Room #s spanning multiple rows (e.g. suite main + LV)
 }
 
 export interface RollupResponse {

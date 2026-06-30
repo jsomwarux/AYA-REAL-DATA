@@ -64,6 +64,39 @@ test('buildTowerRollup: rooms grouped by floor (desc), rooms sorted asc', () => 
   assert.deepEqual(r.floors[0].rooms.map((x) => x.roomNo), ['2701', '2702']); // sorted asc
 });
 
+test('buildTowerRollup: duplicate Room # (suite main + LV) kept distinct, paired by occurrence', () => {
+  // Mirrors live HR 1105: a main suite row + an LV row share Room # and Line; Type
+  // drifts across tabs ("King -Suite Room" vs "King -Suite"), so only occurrence
+  // order reliably pairs them. Main HEADBOARD is 100% received, LV is 0%.
+  const containers = [
+    room('1105', '11', 'HR- Line 5', 'King -Suite Room', [pkg('HEADBOARD', 100, 100)]),
+    room('1105', '11', 'HR- Line 5', 'King -Suite LV Room', [pkg('HEADBOARD', 0, 0)]),
+  ];
+  const installation = [
+    room('1105', '11', 'HR- Line 5', 'King -Suite', [pkg('HEADBOARD', 0, 0)]),
+    room('1105', '11', 'HR- Line 5', 'King -Suite LV Room', [pkg('HEADBOARD', 0, 0)]),
+  ];
+
+  const r = buildTowerRollup('HR', 'HR Containers Distribution', 'HR Installation Progress', containers, installation);
+
+  const rooms = r.floors[0].rooms;
+  assert.equal(rooms.length, 2); // both sub-rooms preserved, not collapsed
+  assert.deepEqual(rooms.map((x) => x.key), ['1105#0', '1105#1']); // distinct UI keys
+  assert.deepEqual(rooms.map((x) => x.type), ['King -Suite Room', 'King -Suite LV Room']);
+
+  // occurrence pairing: main(0) joins main, LV(1) joins LV
+  assert.equal(rooms[0].packages[0].received?.recomputedPct, 100); // main received
+  assert.equal(rooms[0].packages[0].installed?.recomputedPct, 0); // main installed
+  assert.equal(rooms[1].packages[0].received?.recomputedPct, 0); // LV received
+
+  assert.deepEqual(r.duplicateRooms, ['1105']); // surfaced, not silent
+});
+
+test('buildTowerRollup: no duplicates → duplicateRooms empty', () => {
+  const r = buildTowerRollup('LR', 'c', 'i', [room('701', '7', 'L', 'K', [pkg('BED', 0, 0)])], []);
+  assert.deepEqual(r.duplicateRooms, []);
+});
+
 test('deriveFloorFromRoomNo: drop last two digits', () => {
   assert.equal(deriveFloorFromRoomNo('2701'), '27');
   assert.equal(deriveFloorFromRoomNo('701'), '7');

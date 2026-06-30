@@ -129,6 +129,9 @@ export interface RollupPackage {
 }
 
 export interface RollupRoom {
+  /** Unique key within a tower: "roomNo#occurrence". Distinguishes sub-rooms that
+   *  share a Room # (e.g. a suite's main + LV rows), which Room # alone collapses. */
+  key: string;
   roomNo: string;
   floor: string;
   line: string;
@@ -146,6 +149,9 @@ export interface RollupTower {
   containersTab: string;
   installationTab: string;
   floors: RollupFloor[];
+  /** Room #s that appear on more than one row in either tab (joined by occurrence
+   *  order). Surfaced so duplicate/suite rows are never silently dropped. */
+  duplicateRooms: string[];
 }
 
 // ---------------------------------------------------------------------------

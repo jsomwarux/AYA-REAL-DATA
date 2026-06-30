@@ -192,12 +192,20 @@ function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
   const towerColor = tower.tower === "HR" ? "text-blue-300" : "text-purple-300";
   return (
     <section>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Building2 className={cn("h-5 w-5", towerColor)} />
         <h2 className="text-lg font-semibold text-white">{tower.tower} Tower</h2>
         <span className="text-xs text-muted-foreground">
           {tower.floors.length} floors · {roomCount} rooms
         </span>
+        {tower.duplicateRooms.length > 0 && (
+          <span
+            className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200"
+            title={`These Room #s span multiple rows (e.g. a suite's main + LV) and are shown as separate rooms, distinguished by type: ${tower.duplicateRooms.join(", ")}`}
+          >
+            shared #: {tower.duplicateRooms.join(", ")}
+          </span>
+        )}
       </div>
       <div className="space-y-2">
         {tower.floors.map((floor) => (
@@ -225,7 +233,7 @@ function FloorRow({ tower, floor, ...t }: { tower: RollupTower; floor: RollupFlo
       {open && (
         <div className="space-y-1.5 border-t border-white/10 p-2">
           {floor.rooms.map((room) => (
-            <RoomRow key={room.roomNo} tower={tower} room={room} {...t} />
+            <RoomRow key={room.key} tower={tower} room={room} {...t} />
           ))}
         </div>
       )}
@@ -234,7 +242,7 @@ function FloorRow({ tower, floor, ...t }: { tower: RollupTower; floor: RollupFlo
 }
 
 function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom } & ToggleProps) {
-  const key = `${tower.tower}:${room.roomNo}`;
+  const key = `${tower.tower}:${room.key}`;
   const open = t.openRooms.has(key);
   const mismatches = roomMismatchCount(room);
   const inRoom = inRoomItems(room, tower.tower);
@@ -273,7 +281,7 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
           {/* Packages */}
           <div className="space-y-1.5">
             {room.packages.map((pkg) => (
-              <PackageRow key={pkg.name} towerName={tower.tower} roomNo={room.roomNo} pkg={pkg} {...t} />
+              <PackageRow key={pkg.name} towerName={tower.tower} roomKey={room.key} pkg={pkg} {...t} />
             ))}
           </div>
         </div>
@@ -311,11 +319,11 @@ function InRoomSection({ tower, items }: { tower: "HR" | "LR"; items: { pkg: str
 
 function PackageRow({
   towerName,
-  roomNo,
+  roomKey,
   pkg,
   ...t
-}: { towerName: string; roomNo: string; pkg: RollupPackage } & ToggleProps) {
-  const key = `${towerName}:${roomNo}:${pkg.name}`;
+}: { towerName: string; roomKey: string; pkg: RollupPackage } & ToggleProps) {
+  const key = `${towerName}:${roomKey}:${pkg.name}`;
   const open = t.openPkgs.has(key);
   return (
     <div className="rounded border border-white/10 bg-white/[0.02]">
