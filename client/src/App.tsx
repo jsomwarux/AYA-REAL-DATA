@@ -8,6 +8,8 @@ import Landing from "@/pages/Landing";
 import Overview from "@/pages/Overview";
 import ExceptionsPanel from "@/pages/ExceptionsPanel";
 import FloorRoomRollup from "@/pages/FloorRoomRollup";
+import ContainerView from "@/pages/ContainerView";
+import CommonAreas from "@/pages/CommonAreas";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
 import Timeline from "@/pages/Timeline";
@@ -53,6 +55,20 @@ function Router() {
         <Route path="/rollup">
           <TabPasswordGate tab="construction" title="Floor → Room Rollup">
             <FloorRoomRollup />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Container view - when a container lands, what unblocks */}
+        <Route path="/containers">
+          <TabPasswordGate tab="construction" title="Container View">
+            <ContainerView />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Common areas - Corridors / Staircase / Temp-Lobby */}
+        <Route path="/common-areas">
+          <TabPasswordGate tab="construction" title="Common Areas">
+            <CommonAreas />
           </TabPasswordGate>
         </Route>
 

@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Sidebar, SidebarProvider, useSidebar } from "./Sidebar";
-import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Lock, BedDouble, FileText, Link2, ShieldAlert, Layers } from "lucide-react";
+import { RefreshCw, Menu, X, Clock, LayoutDashboard, Building2, DollarSign, Calendar, Lock, BedDouble, FileText, Link2, ShieldAlert, Layers, Container, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -30,6 +30,8 @@ const mobileNavItems: MobileNavItem[] = [
   { title: "Exceptions", href: "/exceptions", icon: <ShieldAlert className="h-5 w-5" />, iconColor: "text-red-400", requiredAuth: "construction" },
   { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400", requiredAuth: "construction" },
   { title: "Floor → Room", href: "/rollup", icon: <Layers className="h-5 w-5" />, iconColor: "text-indigo-400", requiredAuth: "construction" },
+  { title: "Containers", href: "/containers", icon: <Container className="h-5 w-5" />, iconColor: "text-cyan-400", requiredAuth: "construction" },
+  { title: "Common Areas", href: "/common-areas", icon: <LayoutGrid className="h-5 w-5" />, iconColor: "text-violet-400", requiredAuth: "construction" },
   { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true, requiredAuth: "management" },
   { title: "Timeline", href: "/timeline", icon: <Calendar className="h-5 w-5" />, iconColor: "text-amber-400", managementOnly: true, requiredAuth: "management" },
   { title: "Room Specs", href: "/room-specs", icon: <BedDouble className="h-5 w-5" />, iconColor: "text-rose-400", managementOnly: true, requiredAuth: "management" },

@@ -17,6 +17,8 @@ import {
   Link2,
   ShieldAlert,
   Layers,
+  Container,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -78,6 +80,22 @@ const mainNavItems: NavItem[] = [
     icon: <Layers className="h-5 w-5" />,
     iconColor: "text-indigo-400",
     description: "Received vs installed per package, by floor & room",
+    requiredAuth: "construction",
+  },
+  {
+    title: "Containers",
+    href: "/containers",
+    icon: <Container className="h-5 w-5" />,
+    iconColor: "text-cyan-400",
+    description: "When a container lands, which rooms & parts unblock",
+    requiredAuth: "construction",
+  },
+  {
+    title: "Common Areas",
+    href: "/common-areas",
+    icon: <LayoutGrid className="h-5 w-5" />,
+    iconColor: "text-violet-400",
+    description: "Corridors, Staircase & Temp/Lobby progress",
     requiredAuth: "construction",
   },
   {

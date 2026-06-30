@@ -155,6 +155,36 @@ export interface RollupTower {
 }
 
 // ---------------------------------------------------------------------------
+// Container view (§9 item 3) — container # → the rooms/parts it unblocks
+// ---------------------------------------------------------------------------
+
+/** One room-part whose cell references a given container number. The same part can
+ *  be tracked in both a Containers tab and an Installation tab; those are merged
+ *  into one entry with both `sources` so counts aren't double-inflated. */
+export interface ContainerBlockedPart {
+  tower: Tower;
+  tab: string; // first (preferring Containers) tab the ref was seen on
+  sources: ('containers' | 'installation')[];
+  roomNo: string;
+  line: string;
+  type: string;
+  package: string;
+  part: string;
+  rawValue: string;
+  partial: boolean; // "Container X & In China" — this container arrived, rest upstream
+}
+
+/** All rooms/parts tied to one container number, with arrived/pending status. */
+export interface ContainerGroup {
+  number: number;
+  arrived: boolean; // per ARRIVED_CONTAINERS — true = delivered/unblocked
+  roomCount: number; // distinct rooms (tower + room #)
+  partCount: number; // total referencing parts
+  partialCount: number; // how many are partial ("& In China")
+  entries: ContainerBlockedPart[];
+}
+
+// ---------------------------------------------------------------------------
 // Common-area result types (§8)
 // ---------------------------------------------------------------------------
 

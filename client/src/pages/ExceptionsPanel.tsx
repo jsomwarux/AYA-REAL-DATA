@@ -347,15 +347,37 @@ function SeveritySection({ group }: { group: SeverityGroup }) {
               {shortTab(tabGroup.tab)}
               <span className="text-xs font-normal text-muted-foreground">({tabGroup.count})</span>
             </h3>
-            <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-              {tabGroup.rooms.map((room) => (
-                <RoomCard key={`${tabGroup.tab}-${room.roomNo}`} room={room} severity={group.severity} />
-              ))}
-            </div>
+            <TabRoomGrid tabGroup={tabGroup} severity={group.severity} />
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+/** Cap rooms rendered per tab so a 1000+-item severity (e.g. thousands of
+ *  "Not Found") doesn't dump the whole tree into the DOM. Expand on demand. */
+const ROOM_CAP = 24;
+function TabRoomGrid({ tabGroup, severity }: { tabGroup: TabGroup; severity: ExceptionSeverity }) {
+  const [showAll, setShowAll] = useState(false);
+  const rooms = showAll ? tabGroup.rooms : tabGroup.rooms.slice(0, ROOM_CAP);
+  const hidden = tabGroup.rooms.length - rooms.length;
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+        {rooms.map((room) => (
+          <RoomCard key={`${tabGroup.tab}-${room.roomNo}`} room={room} severity={severity} />
+        ))}
+      </div>
+      {hidden > 0 && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="mt-2 text-xs font-medium text-teal-300 hover:text-teal-200"
+        >
+          Show all {tabGroup.rooms.length} rooms (+{hidden} more) — or filter by tab/tower to narrow
+        </button>
+      )}
+    </>
   );
 }
 

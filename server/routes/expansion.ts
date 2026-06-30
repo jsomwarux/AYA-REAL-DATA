@@ -10,6 +10,7 @@ import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
 import { ALL_TABS, ROOM_TABS, recomputeModeFor, isRoomTab, slugifyTab, resolveTab } from '@shared/config/tabs';
 import { getExpectedTaxonomy } from '@shared/config/expectedTaxonomies';
 import { TEMP_LOBBY_CONFIG } from '@shared/config/commonAreas';
+import { ARRIVED_CONTAINERS } from '@shared/config/runtime';
 import type { Tab } from '@shared/types/dashboard';
 import {
   discoverRoomTabStructure,
@@ -20,7 +21,9 @@ import {
   exceptionSeverityForValue,
   exceptionReason,
   buildTowerRollup,
+  buildContainerIndex,
   type ExceptionSeverity,
+  type ContainerIndexInput,
 } from '@shared/lib';
 import type { RoomRow, RoomTab, Tower } from '@shared/types/dashboard';
 
@@ -321,6 +324,64 @@ router.get('/rollup', async (_req, res) => {
   } catch (err) {
     console.error('[expansion] rollup error:', err);
     res.status(500).json({ error: 'Failed to build rollup', message: String(err) });
+  }
+});
+
+/**
+ * GET /api/expansion/containers — Container view (§9 item 3). Inverts the room
+ * tabs into container # → the rooms/parts that reference it, with arrived/pending
+ * per ARRIVED_CONTAINERS and partial ("& In China") flags. Primary source is the
+ * two Containers tabs; Installation "Container N" refs are folded in (tagged by
+ * source). Ordered before /:tab.
+ */
+router.get('/containers', async (_req, res) => {
+  const spreadsheetId = getSpreadsheetId();
+  if (!spreadsheetId) {
+    return res.status(400).json({ error: 'CONSTRUCTION_PROGRESS_SHEET_ID not configured' });
+  }
+
+  try {
+    const info = await getSpreadsheetInfo(spreadsheetId);
+    const availableTitles = (info.sheets?.map((s) => s.title).filter(Boolean) as string[]) || [];
+
+    // Read all 4 room tabs (preserve ROOM_TABS order: Containers tabs first).
+    const results = await Promise.all(
+      ROOM_TABS.map(async (tab) => ({ tab, read: await readRoomTabRows(tab, spreadsheetId, availableTitles) })),
+    );
+
+    const missingTabs: string[] = [];
+    const inputs: ContainerIndexInput[] = [];
+    for (const { tab, read } of results) {
+      if (!read) {
+        missingTabs.push(tab.sheetName);
+        continue;
+      }
+      inputs.push({
+        tower: tab.tower,
+        tab: tab.sheetName,
+        source: tab.type === 'containers' ? 'containers' : 'installation',
+        rooms: read.rows,
+      });
+    }
+
+    const containers = buildContainerIndex(inputs, ARRIVED_CONTAINERS);
+    const arrivedConfig = ARRIVED_CONTAINERS === 'ALL' ? 'ALL' : [...ARRIVED_CONTAINERS].sort((a, b) => a - b);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      arrivedConfig,
+      summary: {
+        containers: containers.length,
+        arrived: containers.filter((g) => g.arrived).length,
+        pending: containers.filter((g) => !g.arrived).length,
+        partialParts: containers.reduce((s, g) => s + g.partialCount, 0),
+      },
+      containers,
+      missingTabs,
+    });
+  } catch (err) {
+    console.error('[expansion] containers error:', err);
+    res.status(500).json({ error: 'Failed to build container index', message: String(err) });
   }
 });
 

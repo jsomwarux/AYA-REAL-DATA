@@ -144,6 +144,99 @@ export async function fetchExpansionRollup(): Promise<RollupResponse> {
   return handleResponse<RollupResponse>(response);
 }
 
+// --- Container view (§9 item 3) ---
+export interface ContainerBlockedPart {
+  tower: 'HR' | 'LR';
+  tab: string;
+  sources: ('containers' | 'installation')[];
+  roomNo: string;
+  line: string;
+  type: string;
+  package: string;
+  part: string;
+  rawValue: string;
+  partial: boolean;   // "Container X & In China"
+}
+
+export interface ContainerGroup {
+  number: number;
+  arrived: boolean;
+  roomCount: number;
+  partCount: number;
+  partialCount: number;
+  entries: ContainerBlockedPart[];
+}
+
+export interface ContainersResponse {
+  generatedAt: string;
+  arrivedConfig: 'ALL' | number[];
+  summary: { containers: number; arrived: number; pending: number; partialParts: number };
+  containers: ContainerGroup[];
+  missingTabs: string[];
+}
+
+export async function fetchExpansionContainers(): Promise<ContainersResponse> {
+  const response = await fetch('/api/expansion/containers');
+  return handleResponse<ContainersResponse>(response);
+}
+
+// --- Common-area views (§8, §9 item 4) ---
+export type StatusState = 'done' | 'in-progress' | 'blocker' | 'in-motion' | 'not-started' | 'other';
+
+export interface CommonAreaTask {
+  header: string;
+  section?: 'A' | 'B';   // Staircase only
+  rawValue: string;
+  status: StatusState;
+}
+
+export interface CommonAreaFloor {
+  area: 'corridors' | 'staircase';
+  floor: string;
+  whiteBox: boolean;
+  fullyComplete: boolean;   // sheet's FULLY COMPLETED / FULLY DONE checkbox
+  derivedComplete: boolean; // recomputed from task cells
+  mismatch: boolean;        // checkbox vs derived disagree
+  tasks: CommonAreaTask[];
+}
+
+export interface CommonAreaResponse {
+  ok: boolean;
+  tab: string;
+  resolvedTitle: string;
+  kind: 'commonArea';
+  area: 'corridors' | 'staircase';
+  floorCount: number;
+  floors: CommonAreaFloor[];
+  warnings: string[];
+}
+
+export interface LobbyTask {
+  task: string;
+  rawValue: string;
+  status: StatusState;
+  flagged: boolean;   // manually red-flagged (e.g. PHR Alarm System)
+}
+
+export interface LobbyResponse {
+  ok: boolean;
+  tab: string;
+  resolvedTitle: string;
+  kind: 'commonArea';
+  area: 'lobby';
+  taskCount: number;
+  completion: { done: number; total: number; pct: number };
+  tasks: LobbyTask[];
+  warnings: string[];
+}
+
+export async function fetchCommonArea(slug: 'corridors' | 'staircase'): Promise<CommonAreaResponse> {
+  return handleResponse<CommonAreaResponse>(await fetch(`/api/expansion/${slug}`));
+}
+export async function fetchLobby(): Promise<LobbyResponse> {
+  return handleResponse<LobbyResponse>(await fetch('/api/expansion/temp-lobby'));
+}
+
 // Construction Progress Types
 // Field names match exactly what's in Row 3 of the Google Sheet
 export interface RoomProgress {
