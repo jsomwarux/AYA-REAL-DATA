@@ -7,7 +7,7 @@
 
 import { Router } from 'express';
 import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
-import { ALL_TABS, getTab, recomputeModeFor, isRoomTab } from '@shared/config/tabs';
+import { ALL_TABS, recomputeModeFor, isRoomTab, slugifyTab, resolveTab } from '@shared/config/tabs';
 import { getExpectedTaxonomy } from '@shared/config/expectedTaxonomies';
 import { TEMP_LOBBY_CONFIG } from '@shared/config/commonAreas';
 import type { Tab } from '@shared/types/dashboard';
@@ -29,11 +29,6 @@ const WIDE_RANGE = 'A1:GZ1000';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** URL slug for a tab, e.g. "LR-Installation Progress" → "lr-installation-progress". */
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
 
 /** Significant lowercase tokens of a name (length ≥ 2). */
 function tokens(name: string): string[] {
@@ -168,7 +163,7 @@ router.get('/', async (_req, res) => {
     const availableTitles = (info.sheets?.map((s) => s.title).filter(Boolean) as string[]) || [];
     const tabs = ALL_TABS.map((t) => ({
       tab: t.sheetName,
-      slug: slugify(t.sheetName),
+      slug: slugifyTab(t.sheetName),
       kind: t.kind,
       resolvedTitle: resolveActualTitle(t.sheetName, availableTitles) ?? null,
     }));
@@ -187,13 +182,12 @@ router.get('/:tab', async (req, res) => {
   }
 
   const param = req.params.tab;
-  const tab =
-    getTab(param) ?? ALL_TABS.find((t) => slugify(t.sheetName) === slugify(param));
+  const tab = resolveTab(param);
   if (!tab) {
     return res.status(404).json({
       error: 'unknown_tab',
       message: `No registered tab for "${param}".`,
-      available: ALL_TABS.map((t) => ({ name: t.sheetName, slug: slugify(t.sheetName) })),
+      available: ALL_TABS.map((t) => ({ name: t.sheetName, slug: slugifyTab(t.sheetName) })),
     });
   }
 

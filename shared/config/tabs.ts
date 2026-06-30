@@ -41,6 +41,38 @@ export function getTab(sheetName: string): Tab | undefined {
   return ALL_TABS.find((t) => t.sheetName === sheetName);
 }
 
+/** URL slug for a tab, e.g. "LR-Installation Progress" → "lr-installation-progress". */
+export function slugifyTab(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Resolve a URL param to a registered tab, tolerantly: exact name → exact slug →
+ * unique slug-prefix ("lr-containers" → "lr-containers-distribution") → unique
+ * token subset. Returns undefined if nothing matches or the match is ambiguous
+ * (e.g. "hr" alone matches both HR tabs).
+ */
+export function resolveTab(param: string): Tab | undefined {
+  const byName = getTab(param);
+  if (byName) return byName;
+
+  const pslug = slugifyTab(param);
+  if (pslug === '') return undefined;
+
+  const exact = ALL_TABS.find((t) => slugifyTab(t.sheetName) === pslug);
+  if (exact) return exact;
+
+  const prefix = ALL_TABS.filter((t) => slugifyTab(t.sheetName).startsWith(pslug));
+  if (prefix.length === 1) return prefix[0];
+
+  const ptokens = pslug.split('-').filter(Boolean);
+  const tokenMatches = ALL_TABS.filter((t) => {
+    const have = new Set(slugifyTab(t.sheetName).split('-'));
+    return ptokens.every((x) => have.has(x));
+  });
+  return tokenMatches.length === 1 ? tokenMatches[0] : undefined;
+}
+
 /** Type guard: is this a room tab? */
 export function isRoomTab(tab: Tab): tab is RoomTab {
   return tab.kind === 'room';

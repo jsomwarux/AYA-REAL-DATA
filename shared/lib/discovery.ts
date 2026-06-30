@@ -38,6 +38,12 @@ function cell(grid: Grid, r: number, c: number): string {
   return v == null ? '' : String(v);
 }
 
+/** Clean a header for storage/matching: collapse internal whitespace (incl. the
+ *  newlines the sheet wraps headers with, e.g. "Wallpaper\n& Corners") and trim. */
+function cleanHeader(raw: string | null | undefined): string {
+  return (raw ?? '').replace(/\s+/g, ' ').trim();
+}
+
 /** Parse a checkbox / boolean cell. Tolerant of TRUE/✓/yes/x. */
 export function parseBool(raw: string | null | undefined): boolean {
   const n = norm(raw);
@@ -181,7 +187,7 @@ export function discoverRoomTabStructure(grid: Grid, expected?: ExpectedTaxonomy
       const h = cell(grid, headerRowIndex, c);
       if (isTrailingStopHeader(h)) break; // trailing region begins
       if (isBlank(h)) continue; // hidden/spacer column
-      parts.push({ header: h.trim(), colIndex: c });
+      parts.push({ header: cleanHeader(h), colIndex: c });
     }
     packages.push({ name, summaryColIndex: pi, parts });
   }
@@ -317,7 +323,7 @@ function discoverCommonAreaHeader(grid: Grid, area: CommonArea): CommonAreaHeade
     if (fixedCols.has(c)) continue;
     const h = cell(grid, headerRowIndex, c);
     if (isBlank(h)) continue;
-    rawTaskCols.push({ header: h.trim(), colIndex: c });
+    rawTaskCols.push({ header: cleanHeader(h), colIndex: c });
   }
 
   const taskCols: CommonAreaHeader['taskCols'] = rawTaskCols.map((t) => ({ ...t }));
@@ -397,7 +403,7 @@ export function discoverLobbyTasks(
 
   const tasks: LobbyTask[] = [];
   for (let r = startRow; r < grid.length; r++) {
-    const task = cell(grid, r, taskCol).trim();
+    const task = cleanHeader(cell(grid, r, taskCol));
     if (isBlank(task)) continue;
     const rawValue = cell(grid, r, statusCol);
     tasks.push({

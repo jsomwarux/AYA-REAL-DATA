@@ -11,7 +11,7 @@ import {
   discoverCommonAreaFloors,
   discoverLobbyTasks,
 } from '../index';
-import { getTab } from '../../config/tabs';
+import { getTab, resolveTab } from '../../config/tabs';
 import { getExpectedTaxonomy, type ExpectedTaxonomy } from '../../config/expectedTaxonomies';
 import { STAIRCASE_SECTION_A_TASKS, STAIRCASE_SECTION_B_TASKS } from '../../config/commonAreas';
 import type { Tab } from '../../types/dashboard';
@@ -92,6 +92,24 @@ test('discovery: trailing columns (Completion %, Missing) are ignored as parts',
 test('discovery: never throws on empty/garbage grids', () => {
   assert.doesNotThrow(() => discoverRoomTabStructure([]));
   assert.doesNotThrow(() => discoverRoomTabStructure([['just', 'noise'], ['1', '2']]));
+});
+
+test('discovery: newline-wrapped headers are collapsed to single spaces', () => {
+  const header = ['Floor', '', 'Room Type', 'WHITE BOX', 'Room #', 'HEADBOARD PACKAGE', 'Headboard\nPanel', 'Wooden \nLED Track', 'Completion %'];
+  const struct = discoverRoomTabStructure([header, ['7', 'L1', 'King', 'TRUE', '701']]);
+  assert.deepEqual(struct.packages[0].parts.map((p) => p.header), ['Headboard Panel', 'Wooden LED Track']);
+});
+
+test('resolveTab: accepts exact name, full slug, and short prefix; rejects ambiguous', () => {
+  assert.equal(resolveTab('LR Containers Distribution')?.sheetName, 'LR Containers Distribution'); // exact
+  assert.equal(resolveTab('lr-containers-distribution')?.sheetName, 'LR Containers Distribution'); // full slug
+  assert.equal(resolveTab('lr-containers')?.sheetName, 'LR Containers Distribution'); // short prefix
+  assert.equal(resolveTab('hr-containers')?.sheetName, 'HR Containers Distribution');
+  assert.equal(resolveTab('lr-installation')?.sheetName, 'LR-Installation Progress');
+  assert.equal(resolveTab('corridors')?.sheetName, 'CORRIDORS');
+  assert.equal(resolveTab('temp-lobby')?.sheetName, 'TEMP/LOBBY');
+  assert.equal(resolveTab('hr'), undefined); // ambiguous → both HR tabs
+  assert.equal(resolveTab('nonsense'), undefined);
 });
 
 // ---------------------------------------------------------------------------
