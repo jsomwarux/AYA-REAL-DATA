@@ -24,7 +24,7 @@ const STATUS: Record<StatusState, { cell: string; dot: string; label: string }> 
   "in-progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
   blocker: { cell: "bg-red-500/80 ring-1 ring-red-300/60", dot: "bg-red-500", label: "Blocker" },
   "in-motion": { cell: "bg-amber-500/70", dot: "bg-amber-500", label: "Ordered" },
-  "not-started": { cell: "bg-white/10", dot: "bg-white/30", label: "Not started" },
+  "not-started": { cell: "bg-slate-500/30", dot: "bg-slate-400", label: "Not started" },
   other: { cell: "bg-fuchsia-500/40", dot: "bg-fuchsia-500", label: "Other" },
 };
 const LEGEND_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
@@ -63,10 +63,12 @@ function Heatmap({
   floors,
   headers,
   section,
+  highlight,
 }: {
   floors: CommonAreaFloor[];
   headers: string[];
   section?: "A" | "B";
+  highlight?: string;
 }) {
   const tasksFor = (f: CommonAreaFloor) => (section ? f.tasks.filter((t) => t.section === section) : f.tasks);
   return (
@@ -98,14 +100,22 @@ function Heatmap({
                     f.fullyComplete && <Check className="mx-auto h-3 w-3 text-emerald-400" />
                   )}
                 </td>
-                {tasks.map((t, i) => (
-                  <td key={i} className="p-0">
-                    <div
-                      className={cn("h-6 w-6 rounded-sm", STATUS[t.status].cell)}
-                      title={`${f.floor} · ${t.header}: ${t.rawValue || "(blank)"} [${STATUS[t.status].label}]`}
-                    />
-                  </td>
-                ))}
+                {tasks.map((t, i) => {
+                  const blank = !t.rawValue || !t.rawValue.trim();
+                  const hot = highlight && t.header === highlight;
+                  return (
+                    <td key={i} className="p-0">
+                      <div
+                        className={cn(
+                          "h-6 w-6 rounded-sm",
+                          blank ? "border border-dashed border-white/20" : STATUS[t.status].cell,
+                          hot && "ring-2 ring-white",
+                        )}
+                        title={`Floor ${f.floor} · ${t.header} · ${t.rawValue?.trim() || "(blank)"}`}
+                      />
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}
@@ -131,6 +141,73 @@ function TaskKey({ headers }: { headers: string[] }) {
   );
 }
 
+// Blocker lead — reuse the status === "blocker" classification (don't re-derive).
+function blockerGroups(floors: CommonAreaFloor[], section?: "A" | "B") {
+  const m = new Map<string, string[]>();
+  for (const f of floors) {
+    for (const t of f.tasks) {
+      if (section && t.section !== section) continue;
+      if (t.status === "blocker") {
+        const list = m.get(t.header) ?? [];
+        list.push(f.floor);
+        m.set(t.header, list);
+      }
+    }
+  }
+  return [...m.entries()].map(([task, fl]) => ({ task, floors: fl })).sort((a, b) => b.floors.length - a.floors.length);
+}
+
+function floorSpanLabel(floors: string[]): string {
+  const nums = floors.map((f) => parseInt(f.replace(/\D/g, ""), 10)).filter((n) => !Number.isNaN(n)).sort((a, b) => b - a);
+  if (nums.length === 0) return "";
+  if (nums.length === 1) return `Floor ${nums[0]}`;
+  return `${nums.length} floors (${nums[0]}–${nums[nums.length - 1]})`;
+}
+
+function BlockerLead({
+  floors,
+  section,
+  blockerLabel,
+  highlight,
+  onPick,
+}: {
+  floors: CommonAreaFloor[];
+  section?: "A" | "B";
+  blockerLabel: string;
+  highlight: string | null;
+  onPick: (task: string | null) => void;
+}) {
+  const groups = blockerGroups(floors, section);
+  const total = groups.reduce((n, g) => n + g.floors.length, 0);
+  if (total === 0) return null;
+  return (
+    <div className="rounded-md border border-red-500/30 bg-red-500/[0.06] p-2.5">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-300">
+        <AlertCircle className="h-3.5 w-3.5" /> {blockerLabel}
+        <span className="text-red-300/70">({total} blocked cell{total > 1 ? "s" : ""})</span>
+      </div>
+      <ul className="space-y-0.5">
+        {groups.map((g) => (
+          <li key={g.task}>
+            <button
+              onClick={() => onPick(highlight === g.task ? null : g.task)}
+              className={cn(
+                "flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs hover:bg-white/5",
+                highlight === g.task && "bg-white/10 ring-1 ring-white/30",
+              )}
+              title="Click to highlight these cells in the grid"
+            >
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+              <span className="text-white/90">{g.task}</span>
+              <span className="ml-auto whitespace-nowrap text-[10px] text-muted-foreground">{floorSpanLabel(g.floors)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function tallyFloors(floors: CommonAreaFloor[], section?: "A" | "B") {
   let done = 0,
     total = 0;
@@ -151,6 +228,7 @@ function CorridorsView({ data }: { data: CommonAreaResponse }) {
   const headers = data.floors[0]?.tasks.map((t) => t.header) ?? [];
   const tally = useMemo(() => tallyFloors(data.floors), [data.floors]);
   const mismatches = data.floors.filter((f) => f.mismatch);
+  const [highlight, setHighlight] = useState<string | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -162,9 +240,10 @@ function CorridorsView({ data }: { data: CommonAreaResponse }) {
           <AlertTriangle className="h-3.5 w-3.5" /> {mismatches.length} floor{mismatches.length > 1 ? "s" : ""} marked FULLY COMPLETED but tasks aren't all done: {mismatches.map((f) => f.floor).join(", ")}
         </p>
       )}
+      <BlockerLead floors={data.floors} blockerLabel="Waiting on product" highlight={highlight} onPick={setHighlight} />
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
-          <Heatmap floors={data.floors} headers={headers} />
+          <Heatmap floors={data.floors} headers={headers} highlight={highlight ?? undefined} />
           <TaskKey headers={headers} />
         </CardContent>
       </Card>
@@ -177,6 +256,7 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
   const headersB = data.floors[0]?.tasks.filter((t) => t.section === "B").map((t) => t.header) ?? [];
   const tally = useMemo(() => tallyFloors(data.floors), [data.floors]);
   const mismatches = data.floors.filter((f) => f.mismatch);
+  const [highlight, setHighlight] = useState<string | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -188,18 +268,19 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
           <AlertTriangle className="h-3.5 w-3.5" /> {mismatches.length} floor{mismatches.length > 1 ? "s" : ""} marked FULLY DONE but tasks aren't all done: {mismatches.map((f) => f.floor).join(", ")}
         </p>
       )}
+      <BlockerLead floors={data.floors} blockerLabel="Blocked" highlight={highlight} onPick={setHighlight} />
       <div className="grid gap-3 lg:grid-cols-2">
         <Card className="border-white/10 bg-white/[0.02]">
           <CardContent className="p-3">
             <h3 className="mb-2 text-sm font-semibold text-white">Section A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
-            <Heatmap floors={data.floors} headers={headersA} section="A" />
+            <Heatmap floors={data.floors} headers={headersA} section="A" highlight={highlight ?? undefined} />
             <TaskKey headers={headersA} />
           </CardContent>
         </Card>
         <Card className="border-white/10 bg-white/[0.02]">
           <CardContent className="p-3">
             <h3 className="mb-2 text-sm font-semibold text-white">Section B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
-            <Heatmap floors={data.floors} headers={headersB} section="B" />
+            <Heatmap floors={data.floors} headers={headersB} section="B" highlight={highlight ?? undefined} />
             <TaskKey headers={headersB} />
           </CardContent>
         </Card>

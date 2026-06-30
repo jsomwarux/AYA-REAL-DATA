@@ -384,6 +384,11 @@ export function discoverCommonAreaFloors(
       };
     });
 
+    // Drop a phantom floor row: a FLOOR label whose every task cell is blank (no
+    // data tracked). A floor that's all "Not Started" is NOT phantom — it has
+    // values — so it is kept.
+    if (tasks.every((t) => isBlank(t.rawValue))) continue;
+
     const completion = commonAreaCompletion(tasks.map((t) => t.rawValue));
     const derivedComplete = completion.total > 0 && completion.done === completion.total;
     const fullyComplete = fixed.fullyComplete !== undefined ? parseBool(cell(grid, r, fixed.fullyComplete)) : false;

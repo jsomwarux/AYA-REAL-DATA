@@ -7,4 +7,4 @@ vite.config.ts.*
 .claude/worktrees/
 .env
 .env.*
-verify-local.ts
+verify-*.ts

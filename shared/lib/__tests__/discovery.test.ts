@@ -165,6 +165,22 @@ test('buildRoomRows: floor carries forward across merged (blank) Floor cells', (
   assert.equal(rows[1].floor, '27'); // carried forward
 });
 
+test('discoverCommonAreaFloors: reads floors from the sheet, drops all-blank phantom rows, keeps all-Not-Started', () => {
+  // Row 1 = decorative banner; row 2 = headers; data from row 3 (§8). Fixed cols
+  // for corridors: A=AREA B=WHITE BOX C=FULLY COMPLETED D=FLOOR, tasks E+.
+  const grid = [
+    ['', '', '', '', 'CORRIDORS'],
+    ['AREA', 'WHITE BOX', 'FULLY COMPLETED', 'FLOOR', 'Wallpaper Removal', 'Sheetrock'],
+    ['HIGH RISE', 'FALSE', 'FALSE', '12TH', 'Completed', 'Completed'],
+    ['', 'FALSE', 'FALSE', '11TH', 'Not Started', 'Not Started'], // all not-started → kept (real)
+    ['', 'FALSE', 'FALSE', '10TH', '', ''], // all blank → phantom, dropped
+    ['', 'FALSE', 'FALSE', '7TH', 'Completed', 'Completed'],
+  ];
+  const { floors } = discoverCommonAreaFloors(grid, 'corridors');
+  assert.deepEqual(floors.map((f) => f.floor), ['12TH', '11TH', '7TH']); // 10TH dropped, no synthesized 8/9
+  assert.equal(floors[1].tasks.every((t) => t.status === 'not-started'), true); // 11TH kept as real
+});
+
 // ---------------------------------------------------------------------------
 // Common-area floors (§8.4) — derived completion vs FULLY COMPLETED checkbox
 // ---------------------------------------------------------------------------

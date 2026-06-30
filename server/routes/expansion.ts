@@ -160,6 +160,7 @@ async function buildTabPayload(tab: Tab, spreadsheetId: string, availableTitles:
   }
 
   const { floors, warnings } = discoverCommonAreaFloors(grid, tab.area);
+  console.log(`[expansion] ${tab.area} floors (${floors.length}): ${floors.map((f) => f.floor).join(', ')}`);
   return {
     ok: true as const,
     tab: tab.sheetName,
