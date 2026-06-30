@@ -250,7 +250,9 @@ const LR_INSTALLATION_PACKAGES: ExpectedPackage[] = [
     ],
   },
   {
-    name: 'SOFT GOOD',
+    // Live sheet header is "SOFT GOODS" (plural); spec §5a transcribed it as
+    // "SOFT GOOD". Aligned to live to silence the validation warning (parts match).
+    name: 'SOFT GOODS',
     parts: [
       'Marble Desk',
       'Ottoman / Bench',
