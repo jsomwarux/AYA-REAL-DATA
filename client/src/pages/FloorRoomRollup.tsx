@@ -71,6 +71,43 @@ function roomMismatchCount(room: RollupRoom): number {
   return n;
 }
 
+// --- Loud problem bucket (§7.3, Gil's #1): Not Found / Damaged (received) +
+//     Damaged / UNKNOWN LOCATION / Missing Parts (installed). We read the engine's
+//     bucket === "problem" directly — never re-derive. ---
+type LoudItem = { pkg: string; part: string; raw: string; side: "received" | "installed" };
+
+function loudItems(room: RollupRoom): LoudItem[] {
+  const out: LoudItem[] = [];
+  for (const pkg of room.packages) {
+    for (const p of pkg.received?.parts ?? []) {
+      if (p.bucket === "problem") out.push({ pkg: pkg.name, part: p.header, raw: p.rawValue, side: "received" });
+    }
+    for (const p of pkg.installed?.parts ?? []) {
+      if (p.bucket === "problem") out.push({ pkg: pkg.name, part: p.header, raw: p.rawValue, side: "installed" });
+    }
+  }
+  return out;
+}
+
+/** Short, explicit label for the loud value ("Not Found" → "not found"). */
+function shortReason(raw: string): string {
+  const n = normVal(raw);
+  if (n === "not found") return "not found";
+  if (n === "damaged") return "damaged";
+  if (n === "missing parts") return "missing";
+  if (n === "unknown location") return "unknown loc";
+  return "problem";
+}
+
+/** Count + label of loud parts on one package side, for the per-package chip. */
+function loudOnSide(side: RollupPackageSide | null): { count: number; label: string } {
+  if (!side) return { count: 0, label: "" };
+  const loud = side.parts.filter((p) => p.bucket === "problem");
+  if (loud.length === 0) return { count: 0, label: "" };
+  const reasons = new Set(loud.map((p) => shortReason(p.rawValue)));
+  return { count: loud.length, label: reasons.size === 1 ? [...reasons][0] : "problem" };
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -146,6 +183,9 @@ export default function FloorRoomRollup() {
           {/* Legend */}
           <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Each package shows <span className="font-semibold text-white">recomputed %</span> (primary) and the sheet's manual % as a badge.</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="rounded border border-red-500/50 bg-red-500/15 px-1 font-semibold text-red-200">n problems</span> Not Found / Damaged / missing (loud)
+            </span>
             <span className="inline-flex items-center gap-1">
               <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-amber-200">sheet 50% ≠</span> mismatch
             </span>
@@ -246,6 +286,7 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
   const open = t.openRooms.has(key);
   const mismatches = roomMismatchCount(room);
   const inRoom = inRoomItems(room, tower.tower);
+  const loud = loudItems(room);
 
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02]">
@@ -260,6 +301,11 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
           <span className="truncate text-xs text-muted-foreground">{[room.line, room.type].filter(Boolean).join(" · ")}</span>
         )}
         <span className="ml-auto flex items-center gap-1.5">
+          {loud.length > 0 && (
+            <span className="rounded border border-red-500/50 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">
+              {loud.length} problem{loud.length > 1 ? "s" : ""}
+            </span>
+          )}
           {mismatches > 0 && (
             <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200">
               {mismatches} mismatch{mismatches > 1 ? "es" : ""}
@@ -275,6 +321,9 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
 
       {open && (
         <div className="space-y-3 border-t border-white/10 p-3">
+          {/* Loud problems (Not Found / Damaged / UNKNOWN LOCATION / Missing Parts) — top, loudest */}
+          <ProblemSection items={loud} />
+
           {/* In-room actionable list */}
           <InRoomSection tower={tower.tower} items={inRoom} />
 
@@ -286,6 +335,31 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProblemSection({ items }: { items: LoudItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-md border border-red-500/40 bg-red-500/[0.08] p-2.5">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-300">
+        <AlertCircle className="h-3.5 w-3.5" />
+        Problem — Not Found / Damaged
+        <span className="text-red-300/70">({items.length})</span>
+      </div>
+      <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-center gap-1.5 text-xs">
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+            <span className="text-muted-foreground">{it.pkg}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="min-w-0 truncate text-white/90">{it.part}</span>
+            <span className="flex-shrink-0 rounded border border-red-500/40 bg-red-500/10 px-1 text-[10px] font-medium text-red-200">{it.raw}</span>
+            <span className="ml-auto flex-shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{it.side}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -352,11 +426,20 @@ function PctCell({ label, side }: { label: string; side: RollupPackageSide | nul
   if (!side) {
     return <div className="text-xs text-muted-foreground">{label}: <span className="text-muted-foreground/60">—</span></div>;
   }
+  const loud = loudOnSide(side);
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap items-baseline gap-1.5">
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
         <span className={cn("text-sm font-semibold", pctText(side.recomputedPct))}>{side.recomputedPct}%</span>
+        {loud.count > 0 && (
+          <span
+            title="Loud problem parts on this side (Not Found / Damaged / UNKNOWN LOCATION / Missing Parts)"
+            className="rounded border border-red-500/50 bg-red-500/15 px-1 py-0 text-[10px] font-semibold text-red-200"
+          >
+            {loud.count} {loud.label}
+          </span>
+        )}
         {side.manualPct !== null && (
           <span
             title={side.mismatch ? "Sheet's manual % differs from recomputed" : "Matches recomputed"}
