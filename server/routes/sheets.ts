@@ -243,10 +243,19 @@ router.get('/construction-progress', async (req, res) => {
     const availableTabs = spreadsheetInfo.sheets?.map(s => s.title) || [];
     console.log('[construction-progress] Available tabs:', availableTabs);
 
-    // Find the rooms progress tab by checking common name patterns
-    const roomsTab = availableTabs.find(t =>
-      t?.toLowerCase().includes('rooms progress')
-    ) || 'A.I Rooms Progress'; // fallback to original name
+    // Find the rooms progress tab by checking common name patterns.
+    // Match on "rooms" AND "progress" appearing anywhere in the name (in order)
+    // rather than the rigid contiguous phrase "rooms progress", so inserted words
+    // like "WB" (e.g. "A.I Rooms WB Progress") don't break the match. This stays
+    // specific enough to avoid colliding with tabs like "HR Installation Progress".
+    const roomsTab = availableTabs.find(t => {
+      const lower = t?.toLowerCase() || '';
+      const roomsIdx = lower.indexOf('rooms');
+      return roomsIdx !== -1 && lower.indexOf('progress', roomsIdx) !== -1;
+    })
+      // Fall back to the older exact-phrase match, then the original literal name
+      || availableTabs.find(t => t?.toLowerCase().includes('rooms progress'))
+      || 'A.I Rooms Progress'; // fallback to original name
 
     // Find the recap tab similarly — check if it actually exists
     const recapTab = availableTabs.find(t =>
