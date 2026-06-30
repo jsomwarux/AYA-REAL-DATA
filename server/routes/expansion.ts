@@ -7,7 +7,7 @@
 
 import { Router } from 'express';
 import { fetchSheetData, getSpreadsheetInfo } from '../services/googleSheets';
-import { ALL_TABS, recomputeModeFor, isRoomTab, slugifyTab, resolveTab } from '@shared/config/tabs';
+import { ALL_TABS, ROOM_TABS, recomputeModeFor, isRoomTab, slugifyTab, resolveTab } from '@shared/config/tabs';
 import { getExpectedTaxonomy } from '@shared/config/expectedTaxonomies';
 import { TEMP_LOBBY_CONFIG } from '@shared/config/commonAreas';
 import type { Tab } from '@shared/types/dashboard';
@@ -17,9 +17,26 @@ import {
   discoverCommonAreaFloors,
   discoverLobbyTasks,
   commonAreaCompletion,
+  exceptionSeverityForValue,
+  exceptionReason,
+  type ExceptionSeverity,
 } from '@shared/lib';
 
 const router = Router();
+
+/** One problem item surfaced in the Exceptions Panel (§9.1). */
+interface ExceptionItem {
+  severity: ExceptionSeverity;
+  tab: string;
+  tower: 'HR' | 'LR';
+  roomNo: string;
+  line: string;
+  type: string;
+  package: string;
+  part: string;
+  rawValue: string;
+  reason: string;
+}
 
 // Wide enough to cover every part column on the room tabs (97 parts + summaries
 // + leading/trailing), including hidden/grouped columns. values.get returns
@@ -171,6 +188,76 @@ router.get('/', async (_req, res) => {
   } catch (err) {
     console.error('[expansion] list error:', err);
     res.status(500).json({ error: 'Failed to read spreadsheet info', message: String(err) });
+  }
+});
+
+/**
+ * GET /api/expansion/exceptions — the LEAD view (§9 item 1). Scans ALL 4 room
+ * tabs and returns the flat list of problem items (LOUD + Attention) plus
+ * per-severity counts. Defined BEFORE /:tab so the literal path wins over the
+ * param route.
+ */
+router.get('/exceptions', async (_req, res) => {
+  const spreadsheetId = getSpreadsheetId();
+  if (!spreadsheetId) {
+    return res.status(400).json({ error: 'CONSTRUCTION_PROGRESS_SHEET_ID not configured' });
+  }
+
+  try {
+    const info = await getSpreadsheetInfo(spreadsheetId);
+    const availableTitles = (info.sheets?.map((s) => s.title).filter(Boolean) as string[]) || [];
+
+    const perTab = await Promise.all(
+      ROOM_TABS.map(async (tab) => {
+        const resolvedTitle = resolveActualTitle(tab.sheetName, availableTitles);
+        if (!resolvedTitle) return { tab, items: [] as ExceptionItem[], missing: true };
+
+        const grid = await readGrid(spreadsheetId, resolvedTitle);
+        const structure = discoverRoomTabStructure(grid, getExpectedTaxonomy(tab.sheetName));
+        const rooms = buildRoomRows(grid, structure, tab);
+
+        const items: ExceptionItem[] = [];
+        for (const room of rooms) {
+          for (const pkg of room.packages) {
+            for (const part of pkg.parts) {
+              const severity = exceptionSeverityForValue(part.rawValue, tab);
+              if (!severity) continue;
+              items.push({
+                severity,
+                tab: tab.sheetName,
+                tower: tab.tower,
+                roomNo: room.roomNo,
+                line: room.line,
+                type: room.type,
+                package: pkg.name,
+                part: part.header,
+                rawValue: part.rawValue,
+                reason: exceptionReason(part.rawValue),
+              });
+            }
+          }
+        }
+        return { tab, items, missing: false };
+      }),
+    );
+
+    const items = perTab.flatMap((t) => t.items);
+    const counts = {
+      loud: items.filter((i) => i.severity === 'loud').length,
+      attention: items.filter((i) => i.severity === 'attention').length,
+      total: items.length,
+    };
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      counts,
+      items,
+      tabsScanned: ROOM_TABS.map((t) => t.sheetName),
+      missingTabs: perTab.filter((t) => t.missing).map((t) => t.tab.sheetName),
+    });
+  } catch (err) {
+    console.error('[expansion] exceptions error:', err);
+    res.status(500).json({ error: 'Failed to build exceptions', message: String(err) });
   }
 });
 

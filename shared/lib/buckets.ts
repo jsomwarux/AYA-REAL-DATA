@@ -197,3 +197,60 @@ export function bucketForValue(
       return 'other';
   }
 }
+
+// ---------------------------------------------------------------------------
+// Exceptions Panel classification (§9 item 1) — the LEAD view
+// ---------------------------------------------------------------------------
+
+export type ExceptionSeverity = 'loud' | 'attention';
+
+/**
+ * Severity for the Exceptions Panel (§9.1), or null if the value is not an
+ * exception. Defined explicitly against §9.1 rather than reusing the urgency
+ * bucket, because a partial "Container X & In China" is incoming-low for the
+ * urgency view but Attention for the exceptions view.
+ *
+ * - LOUD: Damaged (any) · Not Found (Containers) · UNKNOWN LOCATION (LR Install)
+ *   · Missing Parts (HR Install). These all map to the 'problem' urgency bucket.
+ * - ATTENTION: ON-site/ Missing Other · Confirm Item (LR Install) · partial
+ *   "Container X & In China".
+ *
+ * Only room tabs have exceptions; common-area tabs return null.
+ */
+export function exceptionSeverityForValue(
+  raw: string | null | undefined,
+  tab: Tab,
+  opts?: BucketOptions,
+): ExceptionSeverity | null {
+  if (tab.kind !== 'room') return null;
+
+  if (bucketForValue(raw, tab, opts) === 'problem') return 'loud';
+
+  const k = key(raw);
+  if (k === 'on-site/missing other' || k === 'confirm item') return 'attention';
+  if (parseContainerRef(raw).partial) return 'attention';
+
+  return null;
+}
+
+/** Short human label for why an item is an exception (for display). */
+export function exceptionReason(raw: string | null | undefined): string {
+  const k = key(raw);
+  switch (k) {
+    case 'damaged':
+      return 'Damaged';
+    case 'not found':
+      return 'Not Found';
+    case 'unknown location':
+      return 'Unknown Location';
+    case 'missing parts':
+      return 'Missing Parts';
+    case 'on-site/missing other':
+      return 'On-Site / Missing Other';
+    case 'confirm item':
+      return 'Confirm Item';
+    default:
+      if (parseContainerRef(raw).partial) return 'Partial — rest in China';
+      return (raw ?? '').replace(/\s+/g, ' ').trim();
+  }
+}

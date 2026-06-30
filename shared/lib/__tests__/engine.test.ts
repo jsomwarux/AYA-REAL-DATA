@@ -13,6 +13,8 @@ import {
   normalizeManualPct,
   bucketForValue,
   commonAreaCompletion,
+  exceptionSeverityForValue,
+  exceptionReason,
 } from '../index';
 import { getTab } from '../../config/tabs';
 import type { Tab } from '../../types/dashboard';
@@ -175,4 +177,39 @@ test('commonAreaCompletion: done/total excludes N/A, blank counts as not-done', 
   assert.equal(c.done, 2);
   assert.equal(c.total, 4); // 5 − 1 N/A ; blank stays
   assert.equal(c.pct, 0.5);
+});
+
+// ---------------------------------------------------------------------------
+// Exceptions Panel classifier (§9.1) — LOUD vs Attention vs not-an-exception
+// ---------------------------------------------------------------------------
+test('exceptionSeverityForValue: LOUD across all 4 room tabs', () => {
+  assert.equal(exceptionSeverityForValue('Not Found', containersTab), 'loud'); // Containers
+  assert.equal(exceptionSeverityForValue('Damaged', containersTab), 'loud'); // any tab
+  assert.equal(exceptionSeverityForValue('Missing Parts', hrTab), 'loud'); // HR Install
+  assert.equal(exceptionSeverityForValue('Damaged', hrTab), 'loud');
+  assert.equal(exceptionSeverityForValue('UNKNOWN LOCATION', lrTab), 'loud'); // LR Install
+  assert.equal(exceptionSeverityForValue('Damaged', lrTab), 'loud');
+});
+
+test('exceptionSeverityForValue: Attention (LR states + partial "& In China")', () => {
+  assert.equal(exceptionSeverityForValue('ON-site/ Missing Other', lrTab), 'attention');
+  assert.equal(exceptionSeverityForValue('Confirm Item', lrTab), 'attention');
+  assert.equal(exceptionSeverityForValue('Container 5 & In China', containersTab), 'attention'); // partial
+  assert.equal(exceptionSeverityForValue('Container 5 & In China', hrTab), 'attention'); // superset
+});
+
+test('exceptionSeverityForValue: normal values + common areas are NOT exceptions', () => {
+  assert.equal(exceptionSeverityForValue('Installed', hrTab), null);
+  assert.equal(exceptionSeverityForValue('22', containersTab), null); // arrived container
+  assert.equal(exceptionSeverityForValue('In-Room', lrTab), null);
+  assert.equal(exceptionSeverityForValue('Not in Room', lrTab), null); // not in §9.1 attention list
+  assert.equal(exceptionSeverityForValue('', containersTab), null); // blank is unrecorded, not an exception
+  assert.equal(exceptionSeverityForValue('N/A', containersTab), null);
+  assert.equal(exceptionSeverityForValue('Damaged', corridorsTab), null); // common-area tab → no exceptions
+});
+
+test('exceptionReason: canonical labels', () => {
+  assert.equal(exceptionReason('not found'), 'Not Found');
+  assert.equal(exceptionReason('UNKNOWN LOCATION'), 'Unknown Location');
+  assert.equal(exceptionReason('Container 5 & In China'), 'Partial — rest in China');
 });

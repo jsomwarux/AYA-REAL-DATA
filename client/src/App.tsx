@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TabPasswordGate } from "@/components/TabPasswordGate";
 import Landing from "@/pages/Landing";
 import Overview from "@/pages/Overview";
+import ExceptionsPanel from "@/pages/ExceptionsPanel";
 import ConstructionProgress from "@/pages/ConstructionProgress";
 import Budget from "@/pages/Budget";
 import Timeline from "@/pages/Timeline";
@@ -37,6 +38,13 @@ function Router() {
         <Route path="/overview">
           <TabPasswordGate tab="construction" title="Dashboard Access" requireAny>
             <Overview />
+          </TabPasswordGate>
+        </Route>
+
+        {/* Exceptions Panel - lead view across all 4 room tabs */}
+        <Route path="/exceptions">
+          <TabPasswordGate tab="construction" title="Exceptions">
+            <ExceptionsPanel />
           </TabPasswordGate>
         </Route>
 

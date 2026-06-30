@@ -15,6 +15,7 @@ import {
   BedDouble,
   FileText,
   Link2,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,14 @@ const mainNavItems: NavItem[] = [
     iconColor: "text-teal-400",
     description: "Dashboard overview",
     requiredAuth: "anyAuthenticated",
+  },
+  {
+    title: "Exceptions",
+    href: "/exceptions",
+    icon: <ShieldAlert className="h-5 w-5" />,
+    iconColor: "text-red-400",
+    description: "Lost & flagged items across all room tabs",
+    requiredAuth: "construction",
   },
   {
     title: "Construction Progress",

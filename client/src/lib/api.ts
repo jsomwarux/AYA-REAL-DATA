@@ -46,6 +46,39 @@ export async function checkHealth() {
   return handleResponse(response);
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard Expansion — Exceptions Panel (§9 item 1)
+// ---------------------------------------------------------------------------
+
+export type ExceptionSeverity = 'loud' | 'attention';
+
+export interface ExceptionItem {
+  severity: ExceptionSeverity;
+  tab: string;          // sheet name, e.g. "LR-Installation Progress"
+  tower: 'HR' | 'LR';
+  roomNo: string;
+  line: string;
+  type: string;
+  package: string;
+  part: string;         // part header
+  rawValue: string;
+  reason: string;       // canonical label, e.g. "Not Found"
+}
+
+export interface ExceptionsResponse {
+  generatedAt: string;
+  counts: { loud: number; attention: number; total: number };
+  items: ExceptionItem[];
+  tabsScanned: string[];
+  missingTabs: string[];
+}
+
+// Fetch the cross-tab exceptions feed (all 4 room tabs)
+export async function fetchExpansionExceptions(): Promise<ExceptionsResponse> {
+  const response = await fetch('/api/expansion/exceptions');
+  return handleResponse<ExceptionsResponse>(response);
+}
+
 // Construction Progress Types
 // Field names match exactly what's in Row 3 of the Google Sheet
 export interface RoomProgress {
