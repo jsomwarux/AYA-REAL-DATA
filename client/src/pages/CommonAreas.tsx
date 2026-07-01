@@ -24,7 +24,9 @@ const STATUS: Record<StatusState, { cell: string; dot: string; label: string }> 
   "in-progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
   blocker: { cell: "bg-red-500/80 ring-1 ring-red-300/60", dot: "bg-red-500", label: "Blocker" },
   "in-motion": { cell: "bg-amber-500/70", dot: "bg-amber-500", label: "Ordered" },
-  "not-started": { cell: "bg-slate-500/30", dot: "bg-slate-400", label: "Not started" },
+  // "Present but uncolored": a delineated cell (border) with a faint neutral fill —
+  // so an all-not-started floor (e.g. 11TH) reads as a real full row, never an empty band.
+  "not-started": { cell: "border border-white/25 bg-white/[0.06]", dot: "border border-white/30 bg-white/10", label: "Not started" },
   other: { cell: "bg-fuchsia-500/40", dot: "bg-fuchsia-500", label: "Other" },
 };
 const LEGEND_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
