@@ -15,6 +15,8 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { dedupeProblemParts, type ProblemObservation, type ProblemPart } from "@shared/lib/problems";
+import { exceptionReason } from "@shared/lib/buckets";
 import { AlertCircle, ChevronRight, Loader2, Building2, Layers, DoorClosed, PackageOpen } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -73,23 +75,26 @@ function roomMismatchCount(room: RollupRoom): number {
 
 // --- Loud problem bucket (§7.3, Gil's #1): Not Found / Damaged (received) +
 //     Damaged / UNKNOWN LOCATION / Missing Parts (installed). We read the engine's
-//     bucket === "problem" directly — never re-derive. ---
-type LoudItem = { pkg: string; part: string; raw: string; side: "received" | "installed" };
+//     bucket === "problem" directly (never re-derive) and dedupe to DISTINCT parts
+//     via the shared helper so a part loud on both sides counts ONCE (same helper
+//     the Exceptions view uses, so per-room counts reconcile). ---
 
-function loudItems(room: RollupRoom): LoudItem[] {
-  const out: LoudItem[] = [];
+/** Distinct problematic parts in a room (received-side status wins; a part loud on
+ *  both sides is one entry — a part not received can't be installed). */
+function roomProblems(room: RollupRoom): ProblemPart[] {
+  const obs: ProblemObservation[] = [];
   for (const pkg of room.packages) {
     for (const p of pkg.received?.parts ?? []) {
-      if (p.bucket === "problem") out.push({ pkg: pkg.name, part: p.header, raw: p.rawValue, side: "received" });
+      if (p.bucket === "problem") obs.push({ package: pkg.name, part: p.header, side: "received", status: exceptionReason(p.rawValue) });
     }
     for (const p of pkg.installed?.parts ?? []) {
-      if (p.bucket === "problem") out.push({ pkg: pkg.name, part: p.header, raw: p.rawValue, side: "installed" });
+      if (p.bucket === "problem") obs.push({ package: pkg.name, part: p.header, side: "installed", status: exceptionReason(p.rawValue) });
     }
   }
-  return out;
+  return dedupeProblemParts(obs);
 }
 
-/** Short, explicit label for the loud value ("Not Found" → "not found"). */
+/** Short, action-oriented label for a loud value ("Not Found" → "not found"). */
 function shortReason(raw: string): string {
   const n = normVal(raw);
   if (n === "not found") return "not found";
@@ -99,13 +104,19 @@ function shortReason(raw: string): string {
   return "problem";
 }
 
-/** Count + label of loud parts on one package side, for the per-package chip. */
-function loudOnSide(side: RollupPackageSide | null): { count: number; label: string } {
-  if (!side) return { count: 0, label: "" };
-  const loud = side.parts.filter((p) => p.bucket === "problem");
+/** Loud parts on one side, excluding parts already loud on the received side (pass
+ *  their headers) so the installed badge doesn't mirror received "Not Found". */
+function sideLoud(parts: RollupPart[] | undefined, exclude?: Set<string>): { count: number; label: string } {
+  if (!parts) return { count: 0, label: "" };
+  const loud = parts.filter((p) => p.bucket === "problem" && !exclude?.has(p.header));
   if (loud.length === 0) return { count: 0, label: "" };
   const reasons = new Set(loud.map((p) => shortReason(p.rawValue)));
   return { count: loud.length, label: reasons.size === 1 ? [...reasons][0] : "problem" };
+}
+
+/** Headers of parts that are loud on the received side (to exclude from installed). */
+function receivedLoudHeaders(pkg: RollupPackage): Set<string> {
+  return new Set((pkg.received?.parts ?? []).filter((p) => p.bucket === "problem").map((p) => p.header));
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +297,7 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
   const open = t.openRooms.has(key);
   const mismatches = roomMismatchCount(room);
   const inRoom = inRoomItems(room, tower.tower);
-  const loud = loudItems(room);
+  const loud = roomProblems(room);
 
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02]">
@@ -339,26 +350,40 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
   );
 }
 
-function ProblemSection({ items }: { items: LoudItem[] }) {
+function ProblemSection({ items }: { items: ProblemPart[] }) {
   if (items.length === 0) return null;
   return (
     <div className="rounded-md border border-red-500/40 bg-red-500/[0.08] p-2.5">
       <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-300">
         <AlertCircle className="h-3.5 w-3.5" />
-        Problem — Not Found / Damaged
+        Missing parts — locate or order
         <span className="text-red-300/70">({items.length})</span>
       </div>
       <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        {items.map((it, i) => (
-          <li key={i} className="flex items-center gap-1.5 text-xs">
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
-            <span className="text-muted-foreground">{it.pkg}</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="min-w-0 truncate text-white/90">{it.part}</span>
-            <span className="flex-shrink-0 rounded border border-red-500/40 bg-red-500/10 px-1 text-[10px] font-medium text-red-200">{it.raw}</span>
-            <span className="ml-auto flex-shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{it.side}</span>
-          </li>
-        ))}
+        {items.map((it, i) => {
+          // Only tag when it changes the ACTION: Damaged (replace) / other statuses.
+          // Plain "Not Found" needs no tag — the section title already says missing.
+          const isNotFound = it.status.toLowerCase() === "not found";
+          const damaged = it.status.toLowerCase() === "damaged";
+          return (
+            <li key={i} className="flex items-center gap-1.5 text-xs">
+              <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", damaged ? "bg-orange-400" : "bg-red-500")} />
+              <span className="text-muted-foreground">{it.package}</span>
+              <span className="text-muted-foreground/40">·</span>
+              <span className="min-w-0 truncate text-white/90">{it.part}</span>
+              {!isNotFound && (
+                <span
+                  className={cn(
+                    "ml-auto flex-shrink-0 rounded border px-1 text-[10px] font-medium",
+                    damaged ? "border-orange-500/40 bg-orange-500/10 text-orange-200" : "border-red-500/40 bg-red-500/10 text-red-200",
+                  )}
+                >
+                  {it.status}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -409,8 +434,8 @@ function PackageRow({
           <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", open && "rotate-90")} />
           <span className="text-sm font-medium text-white">{pkg.name}</span>
         </span>
-        <PctCell label="Received" side={pkg.received} />
-        <PctCell label="Installed" side={pkg.installed} />
+        <PctCell label="Received" side={pkg.received} loud={sideLoud(pkg.received?.parts)} />
+        <PctCell label="Installed" side={pkg.installed} loud={sideLoud(pkg.installed?.parts, receivedLoudHeaders(pkg))} />
       </button>
       {open && (
         <div className="grid grid-cols-1 gap-4 border-t border-white/10 p-3 sm:grid-cols-2">
@@ -422,11 +447,10 @@ function PackageRow({
   );
 }
 
-function PctCell({ label, side }: { label: string; side: RollupPackageSide | null }) {
+function PctCell({ label, side, loud }: { label: string; side: RollupPackageSide | null; loud: { count: number; label: string } }) {
   if (!side) {
     return <div className="text-xs text-muted-foreground">{label}: <span className="text-muted-foreground/60">—</span></div>;
   }
-  const loud = loudOnSide(side);
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap items-baseline gap-1.5">
