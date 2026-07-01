@@ -154,6 +154,16 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
+// Left-nav sections: labels + display order only. Item definitions live in
+// mainNavItems above (unchanged). The four tabs added in this engagement are grouped
+// under "Tracking Detail" directly after Construction Progress; every pre-existing
+// item keeps its relative order (Overview→Construction on top, Budget→… below).
+const NAV_SECTIONS: { label: string; hrefs: string[] }[] = [
+  { label: "Main", hrefs: ["/overview", "/construction"] },
+  { label: "Tracking Detail", hrefs: ["/exceptions", "/rollup", "/containers", "/common-areas"] },
+  { label: "Management", hrefs: ["/budget", "/timeline", "/weekly-goals", "/container-schedule", "/room-specs", "/vendor-invoices"] },
+];
+
 const bottomNavItems: NavItem[] = [];
 
 interface SidebarProviderProps {
@@ -277,10 +287,7 @@ export function Sidebar() {
   });
 
   const tabAuth = tabAuthQuery.data;
-  const visibleNavItems = mainNavItems.filter(item => {
-    if (!item.requiredAuth) return true;
-    return tabAuth?.[item.requiredAuth] ?? false;
-  });
+  const isVisible = (item: NavItem) => !item.requiredAuth || (tabAuth?.[item.requiredAuth] ?? false);
 
   return (
     <TooltipProvider>
@@ -304,17 +311,28 @@ export function Sidebar() {
           </Link>
         </div>
 
-        {/* Main Navigation */}
+        {/* Main Navigation — grouped into labeled sections */}
         <nav className="flex flex-col gap-1 p-3">
-          <div className={cn(
-            "mb-2 text-[10px] uppercase tracking-wider text-muted-foreground",
-            isCollapsed ? "text-center" : "px-3"
-          )}>
-            {isCollapsed ? "•" : "Main"}
-          </div>
-          {visibleNavItems.map((item) => (
-            <NavLink key={item.href} item={item} isCollapsed={isCollapsed} />
-          ))}
+          {NAV_SECTIONS.map((section, si) => {
+            const items = section.hrefs
+              .map((h) => mainNavItems.find((i) => i.href === h))
+              .filter((i): i is NavItem => !!i && isVisible(i));
+            if (items.length === 0) return null;
+            return (
+              <div key={section.label} className={si > 0 ? "mt-4" : ""}>
+                {isCollapsed ? (
+                  si > 0 ? <div className="mx-auto mb-2 h-px w-6 bg-white/10" /> : null
+                ) : (
+                  <div className="mb-2 px-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {section.label}
+                  </div>
+                )}
+                {items.map((item) => (
+                  <NavLink key={item.href} item={item} isCollapsed={isCollapsed} />
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Bottom Section */}

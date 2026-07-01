@@ -38,6 +38,14 @@ const mobileNavItems: MobileNavItem[] = [
   { title: "Vendor Invoices", href: "/vendor-invoices", icon: <FileText className="h-5 w-5" />, iconColor: "text-yellow-400", managementOnly: true, requiredAuth: "management" },
 ];
 
+// Same labeled sections as the desktop sidebar (display order/grouping only). Hrefs
+// the mobile menu doesn't list are simply skipped, so this mirrors the desktop nav.
+const MOBILE_NAV_SECTIONS: { label: string; hrefs: string[] }[] = [
+  { label: "Main", hrefs: ["/overview", "/construction"] },
+  { label: "Tracking Detail", hrefs: ["/exceptions", "/rollup", "/containers", "/common-areas"] },
+  { label: "Management", hrefs: ["/budget", "/timeline", "/weekly-goals", "/container-schedule", "/room-specs", "/vendor-invoices"] },
+];
+
 function Header({ title, subtitle, onRefresh, isLoading }: Omit<DashboardLayoutProps, 'children'>) {
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -164,10 +172,7 @@ function MobileSidebar({ onClose }: { onClose: () => void }) {
   });
 
   const tabAuth = tabAuthQuery.data;
-  const visibleItems = mobileNavItems.filter(item => {
-    if (!item.requiredAuth) return true;
-    return tabAuth?.[item.requiredAuth] ?? false;
-  });
+  const isVisible = (item: MobileNavItem) => !item.requiredAuth || (tabAuth?.[item.requiredAuth] ?? false);
 
   return (
     <div className="flex h-full flex-col">
@@ -181,35 +186,45 @@ function MobileSidebar({ onClose }: { onClose: () => void }) {
         </Button>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — grouped into labeled sections (mirrors desktop) */}
       <nav className="flex flex-col gap-1 p-3 flex-1">
-        <div className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground px-3">
-          Main
-        </div>
-        {visibleItems.map((item) => {
-          const isActive = location === item.href;
+        {MOBILE_NAV_SECTIONS.map((section, si) => {
+          const items = section.hrefs
+            .map((h) => mobileNavItems.find((i) => i.href === h))
+            .filter((i): i is MobileNavItem => !!i && isVisible(i));
+          if (items.length === 0) return null;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
-                isActive
-                  ? "bg-white/10 text-white"
-                  : "text-muted-foreground hover:bg-white/5 hover:text-white"
-              )}
-            >
-              <span className={cn(isActive ? item.iconColor : "text-current", "transition-colors")}>
-                {item.icon}
-              </span>
-              <span className="flex-1">{item.title}</span>
-              {item.managementOnly && (
-                <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                  <Lock className="h-2.5 w-2.5" />
-                </span>
-              )}
-            </Link>
+            <div key={section.label} className={si > 0 ? "mt-3" : ""}>
+              <div className="mb-2 px-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                {section.label}
+              </div>
+              {items.map((item) => {
+                const isActive = location === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-white/10 text-white"
+                        : "text-muted-foreground hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    <span className={cn(isActive ? item.iconColor : "text-current", "transition-colors")}>
+                      {item.icon}
+                    </span>
+                    <span className="flex-1">{item.title}</span>
+                    {item.managementOnly && (
+                      <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                        <Lock className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
