@@ -17,35 +17,34 @@ import { norm } from './normalize';
  * Non-container values ("In China", "Installed", "Not Found", blank, …) parse to
  * { numbers: [], partial: false } — no numbers, so callers treat them as 0.
  *
- * `partial` is true only when at least one container number IS present AND there is
- * also a non-numeric remainder (e.g. "In China") — i.e. a genuine partial arrival.
+ * `partial` is true only when a container number IS present AND the cell explicitly
+ * says "In China" — i.e. this container landed, the rest is still upstream (§6.1). A
+ * plain multi-container split ("16 & 25") or a typo'd label is NOT partial.
  */
 export function parseContainerRef(raw: string | null | undefined): ContainerRef {
   const s = (raw ?? '').trim();
   if (s === '') return { numbers: [], partial: false };
 
-  // Strip an optional leading "Container" / "Containers" label.
-  const body = s.replace(/^\s*containers?\s*/i, '');
+  // Strip a leading "Container"/"Containers" label, tolerating the "Contanier"
+  // misspelling seen in the sheet: any leading word starting "cont…".
+  const body = s.replace(/^\s*cont[a-z]*\s*/i, '');
 
-  // Split on "&" or the standalone word "and" (case-insensitive), either separator.
+  // Split on "&", the standalone word "and", or a comma — all seen as separators
+  // ("Container 7, 11 & 23"). Case-insensitive.
   const tokens = body
-    .split(/\s*(?:&|\band\b)\s*/i)
+    .split(/\s*(?:&|\band\b|,)\s*/i)
     .map((t) => t.trim())
     .filter((t) => t !== '');
 
   const numbers: number[] = [];
-  let hasNonNumeric = false;
-
   for (const tok of tokens) {
     const m = tok.match(/^#?\s*(\d{1,3})$/); // a bare/“#” container number, 1–3 digits
-    if (m) {
-      numbers.push(parseInt(m[1], 10));
-    } else {
-      hasNonNumeric = true;
-    }
+    if (m) numbers.push(parseInt(m[1], 10));
   }
 
-  return { numbers, partial: numbers.length > 0 && hasNonNumeric };
+  // Partial = a container number plus an explicit "In China" remainder. A plain
+  // split or a typo'd non-numeric token does NOT make it partial.
+  return { numbers, partial: numbers.length > 0 && /china/i.test(s) };
 }
 
 /** Whether every referenced container number has arrived, per ARRIVED_CONTAINERS. */

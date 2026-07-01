@@ -35,6 +35,12 @@ test('parseContainerRef: single / & / and / partial / bare / non-container', () 
   assert.deepEqual(parseContainerRef('22'), { numbers: [22], partial: false });
   assert.deepEqual(parseContainerRef('In China'), { numbers: [], partial: false });
   assert.deepEqual(parseContainerRef('Installed'), { numbers: [], partial: false });
+  // A plain multi-container split is NOT partial (only "& In China" is).
+  assert.deepEqual(parseContainerRef('Container 16 & 25'), { numbers: [16, 25], partial: false });
+  // Comma separators, and the "Contanier" typo seen in the sheet, still parse; not partial.
+  assert.deepEqual(parseContainerRef('Container 7, 11 & 23'), { numbers: [7, 11, 23], partial: false });
+  assert.deepEqual(parseContainerRef('Contanier 16 & 25'), { numbers: [16, 25], partial: false });
+  assert.deepEqual(parseContainerRef('Container 7 & 25 & In China'), { numbers: [7, 25], partial: true });
   // never throws on junk
   assert.deepEqual(parseContainerRef(null), { numbers: [], partial: false });
   assert.deepEqual(parseContainerRef(''), { numbers: [], partial: false });

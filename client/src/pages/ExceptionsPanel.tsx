@@ -1,53 +1,90 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { fetchExpansionExceptions, type ExceptionItem, type ExceptionSeverity } from "@/lib/api";
+import { fetchExpansionExceptions, type ExceptionItem } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AlertCircle, AlertTriangle, CheckCircle2, ShieldAlert, Loader2, MapPin } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Loader2, ChevronRight, PackageSearch, Boxes } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Display helpers
+// Tiers — grouped by the plain-language REASON, not "loud/attention" jargon.
+// Damaged is split from Not Found (different action: replace vs re-order).
+// Reasons must match the endpoint's exceptionReason() output exactly.
 // ---------------------------------------------------------------------------
 
-type TabFilter = "all" | string;
-type TowerFilter = "all" | "HR" | "LR";
+type Tone = "red" | "orange" | "amber";
 
-const SEVERITY_META: Record<
-  ExceptionSeverity,
-  { label: string; icon: typeof ShieldAlert; ring: string; chip: string; dot: string; header: string }
-> = {
-  loud: {
-    label: "Loud — Lost / Damaged",
-    icon: ShieldAlert,
-    ring: "border-red-500/40 bg-red-500/10",
-    chip: "bg-red-500/15 text-red-300 border-red-500/30",
-    dot: "bg-red-500",
-    header: "text-red-300",
+interface TierDef {
+  key: string;
+  label: string;
+  caption: string; // one-line plain-English "what to do"
+  tone: Tone;
+  reasons: string[];
+}
+
+const TIER_DEFS: TierDef[] = [
+  {
+    key: "not-found",
+    label: "Not Found",
+    caption: 'Marked "Not Found" in the sheet. Locate these parts, or re-order them.',
+    tone: "red",
+    reasons: ["Not Found"],
   },
-  attention: {
-    label: "Attention",
-    icon: AlertTriangle,
-    ring: "border-amber-500/40 bg-amber-500/10",
-    chip: "bg-amber-500/15 text-amber-200 border-amber-500/30",
-    dot: "bg-amber-400",
-    header: "text-amber-200",
+  {
+    key: "damaged",
+    label: "Damaged",
+    caption: 'Marked "Damaged". Replace these or claim warranty — a different job from Not Found.',
+    tone: "orange",
+    reasons: ["Damaged"],
   },
+  {
+    key: "missing-parts",
+    label: "Missing Parts",
+    caption: 'Marked "Missing Parts". Check which pieces are missing.',
+    tone: "red",
+    reasons: ["Missing Parts"],
+  },
+  {
+    key: "unknown-location",
+    label: "Unknown Location",
+    caption: "Location unknown. Track these down.",
+    tone: "red",
+    reasons: ["Unknown Location"],
+  },
+  {
+    key: "partial-china",
+    label: "Partial — rest in China",
+    caption: "One container arrived. The rest is still in China — expect a follow-up shipment.",
+    tone: "amber",
+    reasons: ["Partial — rest in China"],
+  },
+  {
+    key: "needs-confirming",
+    label: "Needs confirming",
+    caption: "The sheet asks to confirm these on site. Check the item or its location.",
+    tone: "amber",
+    reasons: ["Confirm Item", "On-Site / Missing Other"],
+  },
+];
+
+const TONE: Record<Tone, { border: string; bg: string; text: string; chip: string; dot: string }> = {
+  red: { border: "border-red-500/40", bg: "bg-red-500/10", text: "text-red-300", chip: "border-red-500/30 bg-red-500/15 text-red-200", dot: "bg-red-500" },
+  orange: { border: "border-orange-500/40", bg: "bg-orange-500/10", text: "text-orange-300", chip: "border-orange-500/30 bg-orange-500/15 text-orange-200", dot: "bg-orange-500" },
+  amber: { border: "border-amber-500/40", bg: "bg-amber-500/10", text: "text-amber-200", chip: "border-amber-500/30 bg-amber-500/15 text-amber-200", dot: "bg-amber-400" },
 };
 
-const SEVERITY_ORDER: ExceptionSeverity[] = ["loud", "attention"];
+/** Plain-language status label for a part row (drops write-implying "Confirm Item"). */
+function statusLabel(reason: string): string {
+  if (reason === "Confirm Item") return "Needs confirming";
+  if (reason === "On-Site / Missing Other") return "On-site / missing";
+  return reason;
+}
 
-/** Shorten the full sheet name for chips/filters. */
 function shortTab(sheetName: string): string {
-  return sheetName
-    .replace(/Distribution/i, "")
-    .replace(/Progress/i, "")
-    .replace(/-/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return sheetName.replace(/Distribution/i, "").replace(/Progress/i, "").replace(/-/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function towerChipClass(tower: string): string {
@@ -57,50 +94,60 @@ function towerChipClass(tower: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Grouping: severity → tab → room → items
+// Grouping: tier → tab → PART TYPE (sorted by room count desc) → rooms
 // ---------------------------------------------------------------------------
 
-interface RoomGroup {
-  roomNo: string;
-  line: string;
-  type: string;
-  tower: string;
-  items: ExceptionItem[];
+interface PartGroup {
+  package: string;
+  part: string;
+  status: string; // status label(s) for this part
+  rooms: { roomNo: string; tower: string; line: string; type: string }[];
 }
-interface TabGroup {
+interface TabPartGroup {
   tab: string;
-  count: number;
-  rooms: RoomGroup[];
+  count: number; // total rooms (items) in this tab within the tier
+  parts: PartGroup[];
 }
-interface SeverityGroup {
-  severity: ExceptionSeverity;
-  count: number;
-  tabs: TabGroup[];
+interface Tier extends TierDef {
+  tabs: TabPartGroup[];
+  totalItems: number;
+  distinctParts: number;
 }
 
-function groupExceptions(items: ExceptionItem[], tabOrder: string[]): SeverityGroup[] {
-  return SEVERITY_ORDER.map((severity) => {
-    const sevItems = items.filter((i) => i.severity === severity);
+function buildTiers(items: ExceptionItem[], tabOrder: string[]): Tier[] {
+  return TIER_DEFS.map((def) => {
+    const tierItems = items.filter((i) => def.reasons.includes(i.reason));
 
-    // Group by tab, preserving the scanned tab order.
-    const tabs: TabGroup[] = tabOrder
+    const tabs: TabPartGroup[] = tabOrder
       .map((tab) => {
-        const tabItems = sevItems.filter((i) => i.tab === tab);
-        const roomMap = new Map<string, RoomGroup>();
-        for (const item of tabItems) {
-          let room = roomMap.get(item.roomNo);
-          if (!room) {
-            room = { roomNo: item.roomNo, line: item.line, type: item.type, tower: item.tower, items: [] };
-            roomMap.set(item.roomNo, room);
+        const ti = tierItems.filter((i) => i.tab === tab);
+        const partMap = new Map<string, PartGroup & { statuses: Set<string> }>();
+        for (const it of ti) {
+          const k = `${it.package}||${it.part}`;
+          let pg = partMap.get(k);
+          if (!pg) {
+            pg = { package: it.package, part: it.part, status: "", statuses: new Set(), rooms: [] };
+            partMap.set(k, pg);
           }
-          room.items.push(item);
+          pg.statuses.add(statusLabel(it.reason));
+          pg.rooms.push({ roomNo: it.roomNo, tower: it.tower, line: it.line, type: it.type });
         }
-        return { tab, count: tabItems.length, rooms: [...roomMap.values()] };
+        const parts: PartGroup[] = [...partMap.values()]
+          .map((pg) => ({
+            package: pg.package,
+            part: pg.part,
+            status: [...pg.statuses].join(" / "),
+            rooms: pg.rooms.slice().sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true })),
+          }))
+          .sort((a, b) => b.rooms.length - a.rooms.length); // biggest procurement gaps first
+        return { tab, count: ti.length, parts };
       })
       .filter((t) => t.count > 0);
 
-    return { severity, count: sevItems.length, tabs };
-  }).filter((g) => g.count > 0);
+    const totalItems = tierItems.length;
+    const distinctParts = tabs.reduce((n, t) => n + t.parts.length, 0);
+    return { ...def, tabs, totalItems, distinctParts };
+  }).filter((tier) => tier.totalItems > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,56 +164,46 @@ export default function ExceptionsPanel() {
     staleTime: 1000 * 60 * 2,
   });
 
-  const [tabFilter, setTabFilter] = useState<TabFilter>("all");
-  const [towerFilter, setTowerFilter] = useState<TowerFilter>("all");
+  const [tabFilter, setTabFilter] = useState<"all" | string>("all");
+  const [towerFilter, setTowerFilter] = useState<"all" | "HR" | "LR">("all");
 
   const handleRefresh = async () => {
     try {
       await refetch();
-      toastSuccess("Refreshed", "Exceptions re-scanned across all room tabs.");
+      toastSuccess("Refreshed", "Re-scanned all room tabs for problem parts.");
     } catch {
-      toastError("Refresh Failed", "Could not refresh exceptions. Please try again.");
+      toastError("Refresh Failed", "Could not refresh. Please try again.");
     }
   };
 
   const allItems = data?.items ?? [];
   const tabsScanned = data?.tabsScanned ?? [];
 
-  // Tab filter options are constrained by the active tower filter.
   const tabOptions = useMemo(
-    () =>
-      tabsScanned.filter((t) => {
-        if (towerFilter === "all") return true;
-        return allItems.some((i) => i.tab === t && i.tower === towerFilter);
-      }),
+    () => tabsScanned.filter((t) => towerFilter === "all" || allItems.some((i) => i.tab === t && i.tower === towerFilter)),
     [tabsScanned, towerFilter, allItems],
   );
 
   const filtered = useMemo(
-    () =>
-      allItems.filter(
-        (i) =>
-          (towerFilter === "all" || i.tower === towerFilter) &&
-          (tabFilter === "all" || i.tab === tabFilter),
-      ),
+    () => allItems.filter((i) => (towerFilter === "all" || i.tower === towerFilter) && (tabFilter === "all" || i.tab === tabFilter)),
     [allItems, towerFilter, tabFilter],
   );
 
-  const loudCount = filtered.filter((i) => i.severity === "loud").length;
-  const attentionCount = filtered.filter((i) => i.severity === "attention").length;
+  const tiers = useMemo(() => buildTiers(filtered, tabsScanned), [filtered, tabsScanned]);
 
-  const grouped = useMemo(() => groupExceptions(filtered, tabsScanned), [filtered, tabsScanned]);
+  const notFoundCount = filtered.filter((i) => i.reason === "Not Found").length;
+  const attentionCount = filtered.filter((i) => i.severity === "attention").length;
+  const partTypes = useMemo(() => new Set(filtered.map((i) => `${i.tab}||${i.package}||${i.part}`)).size, [filtered]);
 
   const lastUpdated = data?.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : null;
 
   return (
     <DashboardLayout
       title="Exceptions"
-      subtitle={lastUpdated ? `Lost & flagged items · synced ${lastUpdated}` : "Lost & flagged items across all room tabs"}
+      subtitle={lastUpdated ? `Problem parts across all room tabs · synced ${lastUpdated}` : "Problem parts across all room tabs"}
       onRefresh={handleRefresh}
       isLoading={isLoading}
     >
-      {/* Error */}
       {error && (
         <Card className="mb-6 border-red-500/30 bg-red-500/10">
           <CardContent className="flex items-center gap-3 p-4">
@@ -179,7 +216,6 @@ export default function ExceptionsPanel() {
         </Card>
       )}
 
-      {/* Loading */}
       {isLoading && !data && (
         <div className="flex items-center justify-center gap-3 py-24 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
@@ -189,29 +225,18 @@ export default function ExceptionsPanel() {
 
       {data && (
         <>
-          {/* Severity count badges (live with filters) */}
+          {/* Count cards */}
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <SeverityCountCard severity="loud" count={loudCount} />
-            <SeverityCountCard severity="attention" count={attentionCount} />
-            <Card className="border-white/10 bg-white/5">
-              <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Total shown</p>
-                  <p className="text-2xl font-bold text-white">{filtered.length}</p>
-                </div>
-                <ShieldAlert className="h-7 w-7 text-muted-foreground/50" />
-              </CardContent>
-            </Card>
+            <CountCard label="Not Found" value={notFoundCount} tone="red" icon={PackageSearch} />
+            <CountCard label="Needs attention" value={attentionCount} tone="amber" icon={AlertTriangle} />
+            <CountCard label="Part types affected" value={partTypes} tone="slate" icon={Boxes} />
           </div>
 
-          {/* Missing-tab warning */}
           {data.missingTabs.length > 0 && (
             <Card className="mb-5 border-amber-500/30 bg-amber-500/10">
               <CardContent className="flex items-center gap-3 p-3 text-sm">
                 <AlertTriangle className="h-4 w-4 text-amber-300" />
-                <span className="text-amber-100">
-                  Could not read: {data.missingTabs.join(", ")}. Those tabs are excluded from this view.
-                </span>
+                <span className="text-amber-100">Could not read: {data.missingTabs.join(", ")}. Those tabs are excluded.</span>
               </CardContent>
             </Card>
           )}
@@ -219,52 +244,27 @@ export default function ExceptionsPanel() {
           {/* Filters */}
           <div className="mb-6 space-y-3">
             <FilterRow label="Tower">
-              <FilterButton active={towerFilter === "all"} onClick={() => setTowerFilter("all")}>
-                All
-              </FilterButton>
+              <FilterButton active={towerFilter === "all"} onClick={() => setTowerFilter("all")}>All</FilterButton>
               {(["HR", "LR"] as const).map((t) => (
-                <FilterButton
-                  key={t}
-                  active={towerFilter === t}
-                  onClick={() => {
-                    setTowerFilter(t);
-                    setTabFilter("all");
-                  }}
-                >
-                  {t}
-                </FilterButton>
+                <FilterButton key={t} active={towerFilter === t} onClick={() => { setTowerFilter(t); setTabFilter("all"); }}>{t}</FilterButton>
               ))}
             </FilterRow>
-
             <FilterRow label="Tab">
-              <FilterButton active={tabFilter === "all"} onClick={() => setTabFilter("all")}>
-                All
-              </FilterButton>
+              <FilterButton active={tabFilter === "all"} onClick={() => setTabFilter("all")}>All</FilterButton>
               {tabOptions.map((t) => (
-                <FilterButton key={t} active={tabFilter === t} onClick={() => setTabFilter(t)}>
-                  {shortTab(t)}
-                </FilterButton>
+                <FilterButton key={t} active={tabFilter === t} onClick={() => setTabFilter(t)}>{shortTab(t)}</FilterButton>
               ))}
             </FilterRow>
           </div>
 
-          {/* Empty states */}
           {data.counts.total === 0 ? (
-            <EmptyState
-              icon={<CheckCircle2 className="h-10 w-10 text-emerald-400" />}
-              title="All clear"
-              body="No Damaged, Not Found, Unknown Location, Missing Parts, or partial-arrival items across any room tab."
-            />
+            <EmptyState icon={<CheckCircle2 className="h-10 w-10 text-emerald-400" />} title="All clear" body="No Not Found, Damaged, Missing Parts, Unknown Location, or partial-arrival items on any room tab." />
           ) : filtered.length === 0 ? (
-            <EmptyState
-              icon={<AlertCircle className="h-10 w-10 text-muted-foreground" />}
-              title="No exceptions match your filters"
-              body="Try widening the tower or tab filter."
-            />
+            <EmptyState icon={<AlertCircle className="h-10 w-10 text-muted-foreground" />} title="Nothing matches your filters" body="Try widening the tower or tab filter." />
           ) : (
-            <div className="space-y-8">
-              {grouped.map((sevGroup) => (
-                <SeveritySection key={sevGroup.severity} group={sevGroup} />
+            <div className="space-y-6">
+              {tiers.map((tier) => (
+                <TierSection key={tier.key} tier={tier} />
               ))}
             </div>
           )}
@@ -278,17 +278,16 @@ export default function ExceptionsPanel() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SeverityCountCard({ severity, count }: { severity: ExceptionSeverity; count: number }) {
-  const meta = SEVERITY_META[severity];
-  const Icon = meta.icon;
+function CountCard({ label, value, tone, icon: Icon }: { label: string; value: number; tone: Tone | "slate"; icon: typeof PackageSearch }) {
+  const cls = tone === "slate" ? { border: "border-white/10", bg: "bg-white/5", text: "text-muted-foreground" } : TONE[tone];
   return (
-    <Card className={cn("border", meta.ring)}>
+    <Card className={cn("border", cls.border, cls.bg)}>
       <CardContent className="flex items-center justify-between p-4">
         <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">{meta.label}</p>
-          <p className="text-2xl font-bold text-white">{count}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold text-white">{value}</p>
         </div>
-        <Icon className={cn("h-7 w-7", meta.header)} />
+        <Icon className={cn("h-7 w-7", cls.text)} />
       </CardContent>
     </Card>
   );
@@ -303,51 +302,44 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function FilterButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <Button
       variant="outline"
       size="sm"
       onClick={onClick}
-      className={cn(
-        "h-8 border-white/10 px-3 text-xs",
-        active ? "bg-white/15 text-white" : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white",
-      )}
+      className={cn("h-8 border-white/10 px-3 text-xs", active ? "bg-white/15 text-white" : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white")}
     >
       {children}
     </Button>
   );
 }
 
-function SeveritySection({ group }: { group: SeverityGroup }) {
-  const meta = SEVERITY_META[group.severity];
-  const Icon = meta.icon;
+function TierSection({ tier }: { tier: Tier }) {
+  const tone = TONE[tier.tone];
   return (
     <section>
-      <div className={cn("mb-3 flex items-center gap-2 rounded-lg border px-4 py-2.5", meta.ring)}>
-        <Icon className={cn("h-5 w-5", meta.header)} />
-        <h2 className={cn("text-sm font-semibold uppercase tracking-wide", meta.header)}>{meta.label}</h2>
-        <span className={cn("ml-auto rounded-full border px-2 py-0.5 text-xs font-semibold", meta.chip)}>
-          {group.count}
+      <div className={cn("mb-1 flex items-center gap-2 rounded-lg border px-4 py-2.5", tone.border, tone.bg)}>
+        <span className={cn("h-2.5 w-2.5 rounded-full", tone.dot)} />
+        <h2 className={cn("text-sm font-semibold uppercase tracking-wide", tone.text)}>{tier.label}</h2>
+        <span className={cn("ml-auto rounded-full border px-2 py-0.5 text-xs font-semibold", tone.chip)}>
+          {tier.totalItems} in {tier.distinctParts} part type{tier.distinctParts > 1 ? "s" : ""}
         </span>
       </div>
+      <p className="mb-3 pl-1 text-xs text-muted-foreground">{tier.caption}</p>
 
-      <div className="space-y-5 pl-1">
-        {group.tabs.map((tabGroup) => (
+      <div className="space-y-4 pl-1">
+        {tier.tabs.map((tabGroup) => (
           <div key={tabGroup.tab}>
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+            <h3 className="mb-1.5 flex items-center gap-2 text-sm font-medium text-white">
               {shortTab(tabGroup.tab)}
-              <span className="text-xs font-normal text-muted-foreground">({tabGroup.count})</span>
+              <span className="text-xs font-normal text-muted-foreground">({tabGroup.parts.length} part types · {tabGroup.count} rooms)</span>
             </h3>
-            <TabRoomGrid tabGroup={tabGroup} severity={group.severity} />
+            <div className="space-y-1">
+              {tabGroup.parts.map((pg) => (
+                <PartRow key={`${pg.package}||${pg.part}`} pg={pg} tone={tier.tone} />
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -355,66 +347,34 @@ function SeveritySection({ group }: { group: SeverityGroup }) {
   );
 }
 
-/** Cap rooms rendered per tab so a 1000+-item severity (e.g. thousands of
- *  "Not Found") doesn't dump the whole tree into the DOM. Expand on demand. */
-const ROOM_CAP = 24;
-function TabRoomGrid({ tabGroup, severity }: { tabGroup: TabGroup; severity: ExceptionSeverity }) {
-  const [showAll, setShowAll] = useState(false);
-  const rooms = showAll ? tabGroup.rooms : tabGroup.rooms.slice(0, ROOM_CAP);
-  const hidden = tabGroup.rooms.length - rooms.length;
+function PartRow({ pg, tone }: { pg: PartGroup; tone: Tone }) {
+  const [open, setOpen] = useState(false);
+  const t = TONE[tone];
   return (
-    <>
-      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-        {rooms.map((room) => (
-          <RoomCard key={`${tabGroup.tab}-${room.roomNo}`} room={room} severity={severity} />
-        ))}
-      </div>
-      {hidden > 0 && (
-        <button
-          onClick={() => setShowAll(true)}
-          className="mt-2 text-xs font-medium text-teal-300 hover:text-teal-200"
-        >
-          Show all {tabGroup.rooms.length} rooms (+{hidden} more) — or filter by tab/tower to narrow
-        </button>
-      )}
-    </>
-  );
-}
-
-function RoomCard({ room, severity }: { room: RoomGroup; severity: ExceptionSeverity }) {
-  const meta = SEVERITY_META[severity];
-  return (
-    <Card className="border-white/10 bg-white/[0.03]">
-      <CardContent className="p-3.5">
-        <div className="mb-2.5 flex items-center gap-2">
-          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="font-semibold text-white">Room {room.roomNo}</span>
-          <span className={cn("rounded border px-1.5 py-0.5 text-[10px] font-medium", towerChipClass(room.tower))}>
-            {room.tower}
-          </span>
-          {(room.line || room.type) && (
-            <span className="truncate text-xs text-muted-foreground">
-              {[room.line, room.type].filter(Boolean).join(" · ")}
+    <div className="rounded border border-white/10 bg-white/[0.02]">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-white/5">
+        <ChevronRight className={cn("h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <span className="min-w-0 flex-1">
+          <span className="text-xs text-muted-foreground">{pg.package}</span>
+          <span className="text-muted-foreground/40"> · </span>
+          <span className="text-sm font-medium text-white">{pg.part}</span>
+        </span>
+        <span className={cn("flex-shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium", t.chip)}>{pg.status}</span>
+        <span className="flex-shrink-0 text-sm font-semibold tabular-nums text-white">{pg.rooms.length}</span>
+        <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">rooms</span>
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5 border-t border-white/10 p-2.5">
+          {pg.rooms.map((r, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px]">
+              <span className={cn("rounded border px-1 text-[9px] font-medium", towerChipClass(r.tower))}>{r.tower}</span>
+              <span className="text-white/90">{r.roomNo}</span>
+              {r.type && <span className="text-muted-foreground/70">{r.type}</span>}
             </span>
-          )}
-        </div>
-        <ul className="space-y-1.5">
-          {room.items.map((item, idx) => (
-            <li key={idx} className="flex items-start gap-2 text-sm">
-              <span className={cn("mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full", meta.dot)} />
-              <span className="flex-1 min-w-0">
-                <span className="text-muted-foreground">{item.package}</span>
-                <span className="text-muted-foreground/50"> · </span>
-                <span className="text-white">{item.part}</span>
-              </span>
-              <span className={cn("flex-shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium", meta.chip)}>
-                {item.reason}
-              </span>
-            </li>
           ))}
-        </ul>
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 }
 
