@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { dedupeProblemParts, type ProblemObservation, type ProblemPart } from "@shared/lib/problems";
 import { exceptionReason } from "@shared/lib/buckets";
+import { LABELS } from "@/lib/labels";
 import { AlertCircle, ChevronRight, Loader2, Building2, Layers, DoorClosed, PackageOpen } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -191,17 +192,17 @@ export default function FloorRoomRollup() {
             </Card>
           )}
 
-          {/* Legend */}
+          {/* Legend — plain site language */}
           <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>Each package shows <span className="font-semibold text-white">recomputed %</span> (primary) and the sheet's manual % as a badge.</span>
+            <span>Each part shows <span className="font-semibold text-white">{LABELS.pctReceived}</span> and <span className="font-semibold text-white">{LABELS.pctInstalled}</span>.</span>
             <span className="inline-flex items-center gap-1">
-              <span className="rounded border border-red-500/50 bg-red-500/15 px-1 font-semibold text-red-200">n problems</span> Not Found / Damaged / missing (loud)
+              <span className="rounded border border-red-500/50 bg-red-500/15 px-1 font-semibold text-red-200">4 problems</span> {LABELS.problemsPhrase}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-amber-200">sheet 50% ≠</span> mismatch
+              <span className="text-fuchsia-300/80">no status</span> {LABELS.noStatusPhrase}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="text-fuchsia-300/80">n blank</span> unrecorded gap
+              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-amber-200">sheet says 50% — doesn't match</span> shown only when the sheet's own number disagrees
             </span>
           </div>
 
@@ -318,8 +319,11 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
             </span>
           )}
           {mismatches > 0 && (
-            <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200">
-              {mismatches} mismatch{mismatches > 1 ? "es" : ""}
+            <span
+              title="Packages where the sheet's own number is different"
+              className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200"
+            >
+              {mismatches} {mismatches === 1 ? "differs" : "differ"} from sheet
             </span>
           )}
           {inRoom.length > 0 && (
@@ -439,8 +443,8 @@ function PackageRow({
       </button>
       {open && (
         <div className="grid grid-cols-1 gap-4 border-t border-white/10 p-3 sm:grid-cols-2">
-          <PartList title="Received · Containers" side={pkg.received} />
-          <PartList title="Installed · Installation" side={pkg.installed} />
+          <PartList title="Received" side={pkg.received} />
+          <PartList title="Installed" side={pkg.installed} />
         </div>
       )}
     </div>
@@ -458,27 +462,25 @@ function PctCell({ label, side, loud }: { label: string; side: RollupPackageSide
         <span className={cn("text-sm font-semibold", pctText(side.recomputedPct))}>{side.recomputedPct}%</span>
         {loud.count > 0 && (
           <span
-            title="Loud problem parts on this side (Not Found / Damaged / UNKNOWN LOCATION / Missing Parts)"
+            title={LABELS.problemsTitle}
             className="rounded border border-red-500/50 bg-red-500/15 px-1 py-0 text-[10px] font-semibold text-red-200"
           >
             {loud.count} {loud.label}
           </span>
         )}
-        {side.manualPct !== null && (
+        {/* Quiet sheet-disagreement note — plain words, only when they actually differ */}
+        {side.mismatch && side.manualPct !== null && (
           <span
-            title={side.mismatch ? "Sheet's manual % differs from recomputed" : "Matches recomputed"}
-            className={cn(
-              "rounded border px-1 py-0 text-[10px]",
-              side.mismatch
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-                : "border-white/10 text-muted-foreground",
-            )}
+            title={LABELS.sheetDiffersTitle}
+            className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0 text-[10px] text-amber-200"
           >
-            sheet {side.manualPct}%{side.mismatch ? " ≠" : ""}
+            {LABELS.sheetDiffers(side.manualPct)}
           </span>
         )}
         {side.unrecordedCount > 0 && (
-          <span className="text-[10px] text-fuchsia-300/80">{side.unrecordedCount} blank</span>
+          <span title={LABELS.noStatusTitle} className="text-[10px] text-fuchsia-300/80">
+            {side.unrecordedCount} {LABELS.noStatusShort}
+          </span>
         )}
       </div>
       <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/10">

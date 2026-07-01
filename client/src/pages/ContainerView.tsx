@@ -22,11 +22,11 @@ import { AlertCircle, ChevronRight, Loader2, Container as ContainerIcon, Search,
 const STAGE_META: Record<string, { label: string; dot: string; ring: string; desc: string }> = {
   "in-ny-port": { label: "In NY Port", dot: "bg-emerald-500", ring: "border-emerald-500/30", desc: "Stateside, awaiting pickup" },
   "in-transit": { label: "In transit", dot: "bg-teal-500", ring: "border-teal-500/30", desc: "En route / on the water" },
-  "partial-china": { label: "Partial — & In China", dot: "bg-amber-500", ring: "border-amber-500/40", desc: "Some pieces here, rest still in China" },
+  "partial-china": { label: "Partial — rest in China", dot: "bg-amber-500", ring: "border-amber-500/40", desc: "Some here, rest still in China" },
   "in-china": { label: "In China / Remaining", dot: "bg-orange-500", ring: "border-orange-500/30", desc: "Still in China" },
-  "in-production": { label: "In Production", dot: "bg-orange-600", ring: "border-orange-600/30", desc: "Being manufactured" },
-  "production-needed": { label: "Production Needed", dot: "bg-red-500", ring: "border-red-500/40", desc: "Not yet ordered into production" },
-  unrecorded: { label: "Unrecorded (blank)", dot: "bg-fuchsia-500", ring: "border-fuchsia-500/30", desc: "No status entered — a tracking gap" },
+  "in-production": { label: "In Production", dot: "bg-orange-600", ring: "border-orange-600/30", desc: "Being made in the factory" },
+  "production-needed": { label: "Production Needed", dot: "bg-red-500", ring: "border-red-500/40", desc: "Not yet ordered to be made" },
+  unrecorded: { label: "No status entered", dot: "bg-fuchsia-500", ring: "border-fuchsia-500/30", desc: "No delivery status filled in the sheet" },
 };
 
 type Tower = "all" | "HR" | "LR";
@@ -221,9 +221,9 @@ function StageView({ stages, filters }: { stages: StageGroup[]; filters: Filters
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-fuchsia-300" />
             <p className="text-xs leading-relaxed text-fuchsia-100">
-              <span className="font-semibold">{unrecordedTotal.toLocaleString()} parts have no delivery status entered.</span>{" "}
-              They count as not-received and lower your progress numbers — this may be a data-entry gap rather than parts truly missing.
-              See the "Unrecorded (blank)" bucket below.
+              <span className="font-semibold">{unrecordedTotal.toLocaleString()} parts have no delivery status entered in the sheet.</span>{" "}
+              They count as not-received and lower your progress numbers — this may just be a missing sheet entry, not parts truly missing.
+              See the "No status entered" group below.
             </p>
           </div>
         </div>
