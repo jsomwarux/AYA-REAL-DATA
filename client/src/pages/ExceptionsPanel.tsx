@@ -7,6 +7,7 @@ import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { rollupByPart } from "@shared/lib/partRollup";
 import { AlertCircle, AlertTriangle, CheckCircle2, Loader2, ChevronRight, PackageSearch, Boxes } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -121,25 +122,15 @@ function buildTiers(items: ExceptionItem[], tabOrder: string[]): Tier[] {
     const tabs: TabPartGroup[] = tabOrder
       .map((tab) => {
         const ti = tierItems.filter((i) => i.tab === tab);
-        const partMap = new Map<string, PartGroup & { statuses: Set<string> }>();
-        for (const it of ti) {
-          const k = `${it.package}||${it.part}`;
-          let pg = partMap.get(k);
-          if (!pg) {
-            pg = { package: it.package, part: it.part, status: "", statuses: new Set(), rooms: [] };
-            partMap.set(k, pg);
-          }
-          pg.statuses.add(statusLabel(it.reason));
-          pg.rooms.push({ roomNo: it.roomNo, tower: it.tower, line: it.line, type: it.type });
-        }
-        const parts: PartGroup[] = [...partMap.values()]
-          .map((pg) => ({
-            package: pg.package,
-            part: pg.part,
-            status: [...pg.statuses].join(" / "),
-            rooms: pg.rooms.slice().sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true })),
-          }))
-          .sort((a, b) => b.rooms.length - a.rooms.length); // biggest procurement gaps first
+        // Same shared part-first rollup the Containers view uses.
+        const parts: PartGroup[] = rollupByPart(ti, (i) => i.package, (i) => i.part).map((g) => ({
+          package: g.package,
+          part: g.part,
+          status: [...new Set(g.items.map((i) => statusLabel(i.reason)))].join(" / "),
+          rooms: g.items
+            .map((i) => ({ roomNo: i.roomNo, tower: i.tower, line: i.line, type: i.type }))
+            .sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true })),
+        }));
         return { tab, count: ti.length, parts };
       })
       .filter((t) => t.count > 0);

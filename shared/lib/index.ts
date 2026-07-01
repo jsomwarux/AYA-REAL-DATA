@@ -9,5 +9,6 @@ export * from './recompute';
 export * from './discovery';
 export * from './rollup';
 export * from './problems';
+export * from './partRollup';
 export * from './containerIndex';
 export * from './outstanding';

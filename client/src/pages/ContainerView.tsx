@@ -15,6 +15,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { rollupByPart } from "@shared/lib/partRollup";
 import { AlertCircle, ChevronRight, Loader2, Container as ContainerIcon, Search, ArrowRight, ShieldAlert } from "lucide-react";
 
 // Incoming stages, ordered closest-to-here → furthest (matches engine order).
@@ -208,11 +209,25 @@ function StageView({ stages, filters }: { stages: StageGroup[]; filters: Filters
 
   const filtered = stages.map((g) => ({ ...g, shown: g.parts.filter((p) => matchPart(p, filters)) }));
   const totalShown = filtered.reduce((n, g) => n + g.shown.length, 0);
+  const unrecordedTotal = stages.find((s) => s.stage === "unrecorded")?.parts.length ?? 0;
 
   if (totalShown === 0) return <p className="py-16 text-center text-sm text-muted-foreground">No outstanding parts match these filters.</p>;
 
   return (
     <div className="space-y-2">
+      {/* Data-quality banner: the blank bucket is the largest and drags every % down */}
+      {unrecordedTotal > 0 && (
+        <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/[0.07] p-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-fuchsia-300" />
+            <p className="text-xs leading-relaxed text-fuchsia-100">
+              <span className="font-semibold">{unrecordedTotal.toLocaleString()} parts have no delivery status entered.</span>{" "}
+              They count as not-received and lower your progress numbers — this may be a data-entry gap rather than parts truly missing.
+              See the "Unrecorded (blank)" bucket below.
+            </p>
+          </div>
+        </div>
+      )}
       {filtered.map((g) =>
         g.shown.length === 0 ? null : (
           <div key={g.stage} className={cn("overflow-hidden rounded-lg border bg-white/[0.02]", STAGE_META[g.stage]?.ring ?? "border-white/10")}>
@@ -232,29 +247,55 @@ function StageView({ stages, filters }: { stages: StageGroup[]; filters: Filters
 }
 
 const PART_CAP = 40;
+/** Part-first: one line per (package, part) with a room count, sorted desc; expand
+ *  a part → its rooms. Collapses e.g. 126 identical Transformer Door rows to 1. */
 function PartsList({ parts }: { parts: OutstandingPart[] }) {
+  const groups = useMemo(() => rollupByPart(parts, (p) => p.package, (p) => p.part), [parts]);
   const [all, setAll] = useState(false);
-  const shown = all ? parts : parts.slice(0, PART_CAP);
+  const shown = all ? groups : groups.slice(0, PART_CAP);
   return (
     <div className="border-t border-white/10 p-2">
       <ul className="space-y-0.5">
-        {shown.map((p, i) => (
-          <li key={i} className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className={cn("rounded px-1 text-[10px] font-medium", p.tower === "HR" ? "bg-blue-500/15 text-blue-200" : "bg-purple-500/15 text-purple-200")}>{p.tower}</span>
-            <span className="font-medium text-white">{p.roomNo}</span>
-            <span className="text-muted-foreground">{p.package}</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="text-white/90">{p.part}</span>
-            <span className="font-mono text-[10px] text-muted-foreground">"{p.rawValue || "(blank)"}"</span>
-          </li>
+        {shown.map((g, i) => (
+          <PartRollupRow key={i} pkg={g.package} part={g.part} rooms={g.items} />
         ))}
       </ul>
-      {!all && parts.length > PART_CAP && (
+      {!all && groups.length > PART_CAP && (
         <button onClick={() => setAll(true)} className="mt-2 text-xs font-medium text-teal-300 hover:text-teal-200">
-          Show all {parts.length} (+{parts.length - PART_CAP} more) — or narrow with filters
+          Show all {groups.length} part types (+{groups.length - PART_CAP} more) — or narrow with filters
         </button>
       )}
     </div>
+  );
+}
+
+function PartRollupRow({ pkg, part, rooms }: { pkg: string; part: string; rooms: OutstandingPart[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="rounded">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-white/5">
+        <ChevronRight className={cn("h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <span className="text-xs text-muted-foreground">{pkg}</span>
+        <span className="text-muted-foreground/40">·</span>
+        <span className="min-w-0 truncate text-sm text-white/90">{part}</span>
+        <span className="ml-auto text-sm font-semibold tabular-nums text-white">{rooms.length}</span>
+        <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">rooms</span>
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5 px-2 pb-2 pt-1">
+          {rooms
+            .slice()
+            .sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true }))
+            .map((r, i) => (
+              <span key={i} className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px]">
+                <span className={cn("rounded px-1 text-[9px] font-medium", r.tower === "HR" ? "bg-blue-500/15 text-blue-200" : "bg-purple-500/15 text-purple-200")}>{r.tower}</span>
+                <span className="text-white/90">{r.roomNo}</span>
+                {r.rawValue?.trim() && <span className="font-mono text-[9px] text-muted-foreground">{r.rawValue}</span>}
+              </span>
+            ))}
+        </div>
+      )}
+    </li>
   );
 }
 
