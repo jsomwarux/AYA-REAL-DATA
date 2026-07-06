@@ -83,12 +83,8 @@ function Heatmap({
       <table className="border-separate border-spacing-0.5">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-background px-2 pb-1 text-left align-bottom text-[10px] font-medium text-muted-foreground">Floor</th>
-            <th className="relative h-[200px] w-6 p-0" title="WHITE BOX">
-              <span className="absolute bottom-0.5 left-[11px] whitespace-nowrap text-[11px] leading-none text-muted-foreground" style={diag}>White Box</span>
-            </th>
-            <th className="relative h-[200px] w-6 p-0" title={checkboxLabel}>
-              <span className="absolute bottom-0.5 left-[11px] whitespace-nowrap text-[11px] leading-none text-muted-foreground" style={diag}>{checkboxLabel}</span>
+            <th className="sticky left-0 z-10 bg-background px-2 pb-1 text-left align-bottom text-[10px] font-medium text-muted-foreground">
+              Floor <span className="font-normal text-muted-foreground/60">· done · WB</span>
             </th>
             {headers.map((h, i) => (
               <th key={i} className="relative h-[200px] w-6 p-0" title={h}>
@@ -102,14 +98,28 @@ function Heatmap({
             const tasks = tasksFor(f);
             return (
               <tr key={f.floor}>
-                <td className="sticky left-0 z-10 bg-background px-2 text-xs font-medium text-white">{f.floor}</td>
-                <td className="px-1 text-center">{f.whiteBox && <Check className="mx-auto h-3 w-3 text-emerald-400" />}</td>
-                <td className="px-1 text-center">
-                  {f.mismatch ? (
-                    <AlertTriangle className="mx-auto h-3 w-3 text-amber-400" aria-label="Marked complete but tasks aren't all done" />
-                  ) : (
-                    f.fullyComplete && <Check className="mx-auto h-3 w-3 text-emerald-400" />
-                  )}
+                <td className="sticky left-0 z-10 bg-background px-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-white">{f.floor}</span>
+                    {/* Fully completed / done (priority): checked · marked-but-not-done · unchecked */}
+                    {f.mismatch ? (
+                      <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" aria-label={`${checkboxLabel}: marked done but tasks aren't all complete`} />
+                    ) : f.fullyComplete ? (
+                      <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-400" aria-label={`${checkboxLabel}: yes`} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40" aria-label={`${checkboxLabel}: no`}>—</span>
+                    )}
+                    {/* White Box (secondary flag): a subtle true/false marker, not a task color */}
+                    <span
+                      title={f.whiteBox ? "White Box: yes" : "White Box: no"}
+                      className={cn(
+                        "rounded px-1 text-[9px] font-semibold leading-tight",
+                        f.whiteBox ? "bg-sky-500/20 text-sky-300" : "text-muted-foreground/30",
+                      )}
+                    >
+                      WB
+                    </span>
+                  </div>
                 </td>
                 {tasks.map((t, i) => {
                   const blank = !t.rawValue || !t.rawValue.trim();
