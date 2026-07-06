@@ -75,24 +75,24 @@ function Heatmap({
   checkboxLabel: string;
 }) {
   const tasksFor = (f: CommonAreaFloor) => (section ? f.tasks.filter((t) => t.section === section) : f.tasks);
-  // Vertical header: reads bottom-to-top and reserves layout height, so the header
-  // band grows to fit the full task name without widening the data cells.
-  const vertical = { writingMode: "vertical-rl" as const, transform: "rotate(180deg)" };
+  // Diagonal (~45°) header: the full task name as ONE rotated string, anchored at the
+  // bottom of a fixed-height band above the grid. Data cells keep their 24px width.
+  const diag = { transformOrigin: "left bottom" as const, transform: "rotate(-45deg)" };
   return (
     <div className="overflow-x-auto">
       <table className="border-separate border-spacing-0.5">
         <thead>
           <tr>
             <th className="sticky left-0 z-10 bg-background px-2 pb-1 text-left align-bottom text-[10px] font-medium text-muted-foreground">Floor</th>
-            <th className="w-6 px-0 pb-1 text-center align-bottom" title="WHITE BOX">
-              <span className="inline-block whitespace-nowrap text-[10px] leading-none text-muted-foreground" style={vertical}>White Box</span>
+            <th className="relative h-[200px] w-6 p-0" title="WHITE BOX">
+              <span className="absolute bottom-0.5 left-[11px] whitespace-nowrap text-[11px] leading-none text-muted-foreground" style={diag}>White Box</span>
             </th>
-            <th className="w-6 px-0 pb-1 text-center align-bottom" title={checkboxLabel}>
-              <span className="inline-block whitespace-nowrap text-[10px] leading-none text-muted-foreground" style={vertical}>{checkboxLabel}</span>
+            <th className="relative h-[200px] w-6 p-0" title={checkboxLabel}>
+              <span className="absolute bottom-0.5 left-[11px] whitespace-nowrap text-[11px] leading-none text-muted-foreground" style={diag}>{checkboxLabel}</span>
             </th>
             {headers.map((h, i) => (
-              <th key={i} className="w-6 px-0 pb-1 text-center align-bottom" title={h}>
-                <span className="inline-block whitespace-nowrap text-[10px] leading-none text-muted-foreground" style={vertical}>{h}</span>
+              <th key={i} className="relative h-[200px] w-6 p-0" title={h}>
+                <span className="absolute bottom-0.5 left-[11px] whitespace-nowrap text-[11px] leading-none text-muted-foreground" style={diag}>{h}</span>
               </th>
             ))}
           </tr>
