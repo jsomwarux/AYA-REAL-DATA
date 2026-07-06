@@ -66,24 +66,33 @@ function Heatmap({
   headers,
   section,
   highlight,
+  checkboxLabel,
 }: {
   floors: CommonAreaFloor[];
   headers: string[];
   section?: "A" | "B";
   highlight?: string;
+  checkboxLabel: string;
 }) {
   const tasksFor = (f: CommonAreaFloor) => (section ? f.tasks.filter((t) => t.section === section) : f.tasks);
+  // Vertical header: reads bottom-to-top and reserves layout height, so the header
+  // band grows to fit the full task name without widening the data cells.
+  const vertical = { writingMode: "vertical-rl" as const, transform: "rotate(180deg)" };
   return (
     <div className="overflow-x-auto">
       <table className="border-separate border-spacing-0.5">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-background px-2 text-left text-[10px] font-medium text-muted-foreground">Floor</th>
-            <th className="px-1 text-[10px] font-medium text-muted-foreground" title="WHITE BOX">WB</th>
-            <th className="px-1 text-[10px] font-medium text-muted-foreground" title="FULLY COMPLETED / FULLY DONE">FC</th>
+            <th className="sticky left-0 z-10 bg-background px-2 pb-1 text-left align-bottom text-[10px] font-medium text-muted-foreground">Floor</th>
+            <th className="w-6 px-0 pb-1 text-center align-bottom" title="WHITE BOX">
+              <span className="inline-block whitespace-nowrap text-[10px] leading-none text-muted-foreground" style={vertical}>White Box</span>
+            </th>
+            <th className="w-6 px-0 pb-1 text-center align-bottom" title={checkboxLabel}>
+              <span className="inline-block whitespace-nowrap text-[10px] leading-none text-muted-foreground" style={vertical}>{checkboxLabel}</span>
+            </th>
             {headers.map((h, i) => (
-              <th key={i} className="w-6 px-0 text-[9px] font-normal text-muted-foreground" title={h}>
-                {i + 1}
+              <th key={i} className="w-6 px-0 pb-1 text-center align-bottom" title={h}>
+                <span className="inline-block whitespace-nowrap text-[10px] leading-none text-muted-foreground" style={vertical}>{h}</span>
               </th>
             ))}
           </tr>
@@ -124,22 +133,6 @@ function Heatmap({
         </tbody>
       </table>
     </div>
-  );
-}
-
-function TaskKey({ headers }: { headers: string[] }) {
-  return (
-    <details className="mt-3 text-[11px] text-muted-foreground">
-      <summary className="cursor-pointer select-none hover:text-white">Task key (1–{headers.length})</summary>
-      <ol className="mt-2 grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2 lg:grid-cols-3">
-        {headers.map((h, i) => (
-          <li key={i} className="flex gap-1.5">
-            <span className="w-5 flex-shrink-0 text-right tabular-nums text-muted-foreground/60">{i + 1}.</span>
-            <span>{h}</span>
-          </li>
-        ))}
-      </ol>
-    </details>
   );
 }
 
@@ -245,8 +238,7 @@ function CorridorsView({ data }: { data: CommonAreaResponse }) {
       <BlockerLead floors={data.floors} blockerLabel="Waiting on product" highlight={highlight} onPick={setHighlight} />
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
-          <Heatmap floors={data.floors} headers={headers} highlight={highlight ?? undefined} />
-          <TaskKey headers={headers} />
+          <Heatmap floors={data.floors} headers={headers} highlight={highlight ?? undefined} checkboxLabel="Fully completed" />
         </CardContent>
       </Card>
     </div>
@@ -275,15 +267,13 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
         <Card className="border-white/10 bg-white/[0.02]">
           <CardContent className="p-3">
             <h3 className="mb-2 text-sm font-semibold text-white">Section A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
-            <Heatmap floors={data.floors} headers={headersA} section="A" highlight={highlight ?? undefined} />
-            <TaskKey headers={headersA} />
+            <Heatmap floors={data.floors} headers={headersA} section="A" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
           </CardContent>
         </Card>
         <Card className="border-white/10 bg-white/[0.02]">
           <CardContent className="p-3">
             <h3 className="mb-2 text-sm font-semibold text-white">Section B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
-            <Heatmap floors={data.floors} headers={headersB} section="B" highlight={highlight ?? undefined} />
-            <TaskKey headers={headersB} />
+            <Heatmap floors={data.floors} headers={headersB} section="B" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
           </CardContent>
         </Card>
       </div>
