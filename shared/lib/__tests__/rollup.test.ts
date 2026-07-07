@@ -7,11 +7,35 @@ import { buildTowerRollup, deriveFloorFromRoomNo } from '../index';
 import type { RoomRow, PackageResult } from '../../types/dashboard';
 
 function pkg(name: string, recomputedPct: number, manualPct: number | null, mismatch = false, unrecordedCount = 0): PackageResult {
-  return { name, recomputedPct, manualPct, mismatch, unrecordedCount, parts: [] };
+  return { name, recomputedPct, manualPct, mismatch, unrecordedCount, naOnly: false, parts: [] };
 }
-function room(roomNo: string, floor: string, line: string, type: string, packages: PackageResult[]): RoomRow {
-  return { roomNo, floor, line, type, packages };
+function room(roomNo: string, floor: string, line: string, type: string, packages: PackageResult[], installedPct: number | null = null): RoomRow {
+  return { roomNo, floor, line, type, installedPct, packages };
 }
+/** A package with `applicable` non-N/A installed parts (for weighting). */
+function instPkg(applicable: number): PackageResult {
+  const parts = Array.from({ length: applicable }, (_, i) => ({ header: `p${i}`, rawValue: 'Installed', bucket: 'received' as const, weight: 1, isBlank: false }));
+  return { name: 'HEADBOARD', recomputedPct: 0, manualPct: null, mismatch: false, unrecordedCount: 0, naOnly: false, parts };
+}
+
+test('buildTowerRollup: installedPct = part-count-WEIGHTED average of room Completion%, never a sum', () => {
+  // Room 701: 100% with 8 applicable parts; Room 601: 0% with 2 applicable parts.
+  // Weighted = (100·8 + 0·2)/(8+2) = 80 (a plain average would be a wrong 50).
+  const installation = [
+    room('701', '7', 'L', 'K', [instPkg(8)], 100),
+    room('601', '6', 'L', 'K', [instPkg(2)], 0),
+  ];
+  const r = buildTowerRollup('LR', 'c', 'i', [], installation);
+  assert.equal(r.installedPct, 80); // tower: weighted, not 50
+  assert.equal(r.floors.find((f) => f.floor === '7')!.installedPct, 100);
+  assert.equal(r.floors.find((f) => f.floor === '6')!.installedPct, 0);
+});
+
+test('buildTowerRollup: installedPct is null when the sheet Completion% is blank', () => {
+  const r = buildTowerRollup('LR', 'c', 'i', [], [room('701', '7', 'L', 'K', [instPkg(5)], null)]);
+  assert.equal(r.installedPct, null);
+  assert.equal(r.floors[0].installedPct, null);
+});
 
 test('buildTowerRollup: joins received (Containers) + installed (Installation) per package', () => {
   const containers = [

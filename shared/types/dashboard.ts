@@ -103,6 +103,9 @@ export interface PackageResult {
   manualPct: number | null;
   mismatch: boolean;
   unrecordedCount: number;
+  /** True when EVERY part is N/A (package doesn't apply to this room) — display "N/A",
+   *  not 0%, and exclude from rollups. */
+  naOnly: boolean;
   parts: PartCell[];
 }
 
@@ -112,6 +115,10 @@ export interface RoomRow {
   floor: string;       // Floor (carried forward across merged cells; falls back to room #)
   line: string;        // Room Line, e.g. "LR-LINE1" (blank-header leading column)
   type: string;        // Room Type, e.g. "King", "LR-CAVE", "King ADA"
+  /** Installation completion taken DIRECTLY from the sheet's "Completion %" column
+   *  (HR col DL / LR col CU) — 0-100, or null if the cell is blank/absent. Installation
+   *  tabs only; null on Containers tabs. NOT recomputed from part cells. */
+  installedPct: number | null;
   packages: PackageResult[];
 }
 
@@ -136,11 +143,17 @@ export interface RollupRoom {
   floor: string;
   line: string;
   type: string;
+  /** Installation % from the Installation tab's Completion % cell (sheet-sourced). */
+  installedPct: number | null;
+  /** Applicable (non-N/A) installed-part count — the weight for floor/tower averages. */
+  installedApplicable: number;
   packages: RollupPackage[];
 }
 
 export interface RollupFloor {
   floor: string;
+  /** Part-count-weighted average of the rooms' Completion% values (NOT a sum). */
+  installedPct: number | null;
   rooms: RollupRoom[];
 }
 
@@ -148,6 +161,8 @@ export interface RollupTower {
   tower: Tower;
   containersTab: string;
   installationTab: string;
+  /** Part-count-weighted average of all the tower's rooms' Completion% values. */
+  installedPct: number | null;
   floors: RollupFloor[];
   /** Room #s that appear on more than one row in either tab (joined by occurrence
    *  order). Surfaced so duplicate/suite rows are never silently dropped. */

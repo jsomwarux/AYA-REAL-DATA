@@ -101,6 +101,7 @@ export interface RollupPackageSide {
   manualPct: number | null;    // sheet's manual % (secondary)
   mismatch: boolean;           // recomputed ≠ manual (§3.2)
   unrecordedCount: number;     // blank parts (gap indicator)
+  naOnly: boolean;             // every part N/A → show "N/A", not 0%
   parts: RollupPart[];
 }
 
@@ -116,11 +117,14 @@ export interface RollupRoom {
   floor: string;
   line: string;
   type: string;
+  installedPct: number | null;   // sheet Completion % (HR DL / LR CU), not recomputed
+  installedApplicable: number;   // non-N/A installed-part count (weight for averages)
   packages: RollupPackage[];
 }
 
 export interface RollupFloor {
   floor: string;
+  installedPct: number | null;   // part-count-weighted avg of rooms' Completion%
   rooms: RollupRoom[];
 }
 
@@ -128,6 +132,7 @@ export interface RollupTower {
   tower: 'HR' | 'LR';
   containersTab: string;
   installationTab: string;
+  installedPct: number | null;   // part-count-weighted avg across the tower's rooms
   floors: RollupFloor[];
   duplicateRooms: string[];   // Room #s spanning multiple rows (e.g. suite main + LV)
 }

@@ -107,6 +107,9 @@ export interface RoomTabStructure {
   firstDataRowIndex: number;
   leading: LeadingColumns;
   packages: DiscoveredPackage[];
+  /** Trailing "Completion %" column index (HR DL / LR CU) — the sheet-sourced
+   *  installation %. undefined if the tab has no such column (e.g. Containers tabs). */
+  completionCol?: number;
   warnings: string[];
 }
 
@@ -222,7 +225,17 @@ export function discoverRoomTabStructure(grid: Grid, expected?: ExpectedTaxonomy
     }
   }
 
-  return { headerRowIndex, firstDataRowIndex, leading, packages, warnings };
+  // Trailing "Completion %" column (HR col DL / LR col CU) — the sheet-sourced
+  // installation %. Located by header so it survives column shifts.
+  let completionCol: number | undefined;
+  for (let c = 0; c < header.length; c++) {
+    if (/^completion\s*%?$/.test(norm(cell(grid, headerRowIndex, c)))) {
+      completionCol = c;
+      break;
+    }
+  }
+
+  return { headerRowIndex, firstDataRowIndex, leading, packages, completionCol, warnings };
 }
 
 /** Build fully-recomputed room rows from a grid + its discovered structure. */
@@ -279,11 +292,21 @@ export function buildRoomRows(
         manualPct: manualPct === null ? null : Math.round(manualPct),
         mismatch: flagMismatch(result.pct, manualRaw),
         unrecordedCount: result.unrecordedCount,
+        naOnly: pkg.parts.length > 0 && result.naCount === pkg.parts.length, // every part N/A
         parts,
       };
     });
 
-    rows.push({ roomNo, floor, line, type, packages });
+    // Installation % is taken DIRECTLY from the sheet's Completion % cell (not recomputed).
+    const installedPct =
+      structure.completionCol !== undefined
+        ? (() => {
+            const v = normalizeManualPct(cell(grid, r, structure.completionCol!));
+            return v === null ? null : Math.round(v);
+          })()
+        : null;
+
+    rows.push({ roomNo, floor, line, type, installedPct, packages });
   }
 
   return rows;

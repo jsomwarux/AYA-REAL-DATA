@@ -69,7 +69,7 @@ function roomMismatchCount(room: RollupRoom): number {
   let n = 0;
   for (const pkg of room.packages) {
     if (pkg.received?.mismatch) n++;
-    if (pkg.installed?.mismatch) n++;
+    // Installed side has no mismatch: its % comes straight from the sheet's Completion %.
   }
   return n;
 }
@@ -194,7 +194,7 @@ export default function FloorRoomRollup() {
 
           {/* Legend — plain site language */}
           <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>Each part shows <span className="font-semibold text-white">{LABELS.pctReceived}</span> and <span className="font-semibold text-white">{LABELS.pctInstalled}</span>.</span>
+            <span><span className="font-semibold text-white">% delivered</span> is counted from the Containers parts; <span className="font-semibold text-white">% installed</span> is the sheet's own Completion % (shown per room / floor / tower).</span>
             <span className="inline-flex items-center gap-1">
               <span className="rounded border border-red-500/50 bg-red-500/15 px-1 font-semibold text-red-200">4 problems</span> {LABELS.problemsPhrase}
             </span>
@@ -202,7 +202,10 @@ export default function FloorRoomRollup() {
               <span className="text-fuchsia-300/80">no status</span> {LABELS.noStatusPhrase}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-amber-200">sheet says 50% — doesn't match</span> shown only when the sheet's own number disagrees
+              <span className="rounded border border-white/15 bg-white/[0.04] px-1 text-muted-foreground">N/A</span> package doesn't apply to that room (not counted)
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-amber-200">sheet says 50% — doesn't match</span> delivered side only, when the sheet disagrees
             </span>
           </div>
 
@@ -267,10 +270,10 @@ const floorDeliveryCounts = (floor: RollupFloor): DeliveryCounts => sumCounts(fl
 const towerDeliveryCounts = (tower: RollupTower): DeliveryCounts => sumCounts(tower.floors.flatMap((f) => f.rooms.map(roomDeliveryCounts)));
 const pctOf = (num: number, den: number): number => (den > 0 ? Math.round((num / den) * 100) : 0);
 
-/** Prominent "% delivered" + bar, with a smaller secondary "% installed" + bar. */
-function DeliveryStat({ counts, size = "md" }: { counts: DeliveryCounts; size?: "md" | "lg" }) {
+/** Prominent count-summed "% delivered" + bar, plus a smaller "% installed" taken
+ *  straight from the sheet's Completion % (weighted-avg at floor/tower; null → n/a). */
+function DeliveryStat({ counts, installedPct, size = "md" }: { counts: DeliveryCounts; installedPct: number | null; size?: "md" | "lg" }) {
   const delivered = pctOf(counts.dNum, counts.dDen);
-  const installed = pctOf(counts.iNum, counts.iDen);
   const big = size === "lg";
   return (
     <div className="flex items-center gap-2.5">
@@ -281,11 +284,11 @@ function DeliveryStat({ counts, size = "md" }: { counts: DeliveryCounts; size?: 
           <div className={cn("h-full rounded", pctBar(delivered))} style={{ width: `${delivered}%` }} />
         </div>
       </div>
-      <div className="flex items-center gap-1 opacity-75" title={`Installed: ${counts.iNum}/${counts.iDen}`}>
-        <span className="text-xs tabular-nums text-muted-foreground">{installed}%</span>
+      <div className="flex items-center gap-1 opacity-75" title="Installed % — the sheet's own Completion % (not recomputed)">
+        <span className="text-xs tabular-nums text-muted-foreground">{installedPct === null ? "n/a" : `${installedPct}%`}</span>
         <span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">inst.</span>
         <div className="h-1 w-10 overflow-hidden rounded bg-white/10">
-          <div className="h-full rounded bg-sky-400/70" style={{ width: `${installed}%` }} />
+          <div className="h-full rounded bg-sky-400/70" style={{ width: `${installedPct ?? 0}%` }} />
         </div>
       </div>
     </div>
@@ -312,7 +315,7 @@ function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
           </span>
         )}
         <div className="ml-auto">
-          <DeliveryStat counts={towerDeliveryCounts(tower)} size="lg" />
+          <DeliveryStat counts={towerDeliveryCounts(tower)} installedPct={tower.installedPct} size="lg" />
         </div>
       </div>
       <div className="space-y-2">
@@ -337,7 +340,7 @@ function FloorRow({ tower, floor, ...t }: { tower: RollupTower; floor: RollupFlo
         <Layers className="h-4 w-4 text-teal-400" />
         <span className="font-medium text-white">Floor {floor.floor}</span>
         <div className="ml-auto flex items-center gap-3">
-          <DeliveryStat counts={floorDeliveryCounts(floor)} />
+          <DeliveryStat counts={floorDeliveryCounts(floor)} installedPct={floor.installedPct} />
           <span className="hidden text-xs text-muted-foreground sm:inline">{floor.rooms.length} rooms</span>
         </div>
       </button>
@@ -372,7 +375,7 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
           <span className="truncate text-xs text-muted-foreground">{[room.line, room.type].filter(Boolean).join(" · ")}</span>
         )}
         <div className="ml-auto flex items-center gap-3">
-          <DeliveryStat counts={roomDeliveryCounts(room)} />
+          <DeliveryStat counts={roomDeliveryCounts(room)} installedPct={room.installedPct} />
           <span className="flex items-center gap-1.5">
             {loud.length > 0 && (
               <span className="rounded border border-red-500/50 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">
@@ -494,14 +497,15 @@ function PackageRow({
     <div className="rounded border border-white/10 bg-white/[0.02]">
       <button
         onClick={() => t.onTogglePkg(key)}
-        className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left hover:bg-white/5 sm:grid-cols-[180px_1fr_1fr]"
+        className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2 text-left hover:bg-white/5 sm:grid-cols-[220px_1fr]"
       >
         <span className="flex items-center gap-1.5">
           <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", open && "rotate-90")} />
           <span className="text-sm font-medium text-white">{pkg.name}</span>
         </span>
+        {/* Received % is per-package (recomputed from Containers parts). Installation is
+            tracked as ONE Completion % per room (shown at the room level), not per package. */}
         <PctCell label="Received" side={pkg.received} loud={sideLoud(pkg.received?.parts)} />
-        <PctCell label="Installed" side={pkg.installed} loud={sideLoud(pkg.installed?.parts, receivedLoudHeaders(pkg))} />
       </button>
       {open && (
         <div className="grid grid-cols-1 gap-4 border-t border-white/10 p-3 sm:grid-cols-2">
@@ -516,6 +520,23 @@ function PackageRow({
 function PctCell({ label, side, loud }: { label: string; side: RollupPackageSide | null; loud: { count: number; label: string } }) {
   if (!side) {
     return <div className="text-xs text-muted-foreground">{label}: <span className="text-muted-foreground/60">—</span></div>;
+  }
+  // N/A: the package doesn't apply to this room (every part N/A). Show "N/A", NOT 0% —
+  // distinct grey pill, no progress bar. Excluded from all rollups.
+  if (side.naOnly) {
+    return (
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+          <span
+            title="Not applicable to this room (all parts N/A) — excluded from the math"
+            className="rounded border border-white/15 bg-white/[0.04] px-1.5 py-0 text-xs font-medium text-muted-foreground"
+          >
+            N/A
+          </span>
+        </div>
+      </div>
+    );
   }
   return (
     <div className="min-w-0">
