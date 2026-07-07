@@ -24,12 +24,23 @@ const STATUS: Record<StatusState, { cell: string; dot: string; label: string }> 
   "in-progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
   blocker: { cell: "bg-red-500/80 ring-1 ring-red-300/60", dot: "bg-red-500", label: "Blocker" },
   "in-motion": { cell: "bg-amber-500/70", dot: "bg-amber-500", label: "Ordered" },
-  // "Present but uncolored": a delineated cell (border) with a faint neutral fill —
-  // so an all-not-started floor (e.g. 11TH) reads as a real full row, never an empty band.
   "not-started": { cell: "border border-white/25 bg-white/[0.06]", dot: "border border-white/30 bg-white/10", label: "Not started" },
   other: { cell: "bg-fuchsia-500/40", dot: "bg-fuchsia-500", label: "Other" },
 };
+// Same palette as hex, for the SVG donut.
+const STATUS_HEX: Record<StatusState, string> = {
+  done: "#10b981",
+  "in-progress": "#0ea5e9",
+  "in-motion": "#f59e0b",
+  blocker: "#ef4444",
+  "not-started": "#64748b",
+  other: "#d946ef",
+};
 const LEGEND_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
+
+function statusLabel(s: StatusState, blockerLabel: string): string {
+  return s === "blocker" ? blockerLabel : STATUS[s].label;
+}
 
 function Legend({ blockerLabel }: { blockerLabel: string }) {
   return (
@@ -37,7 +48,7 @@ function Legend({ blockerLabel }: { blockerLabel: string }) {
       {LEGEND_ORDER.map((s) => (
         <span key={s} className="flex items-center gap-1.5">
           <span className={cn("h-2.5 w-2.5 rounded-sm", STATUS[s].dot)} />
-          {s === "blocker" ? blockerLabel : STATUS[s].label}
+          {statusLabel(s, blockerLabel)}
         </span>
       ))}
     </div>
@@ -59,7 +70,8 @@ function CompletionBar({ done, total }: { done: number; total: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Floor × task heatmap (Corridors + each Staircase section)
+// Transposed grid: TASKS = rows (readable horizontal labels), FLOORS = columns.
+// White Box / Fully completed are per-floor FLAGS → two indicator rows, not tasks.
 // ---------------------------------------------------------------------------
 function Heatmap({
   floors,
@@ -74,65 +86,71 @@ function Heatmap({
   highlight?: string;
   checkboxLabel: string;
 }) {
-  const tasksFor = (f: CommonAreaFloor) => (section ? f.tasks.filter((t) => t.section === section) : f.tasks);
-  // Diagonal (~45°) header: the full task name as ONE rotated string, anchored at the
-  // bottom of a fixed-height band above the grid. Data cells keep their 24px width.
-  const diag = { transformOrigin: "left bottom" as const, transform: "rotate(-45deg)" };
+  const cellsFor = (f: CommonAreaFloor) => (section ? f.tasks.filter((t) => t.section === section) : f.tasks);
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-auto">
       <table className="border-separate border-spacing-0.5">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-background px-2 pb-1 text-left align-bottom text-[10px] font-medium text-muted-foreground">
-              Floor <span className="font-normal text-muted-foreground/60">· done · WB</span>
+            <th className="sticky left-0 z-20 bg-background px-2 pb-1 text-left text-[10px] font-medium text-muted-foreground">
+              Task <span className="text-muted-foreground/50">╲ Floor</span>
             </th>
-            {headers.map((h, i) => (
-              <th key={i} className="relative h-[200px] w-6 p-0" title={h}>
-                <span className="absolute bottom-0.5 left-[11px] whitespace-nowrap text-[11px] leading-none text-muted-foreground" style={diag}>{h}</span>
+            {floors.map((f) => (
+              <th key={f.floor} className="px-0 pb-1 text-center text-[10px] font-semibold text-muted-foreground" title={`Floor ${f.floor}`}>
+                <div className="w-9">{f.floor}</div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {floors.map((f) => {
-            const tasks = tasksFor(f);
+          {/* Per-floor flags (not tasks) — checkmark / blank, visually separated */}
+          <IndicatorRow
+            label="White Box"
+            floors={floors}
+            render={(f) => (f.whiteBox ? <Check className="mx-auto h-3.5 w-3.5 text-emerald-400" /> : null)}
+            titleFor={(f) => `Floor ${f.floor} · White Box: ${f.whiteBox ? "yes" : "no"}`}
+          />
+          <IndicatorRow
+            label={checkboxLabel}
+            floors={floors}
+            separator
+            render={(f) =>
+              f.mismatch ? (
+                <AlertTriangle className="mx-auto h-3.5 w-3.5 text-amber-400" />
+              ) : f.fullyComplete ? (
+                <Check className="mx-auto h-3.5 w-3.5 text-emerald-400" />
+              ) : null
+            }
+            titleFor={(f) =>
+              `Floor ${f.floor} · ${checkboxLabel}: ${f.mismatch ? "marked done but tasks aren't all complete" : f.fullyComplete ? "yes" : "no"}`
+            }
+          />
+          {/* Task rows */}
+          {headers.map((header, i) => {
+            const hot = highlight === header;
             return (
-              <tr key={f.floor}>
-                <td className="sticky left-0 z-10 bg-background px-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-white">{f.floor}</span>
-                    {/* Fully completed / done (priority): checked · marked-but-not-done · unchecked */}
-                    {f.mismatch ? (
-                      <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" aria-label={`${checkboxLabel}: marked done but tasks aren't all complete`} />
-                    ) : f.fullyComplete ? (
-                      <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-400" aria-label={`${checkboxLabel}: yes`} />
-                    ) : (
-                      <span className="text-xs text-muted-foreground/40" aria-label={`${checkboxLabel}: no`}>—</span>
-                    )}
-                    {/* White Box (secondary flag): a subtle true/false marker, not a task color */}
-                    <span
-                      title={f.whiteBox ? "White Box: yes" : "White Box: no"}
-                      className={cn(
-                        "rounded px-1 text-[9px] font-semibold leading-tight",
-                        f.whiteBox ? "bg-sky-500/20 text-sky-300" : "text-muted-foreground/30",
-                      )}
-                    >
-                      WB
-                    </span>
-                  </div>
+              <tr key={header}>
+                <td
+                  className={cn(
+                    "sticky left-0 z-10 whitespace-nowrap bg-background px-2 py-0.5 text-xs",
+                    hot ? "rounded font-semibold text-white ring-1 ring-white/40" : "text-white/90",
+                  )}
+                  title={header}
+                >
+                  {header}
                 </td>
-                {tasks.map((t, i) => {
-                  const blank = !t.rawValue || !t.rawValue.trim();
-                  const hot = highlight && t.header === highlight;
+                {floors.map((f) => {
+                  const t = cellsFor(f)[i];
+                  const blank = !t?.rawValue || !t.rawValue.trim();
                   return (
-                    <td key={i} className="p-0">
+                    <td key={f.floor} className="p-0">
                       <div
                         className={cn(
-                          "h-6 w-6 rounded-sm",
+                          "mx-auto h-7 w-9 rounded-sm",
                           blank ? "border border-dashed border-white/20" : STATUS[t.status].cell,
                           hot && "ring-2 ring-white",
                         )}
-                        title={`Floor ${f.floor} · ${t.header} · ${t.rawValue?.trim() || "(blank)"}`}
+                        title={`Floor ${f.floor} · ${header} · ${t?.rawValue?.trim() || "(blank)"}`}
                       />
                     </td>
                   );
@@ -143,6 +161,34 @@ function Heatmap({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function IndicatorRow({
+  label,
+  floors,
+  render,
+  titleFor,
+  separator,
+}: {
+  label: string;
+  floors: CommonAreaFloor[];
+  render: (f: CommonAreaFloor) => React.ReactNode;
+  titleFor: (f: CommonAreaFloor) => string;
+  separator?: boolean;
+}) {
+  const cell = cn("bg-white/[0.03] text-center", separator && "border-b border-white/15");
+  return (
+    <tr>
+      <td className={cn("sticky left-0 z-10 whitespace-nowrap bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground", separator && "border-b border-white/15")}>
+        {label}
+      </td>
+      {floors.map((f) => (
+        <td key={f.floor} className={cell} title={titleFor(f)}>
+          {render(f) ?? <span className="text-muted-foreground/25">·</span>}
+        </td>
+      ))}
+    </tr>
   );
 }
 
@@ -200,7 +246,7 @@ function BlockerLead({
                 "flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs hover:bg-white/5",
                 highlight === g.task && "bg-white/10 ring-1 ring-white/30",
               )}
-              title="Click to highlight these cells in the grid"
+              title="Click to highlight this task's row in the grid"
             >
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
               <span className="text-white/90">{g.task}</span>
@@ -224,6 +270,50 @@ function tallyFloors(floors: CommonAreaFloor[], section?: "A" | "B") {
     }
   }
   return { done, total };
+}
+
+// ---------------------------------------------------------------------------
+// Status donut (Temp/Lobby — no floor dimension, so a chart instead of a grid)
+// ---------------------------------------------------------------------------
+function StatusDonut({ segments, total, done }: { segments: { status: StatusState; count: number }[]; total: number; done: number }) {
+  const size = 150,
+    stroke = 24,
+    r = (size - stroke) / 2,
+    c = size / 2;
+  const circ = 2 * Math.PI * r;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  let acc = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
+      <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
+      <g transform={`rotate(-90 ${c} ${c})`}>
+        {segments.map((s) => {
+          const len = total > 0 ? circ * (s.count / total) : 0;
+          const el = (
+            <circle
+              key={s.status}
+              cx={c}
+              cy={c}
+              r={r}
+              fill="none"
+              stroke={STATUS_HEX[s.status]}
+              strokeWidth={stroke}
+              strokeDasharray={`${len} ${circ - len}`}
+              strokeDashoffset={-acc}
+            />
+          );
+          acc += len;
+          return el;
+        })}
+      </g>
+      <text x={c} y={c - 2} textAnchor="middle" dominantBaseline="middle" fill="#fff" style={{ fontSize: "26px", fontWeight: 700 }}>
+        {pct}%
+      </text>
+      <text x={c} y={c + 18} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" style={{ fontSize: "10px", letterSpacing: "0.06em" }}>
+        DONE
+      </text>
+    </svg>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -273,36 +363,39 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
         </p>
       )}
       <BlockerLead floors={data.floors} blockerLabel="Blocked" highlight={highlight} onPick={setHighlight} />
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="border-white/10 bg-white/[0.02]">
-          <CardContent className="p-3">
-            <h3 className="mb-2 text-sm font-semibold text-white">Section A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
-            <Heatmap floors={data.floors} headers={headersA} section="A" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
-          </CardContent>
-        </Card>
-        <Card className="border-white/10 bg-white/[0.02]">
-          <CardContent className="p-3">
-            <h3 className="mb-2 text-sm font-semibold text-white">Section B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
-            <Heatmap floors={data.floors} headers={headersB} section="B" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
-          </CardContent>
-        </Card>
-      </div>
+      {/* Sections A and B stacked vertically — each is 19 floor-columns wide */}
+      <Card className="border-white/10 bg-white/[0.02]">
+        <CardContent className="p-3">
+          <h3 className="mb-2 text-sm font-semibold text-white">Section A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
+          <Heatmap floors={data.floors} headers={headersA} section="A" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
+        </CardContent>
+      </Card>
+      <Card className="border-white/10 bg-white/[0.02]">
+        <CardContent className="p-3">
+          <h3 className="mb-2 text-sm font-semibold text-white">Section B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
+          <Heatmap floors={data.floors} headers={headersB} section="B" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 const LOBBY_GROUP_ORDER: StatusState[] = ["blocker", "in-progress", "in-motion", "not-started", "done", "other"];
+const DONUT_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
 
 function LobbyView({ data }: { data: LobbyResponse }) {
-  const groups = useMemo(() => {
-    const byStatus = new Map<StatusState, LobbyTask[]>();
+  const byStatus = useMemo(() => {
+    const m = new Map<StatusState, LobbyTask[]>();
     for (const t of data.tasks) {
-      const list = byStatus.get(t.status);
+      const list = m.get(t.status);
       if (list) list.push(t);
-      else byStatus.set(t.status, [t]);
+      else m.set(t.status, [t]);
     }
-    return LOBBY_GROUP_ORDER.filter((s) => byStatus.has(s)).map((s) => ({ status: s, tasks: byStatus.get(s)! }));
+    return m;
   }, [data.tasks]);
+
+  const donutSegments = DONUT_ORDER.filter((s) => byStatus.has(s)).map((s) => ({ status: s, count: byStatus.get(s)!.length }));
+  const groups = LOBBY_GROUP_ORDER.filter((s) => byStatus.has(s)).map((s) => ({ status: s, tasks: byStatus.get(s)! }));
 
   return (
     <div className="space-y-3">
@@ -310,13 +403,37 @@ function LobbyView({ data }: { data: LobbyResponse }) {
         <CompletionBar done={data.completion.done} total={data.completion.total} />
         <Legend blockerLabel="Need to order" />
       </div>
+
+      {/* Donut for the glance */}
+      <Card className="border-white/10 bg-white/[0.02]">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-6">
+            <StatusDonut segments={donutSegments} total={data.completion.total} done={data.completion.done} />
+            <ul className="min-w-[180px] space-y-1 text-xs">
+              {donutSegments.map(({ status, count }) => (
+                <li key={status} className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 flex-shrink-0 rounded-sm" style={{ background: STATUS_HEX[status] }} />
+                  <span className="text-white/90">{statusLabel(status, "Need to order")}</span>
+                  <span className="ml-auto tabular-nums text-muted-foreground">{count}</span>
+                </li>
+              ))}
+              <li className="mt-1 flex items-center gap-2 border-t border-white/10 pt-1 text-muted-foreground">
+                <span className="text-white/90">Total</span>
+                <span className="ml-auto tabular-nums">{data.completion.total}</span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Grouped list for the detail */}
       <div className="space-y-3">
         {groups.map(({ status, tasks }) => (
           <Card key={status} className={cn("border-white/10 bg-white/[0.02]", status === "blocker" && "border-red-500/30 bg-red-500/[0.04]")}>
             <CardContent className="p-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
                 <span className={cn("h-2.5 w-2.5 rounded-sm", STATUS[status].dot)} />
-                <span className={status === "blocker" ? "text-red-300" : "text-white"}>{status === "blocker" ? "Need to order" : STATUS[status].label}</span>
+                <span className={status === "blocker" ? "text-red-300" : "text-white"}>{statusLabel(status, "Need to order")}</span>
                 <span className="text-muted-foreground">({tasks.length})</span>
               </div>
               <ul className="space-y-1">
@@ -346,6 +463,15 @@ function LobbyView({ data }: { data: LobbyResponse }) {
 // ---------------------------------------------------------------------------
 type View = "corridors" | "staircase" | "lobby";
 
+function AreaPct({ label, done, total, loading }: { label: string; done?: number; total?: number; loading: boolean }) {
+  const pct = total && total > 0 ? Math.round((done! / total) * 100) : null;
+  return (
+    <span className="text-white/90">
+      {label} <span className={cn("font-semibold", pct === null ? "text-muted-foreground" : "text-emerald-300")}>{loading || pct === null ? "…" : `${pct}%`}</span>
+    </span>
+  );
+}
+
 export default function CommonAreas() {
   useDocumentTitle("Common Areas");
   const [view, setView] = useState<View>("corridors");
@@ -355,6 +481,10 @@ export default function CommonAreas() {
   const lobby = useQuery({ queryKey: ["expansion-lobby"], queryFn: fetchLobby, retry: false, staleTime: 1000 * 60 * 2 });
 
   const active = view === "corridors" ? corridors : view === "staircase" ? staircase : lobby;
+
+  const corridorsT = corridors.data ? tallyFloors(corridors.data.floors) : undefined;
+  const staircaseT = staircase.data ? tallyFloors(staircase.data.floors) : undefined;
+  const lobbyT = lobby.data?.completion;
 
   const handleRefresh = async () => {
     try {
@@ -367,6 +497,15 @@ export default function CommonAreas() {
 
   return (
     <DashboardLayout title="Common Areas" subtitle="Corridors · Staircase · Temp/Lobby" onRefresh={handleRefresh} isLoading={active.isLoading}>
+      {/* Per-area completion summary — overall standing before drilling in */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm">
+        <AreaPct label="Corridors" done={corridorsT?.done} total={corridorsT?.total} loading={corridors.isLoading} />
+        <span className="text-muted-foreground/40">·</span>
+        <AreaPct label="Staircase" done={staircaseT?.done} total={staircaseT?.total} loading={staircase.isLoading} />
+        <span className="text-muted-foreground/40">·</span>
+        <AreaPct label="Temp/Lobby" done={lobbyT?.done} total={lobbyT?.total} loading={lobby.isLoading} />
+      </div>
+
       <div className="mb-4 flex flex-wrap gap-2">
         {(["corridors", "staircase", "lobby"] as View[]).map((v) => (
           <button
