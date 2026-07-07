@@ -295,6 +295,12 @@ function DeliveryStat({ counts, installedPct, size = "md" }: { counts: DeliveryC
   );
 }
 
+/** "1105" → "1105"; "1105","1106" → "1105 & 1106"; a,b,c → "a, b & c". */
+function formatRoomList(rooms: string[]): string {
+  if (rooms.length <= 1) return rooms.join("");
+  return `${rooms.slice(0, -1).join(", ")} & ${rooms[rooms.length - 1]}`;
+}
+
 function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
   const roomCount = tower.floors.reduce((s, f) => s + f.rooms.length, 0);
   const towerColor = tower.tower === "HR" ? "text-blue-300" : "text-purple-300";
@@ -308,10 +314,12 @@ function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
         </span>
         {tower.duplicateRooms.length > 0 && (
           <span
-            className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200"
-            title={`These Room #s span multiple rows (e.g. a suite's main + LV) and are shown as separate rooms, distinguished by type: ${tower.duplicateRooms.join(", ")}`}
+            className="rounded border border-slate-400/25 bg-slate-400/10 px-1.5 py-0.5 text-[10px] text-slate-200"
+            title={`Rooms ${formatRoomList(
+              tower.duplicateRooms,
+            )} are suites: each is tracked on more than one row in the sheet (the main bedroom plus the "LV" living room), so each shows here as separate room cards. This is expected — not a duplicate to fix.`}
           >
-            shared #: {tower.duplicateRooms.join(", ")}
+            {tower.duplicateRooms.length === 1 ? "Suite" : "Suites"} {formatRoomList(tower.duplicateRooms)} · shown as separate rooms
           </span>
         )}
         <div className="ml-auto">
