@@ -16,7 +16,7 @@ import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { rollupByPart } from "@shared/lib/partRollup";
-import { AlertCircle, ChevronRight, Loader2, Container as ContainerIcon, Search, ArrowRight, ShieldAlert } from "lucide-react";
+import { AlertCircle, ChevronRight, Loader2, Container as ContainerIcon, Search, ArrowRight } from "lucide-react";
 
 // Incoming stages, ordered closest-to-here → furthest (matches engine order).
 const STAGE_META: Record<string, { label: string; dot: string; ring: string; desc: string }> = {
@@ -27,10 +27,65 @@ const STAGE_META: Record<string, { label: string; dot: string; ring: string; des
   "in-production": { label: "In Production", dot: "bg-orange-600", ring: "border-orange-600/30", desc: "Being made in the factory" },
   "production-needed": { label: "Production Needed", dot: "bg-red-500", ring: "border-red-500/40", desc: "Not yet ordered to be made" },
   unrecorded: { label: "No status entered", dot: "bg-fuchsia-500", ring: "border-fuchsia-500/30", desc: "No delivery status filled in the sheet" },
+  other: { label: "Other / unclear status", dot: "bg-slate-500", ring: "border-slate-500/30", desc: "A sheet status that doesn't map to a known stage" },
 };
+// Order the stage bar closest-to-here → furthest (matches the engine order).
+const STAGE_BAR_ORDER: DeliveryStage[] = ["in-ny-port", "in-transit", "partial-china", "in-china", "in-production", "production-needed", "unrecorded", "other"];
 
 type Tower = "all" | "HR" | "LR";
-type View = "stage" | "partials" | "lens";
+type View = "stage" | "container";
+
+// --- Delivered-vs-total summary (leads the tab). Reconciles by construction:
+//     delivered (received) + outstanding (incoming) + problems = total applicable. ---
+function DeliveredSummary({ received, incoming, problems, exceptionsHref = "/exceptions" }: { received: number; incoming: number; problems: number; exceptionsHref?: string }) {
+  const total = received + incoming + problems;
+  const pct = total > 0 ? Math.round((received / total) * 100) : 0;
+  const w = (n: number) => (total > 0 ? `${(n / total) * 100}%` : "0%");
+  return (
+    <Card className="mb-3 border-white/10 bg-white/[0.02]">
+      <CardContent className="p-4">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            <span className="text-2xl font-bold text-white">{received.toLocaleString()}</span> of{" "}
+            <span className="font-semibold text-white">{total.toLocaleString()}</span> parts delivered
+          </p>
+          <span className="text-2xl font-bold text-emerald-300">{pct}%</span>
+        </div>
+        <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-full bg-emerald-500" style={{ width: w(received) }} title={`Delivered: ${received.toLocaleString()}`} />
+          <div className="h-full bg-amber-500" style={{ width: w(incoming) }} title={`Still incoming: ${incoming.toLocaleString()}`} />
+          <div className="h-full bg-red-500" style={{ width: w(problems) }} title={`Problems: ${problems.toLocaleString()}`} />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Delivered <b className="text-white">{received.toLocaleString()}</b></span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" /> Still incoming <b className="text-white">{incoming.toLocaleString()}</b></span>
+          <Link href={exceptionsHref} className="flex items-center gap-1.5 hover:text-red-200"><span className="h-2.5 w-2.5 rounded-sm bg-red-500" /> Problems <b className="text-white">{problems.toLocaleString()}</b> <ArrowRight className="h-3 w-3" /></Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Small stacked bar of the outstanding pipeline — shows at a glance where the mass sits. */
+function StageBar({ counts }: { counts: { stage: DeliveryStage; count: number }[] }) {
+  const total = counts.reduce((n, s) => n + s.count, 0);
+  if (total === 0) return null;
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">Outstanding pipeline ({total.toLocaleString()} parts)</p>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+        {counts.map((s) => s.count > 0 && (
+          <div key={s.stage} className={cn("h-full", STAGE_META[s.stage]?.dot)} style={{ width: `${(s.count / total) * 100}%` }} title={`${STAGE_META[s.stage]?.label}: ${s.count.toLocaleString()}`} />
+        ))}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        {counts.map((s) => s.count > 0 && (
+          <span key={s.stage} className="flex items-center gap-1"><span className={cn("h-2 w-2 rounded-sm", STAGE_META[s.stage]?.dot)} /> {STAGE_META[s.stage]?.label} <b className="text-white/80">{s.count.toLocaleString()}</b></span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface Filters {
   tower: Tower;
@@ -80,9 +135,7 @@ export default function ContainerView() {
   );
   const packages = useMemo(() => [...new Set(allParts.map((p) => p.package))].sort(), [allParts]);
 
-  const subtitle = data
-    ? `${data.summary.incoming.toLocaleString()} parts still incoming · ${data.summary.received.toLocaleString()} on site / received`
-    : "Outstanding parts by delivery stage";
+  const subtitle = "Delivery status — what's delivered, and what's still coming";
 
   return (
     <DashboardLayout title="Containers" subtitle={subtitle} onRefresh={handleRefresh} isLoading={isLoading}>
@@ -106,33 +159,21 @@ export default function ContainerView() {
 
       {data && (
         <>
-          {/* Header chips: incoming / received / problems (→ Exceptions) */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">
-              <span className="font-semibold">{data.summary.incoming.toLocaleString()}</span> still incoming
-            </span>
-            <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-200">
-              <span className="font-semibold">{data.summary.received.toLocaleString()}</span> on site / received
-            </span>
-            <Link href="/exceptions" className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-200 hover:bg-red-500/20">
-              <ShieldAlert className="h-3 w-3" />
-              <span className="font-semibold">{data.summary.problems.toLocaleString()}</span> Not Found / Damaged
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-            {data.missingTabs.length > 0 && (
-              <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">unread: {data.missingTabs.join(", ")}</span>
-            )}
-          </div>
+          {/* Lead: delivered-vs-total */}
+          <DeliveredSummary received={data.summary.received} incoming={data.summary.incoming} problems={data.summary.problems} />
+          {data.missingTabs.length > 0 && (
+            <p className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">Couldn't read: {data.missingTabs.join(", ")} — excluded from these numbers.</p>
+          )}
 
           {/* Convention caveat (§3.3) */}
           <p className="mb-4 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-            <span className="font-medium text-white/80">Note:</span> "Received" assumes a <span className="font-mono">Container N</span> cell means the container has landed. If your team
-            assigns container numbers <em>before</em> arrival, received will over-count — confirm the convention with the site team.
+            <span className="font-medium text-white/80">Note:</span> "Delivered" assumes a <span className="font-mono">Container N</span> cell means the container has landed. If your team
+            assigns container numbers <em>before</em> arrival, delivered will over-count — confirm the convention with the site team.
           </p>
 
-          {/* View switcher */}
-          <div className="mb-4 flex flex-wrap gap-2">
-            {([["stage", "By stage"], ["partials", `Partials (${data.summary.partials})`], ["lens", "Container lens"]] as [View, string][]).map(([v, label]) => (
+          {/* Two views */}
+          <div className="mb-1 flex flex-wrap gap-2">
+            {([["stage", "By stage"], ["container", "By container"]] as [View, string][]).map(([v, label]) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -145,9 +186,14 @@ export default function ContainerView() {
               </button>
             ))}
           </div>
+          <p className="mb-4 text-xs text-muted-foreground">
+            {view === "stage"
+              ? "Outstanding parts grouped by where they are in the delivery pipeline (biggest group is usually “No status entered”)."
+              : "See what each container delivered / is bringing — expand a container for its parts."}
+          </p>
 
-          {/* Filters (stage + partials views) */}
-          {view !== "lens" && (
+          {/* Filters (by-stage view) */}
+          {view === "stage" && (
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
               {(["all", "HR", "LR"] as Tower[]).map((t) => (
                 <button
@@ -174,8 +220,7 @@ export default function ContainerView() {
           )}
 
           {view === "stage" && <StageView stages={data.stages} filters={filters} />}
-          {view === "partials" && <PartialsView stages={data.stages} filters={filters} />}
-          {view === "lens" && <ContainerLens containers={data.containers} containerQ={containerQ} setContainerQ={setContainerQ} />}
+          {view === "container" && <ContainerLens containers={data.containers} containerQ={containerQ} setContainerQ={setContainerQ} />}
         </>
       )}
     </DashboardLayout>
@@ -210,11 +255,14 @@ function StageView({ stages, filters }: { stages: StageGroup[]; filters: Filters
   const filtered = stages.map((g) => ({ ...g, shown: g.parts.filter((p) => matchPart(p, filters)) }));
   const totalShown = filtered.reduce((n, g) => n + g.shown.length, 0);
   const unrecordedTotal = stages.find((s) => s.stage === "unrecorded")?.parts.length ?? 0;
+  const stageBar = STAGE_BAR_ORDER.map((s) => ({ stage: s, count: filtered.find((g) => g.stage === s)?.shown.length ?? 0 })).filter((s) => s.count > 0);
 
   if (totalShown === 0) return <p className="py-16 text-center text-sm text-muted-foreground">No outstanding parts match these filters.</p>;
 
   return (
     <div className="space-y-2">
+      {/* At-a-glance pipeline bar */}
+      <StageBar counts={stageBar} />
       {/* Data-quality banner: the blank bucket is the largest and drags every % down */}
       {unrecordedTotal > 0 && (
         <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/[0.07] p-3">
@@ -300,30 +348,7 @@ function PartRollupRow({ pkg, part, rooms }: { pkg: string; part: string; rooms:
 }
 
 // ---------------------------------------------------------------------------
-// Partials view (first-class — all "& In China")
-// ---------------------------------------------------------------------------
-function PartialsView({ stages, filters }: { stages: StageGroup[]; filters: Filters }) {
-  const partials = stages.find((s) => s.stage === "partial-china");
-  const shown = (partials?.parts ?? []).filter((p) => matchPart(p, filters));
-  return (
-    <Card className="border-amber-500/30 bg-amber-500/[0.04]">
-      <CardContent className="p-3">
-        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-200">
-          Partial arrivals — started, pieces still in China
-          <span className="text-muted-foreground">({shown.length})</span>
-        </div>
-        {shown.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No partial arrivals match these filters.</p>
-        ) : (
-          <PartsList parts={shown} />
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Container lens (secondary, summary-first)
+// By-container view (secondary, summary-first)
 // ---------------------------------------------------------------------------
 function ContainerLens({ containers, containerQ, setContainerQ }: { containers: ContainerGroup[]; containerQ: string; setContainerQ: (v: string) => void }) {
   const shown = useMemo(() => {

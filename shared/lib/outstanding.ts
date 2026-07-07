@@ -22,6 +22,7 @@ export const INCOMING_STAGES: DeliveryStage[] = [
   'in-production',
   'production-needed',
   'unrecorded',
+  'other', // sheet statuses that don't map to a known stage — still outstanding, not N/A
 ];
 
 /**
@@ -77,10 +78,12 @@ export function buildOutstanding(inputs: OutstandingInput[]): OutstandingResult 
             problems++;
             continue;
           }
-          if (stage === 'excluded' || stage === 'other') {
+          if (stage === 'excluded') {
             excluded++;
-            continue;
+            continue; // only N/A is excluded from the applicable denominator
           }
+          // 'other' (unrecognized sheet status) is applicable + not delivered →
+          // treated as an outstanding stage below, not hidden.
           const entry: OutstandingPart = {
             tower: input.tower,
             roomNo: room.roomNo,

@@ -62,6 +62,23 @@ test('buildOutstanding: groups by stage, excludes received/problem, tallies summ
   assert.equal(china.parts[0].floor, '7');
 });
 
+test('buildOutstanding: unrecognized "other" values are an outstanding stage (applicable); only N/A excluded', () => {
+  const rooms = [
+    room('701', [
+      part('A', 'Container 5'), // received
+      part('B', 'Other Remaining'), // other → outstanding (not hidden, not excluded)
+      part('C', 'N/A'), // excluded
+    ]),
+  ];
+  const { stages, summary } = buildOutstanding([input(rooms)]);
+  assert.equal(summary.received, 1);
+  assert.equal(summary.excluded, 1); // only N/A
+  assert.equal(summary.incoming, 1); // "Other Remaining" counts as outstanding
+  assert.ok(stages.some((g) => g.stage === 'other' && g.count === 1));
+  // reconciliation identity: received + incoming + problems = applicable (total − N/A)
+  assert.equal(summary.received + summary.incoming + summary.problems, 2);
+});
+
 test('buildOutstanding: partial "& In China" is its own stage, not lumped with In China', () => {
   const { stages } = buildOutstanding([input([room('701', [part('A', 'Container 7 & In China'), part('B', 'In China')])])]);
   const partial = stages.find((g) => g.stage === 'partial-china');
