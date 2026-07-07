@@ -25,7 +25,7 @@ const STATUS: Record<StatusState, { cell: string; dot: string; label: string }> 
   "in-progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
   blocker: { cell: "bg-red-500/80", dot: "bg-red-500", label: "Blocker" },
   "in-motion": { cell: "bg-amber-500/80", dot: "bg-amber-500", label: "Ordered" },
-  "not-started": { cell: "bg-slate-500/70", dot: "bg-slate-500", label: "Not started" },
+  "not-started": { cell: "bg-zinc-700/60", dot: "bg-zinc-500", label: "Not started" },
   other: { cell: "bg-fuchsia-500/60", dot: "bg-fuchsia-500", label: "Other" },
 };
 
@@ -39,8 +39,12 @@ const VALUE_STYLE: Record<string, { cell: string; dot: string; label: string }> 
   "waiting on product": { cell: "bg-red-500/80", dot: "bg-red-500", label: "Waiting on product" },
   "need to order": { cell: "bg-red-500/80", dot: "bg-red-500", label: "Need to order" },
   "ordered": { cell: "bg-amber-500/80", dot: "bg-amber-500", label: "Ordered" },
-  "not started": { cell: "bg-slate-500/70", dot: "bg-slate-500", label: "Not Started" },
-  "not yet": { cell: "bg-violet-500/60", dot: "bg-violet-500", label: "Not Yet" },
+  // Not-done states are MUTED/receding so the green "done" region pops. The app's
+  // background is a dark NAVY, so low-opacity neutrals get tinted blue and collapse
+  // together — these two are pushed apart on BOTH lightness and hue: Not Yet = a
+  // lighter, soft blue-slate; Not Started = a darker, neutral zinc (reads greyer/cooler).
+  "not started": { cell: "bg-zinc-700/60", dot: "bg-zinc-500", label: "Not Started" },
+  "not yet": { cell: "bg-slate-500/45", dot: "bg-slate-400", label: "Not Yet" },
 };
 // The ONLY blank-rendered state: a genuinely empty sheet cell (explicitly labeled).
 const NO_DATA = { cell: "border border-dashed border-white/25", dot: "border border-dashed border-white/40", label: "No data (empty cell)" };
@@ -402,13 +406,13 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
       {/* Sections A and B stacked vertically — each is 19 floor-columns wide */}
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
-          <h3 className="mb-2 text-sm font-semibold text-white">Section A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
+          <h3 className="mb-2 text-sm font-semibold text-white">Staircase A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
           <Heatmap floors={displayFloors} headers={headersA} section="A" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
         </CardContent>
       </Card>
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
-          <h3 className="mb-2 text-sm font-semibold text-white">Section B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
+          <h3 className="mb-2 text-sm font-semibold text-white">Staircase B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
           <Heatmap floors={displayFloors} headers={headersB} section="B" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
         </CardContent>
       </Card>
