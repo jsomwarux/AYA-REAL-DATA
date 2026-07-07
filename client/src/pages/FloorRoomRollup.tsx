@@ -239,6 +239,59 @@ interface ToggleProps {
   onTogglePkg: (k: string) => void;
 }
 
+// --- Delivered / installed roll-up (§ reconcile by SUMMING part counts, never by
+//     averaging room %s). Applicable EXCLUDES N/A (bucket "excluded"); blank stays
+//     in the denominator as not-delivered (its weight is 0). Delivered = received. ---
+interface DeliveryCounts { dNum: number; dDen: number; iNum: number; iDen: number }
+
+function roomDeliveryCounts(room: RollupRoom): DeliveryCounts {
+  let dNum = 0, dDen = 0, iNum = 0, iDen = 0;
+  for (const pkg of room.packages) {
+    for (const p of pkg.received?.parts ?? []) {
+      if (p.bucket !== "excluded") { dDen++; dNum += p.weight; } // received/delivered side
+    }
+    for (const p of pkg.installed?.parts ?? []) {
+      if (p.bucket !== "excluded") { iDen++; iNum += p.weight; } // installed side
+    }
+  }
+  return { dNum, dDen, iNum, iDen };
+}
+
+function sumCounts(list: DeliveryCounts[]): DeliveryCounts {
+  return list.reduce(
+    (a, c) => ({ dNum: a.dNum + c.dNum, dDen: a.dDen + c.dDen, iNum: a.iNum + c.iNum, iDen: a.iDen + c.iDen }),
+    { dNum: 0, dDen: 0, iNum: 0, iDen: 0 },
+  );
+}
+const floorDeliveryCounts = (floor: RollupFloor): DeliveryCounts => sumCounts(floor.rooms.map(roomDeliveryCounts));
+const towerDeliveryCounts = (tower: RollupTower): DeliveryCounts => sumCounts(tower.floors.flatMap((f) => f.rooms.map(roomDeliveryCounts)));
+const pctOf = (num: number, den: number): number => (den > 0 ? Math.round((num / den) * 100) : 0);
+
+/** Prominent "% delivered" + bar, with a smaller secondary "% installed" + bar. */
+function DeliveryStat({ counts, size = "md" }: { counts: DeliveryCounts; size?: "md" | "lg" }) {
+  const delivered = pctOf(counts.dNum, counts.dDen);
+  const installed = pctOf(counts.iNum, counts.iDen);
+  const big = size === "lg";
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5" title={`Delivered: ${counts.dNum}/${counts.dDen} parts received (N/A excluded)`}>
+        <span className={cn("font-semibold tabular-nums", big ? "text-base" : "text-sm", pctText(delivered))}>{delivered}%</span>
+        <span className="text-[9px] uppercase tracking-wide text-muted-foreground">delivered</span>
+        <div className={cn("h-1.5 overflow-hidden rounded bg-white/10", big ? "w-28" : "w-16 sm:w-20")}>
+          <div className={cn("h-full rounded", pctBar(delivered))} style={{ width: `${delivered}%` }} />
+        </div>
+      </div>
+      <div className="flex items-center gap-1 opacity-75" title={`Installed: ${counts.iNum}/${counts.iDen}`}>
+        <span className="text-xs tabular-nums text-muted-foreground">{installed}%</span>
+        <span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">inst.</span>
+        <div className="h-1 w-10 overflow-hidden rounded bg-white/10">
+          <div className="h-full rounded bg-sky-400/70" style={{ width: `${installed}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
   const roomCount = tower.floors.reduce((s, f) => s + f.rooms.length, 0);
   const towerColor = tower.tower === "HR" ? "text-blue-300" : "text-purple-300";
@@ -258,6 +311,9 @@ function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
             shared #: {tower.duplicateRooms.join(", ")}
           </span>
         )}
+        <div className="ml-auto">
+          <DeliveryStat counts={towerDeliveryCounts(tower)} size="lg" />
+        </div>
       </div>
       <div className="space-y-2">
         {tower.floors.map((floor) => (
@@ -280,7 +336,10 @@ function FloorRow({ tower, floor, ...t }: { tower: RollupTower; floor: RollupFlo
         <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-90")} />
         <Layers className="h-4 w-4 text-teal-400" />
         <span className="font-medium text-white">Floor {floor.floor}</span>
-        <span className="ml-auto text-xs text-muted-foreground">{floor.rooms.length} rooms</span>
+        <div className="ml-auto flex items-center gap-3">
+          <DeliveryStat counts={floorDeliveryCounts(floor)} />
+          <span className="hidden text-xs text-muted-foreground sm:inline">{floor.rooms.length} rooms</span>
+        </div>
       </button>
       {open && (
         <div className="space-y-1.5 border-t border-white/10 p-2">
@@ -312,26 +371,29 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
         {(room.line || room.type) && (
           <span className="truncate text-xs text-muted-foreground">{[room.line, room.type].filter(Boolean).join(" · ")}</span>
         )}
-        <span className="ml-auto flex items-center gap-1.5">
-          {loud.length > 0 && (
-            <span className="rounded border border-red-500/50 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">
-              {loud.length} problem{loud.length > 1 ? "s" : ""}
-            </span>
-          )}
-          {mismatches > 0 && (
-            <span
-              title="Packages where the sheet's own number is different"
-              className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200"
-            >
-              {mismatches} {mismatches === 1 ? "differs" : "differ"} from sheet
-            </span>
-          )}
-          {inRoom.length > 0 && (
-            <span className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300">
-              {inRoom.length} in-room
-            </span>
-          )}
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <DeliveryStat counts={roomDeliveryCounts(room)} />
+          <span className="flex items-center gap-1.5">
+            {loud.length > 0 && (
+              <span className="rounded border border-red-500/50 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">
+                {loud.length} problem{loud.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {mismatches > 0 && (
+              <span
+                title="Packages where the sheet's own number is different"
+                className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200"
+              >
+                {mismatches} {mismatches === 1 ? "differs" : "differ"} from sheet
+              </span>
+            )}
+            {inRoom.length > 0 && (
+              <span className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300">
+                {inRoom.length} in-room
+              </span>
+            )}
+          </span>
+        </div>
       </button>
 
       {open && (
