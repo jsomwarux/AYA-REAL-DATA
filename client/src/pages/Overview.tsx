@@ -325,7 +325,7 @@ export default function Overview() {
         <StatCard
           title="Construction Progress"
           value={`${overallCompletion}%`}
-          change={`${completedUnits}/${totalRooms} units complete`}
+          change="of all tasks completed"
           changeType={overallCompletion >= 50 ? "positive" : "neutral"}
           icon={<Building2 className="h-5 w-5" />}
           accentColor="teal"
@@ -350,8 +350,8 @@ export default function Overview() {
             />
             <StatCard
               title="Top Vendor"
-              value={topVendor?.name ? (topVendor.name.length > 14 ? topVendor.name.slice(0, 14) + '…' : topVendor.name) : '—'}
-              change={topVendor ? `${formatCurrencyCompact(topVendor.total)} across ${topVendor.count} items` : 'No vendor data'}
+              value={topVendor?.name ? (topVendor.name.length > 14 ? topVendor.name.slice(0, 14) + '…' : topVendor.name) : (budgetQuery.isLoading ? '…' : 'Not available')}
+              change={topVendor ? `${formatCurrencyCompact(topVendor.total)} across ${topVendor.count} items` : (budgetQuery.isLoading ? 'Loading budget…' : 'No vendor data in the budget sheet yet')}
               changeType="neutral"
               icon={<ListChecks className="h-5 w-5" />}
               accentColor="amber"
@@ -381,7 +381,7 @@ export default function Overview() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Overall</span>
+                  <span className="text-muted-foreground">Tasks completed (all units)</span>
                   <span className={getCompletionColor(overallCompletion)}>{overallCompletion}%</span>
                 </div>
                 <Progress value={overallCompletion} className="h-3 bg-white/10" />
@@ -415,13 +415,18 @@ export default function Overview() {
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-semibold text-teal-400">{completedUnits}</p>
-                  <p className="text-xs text-muted-foreground">Completed</p>
+                  <p className="text-xs text-muted-foreground">Fully finished</p>
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-semibold text-amber-400">{totalRooms - completedUnits}</p>
-                  <p className="text-xs text-muted-foreground">In Progress</p>
+                  <p className="text-xs text-muted-foreground">In progress</p>
                 </div>
               </div>
+
+              {/* Plain-language note: the two numbers measure different things */}
+              <p className="rounded-md bg-white/[0.03] px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                {overallCompletion}% of all tasks are done, but {completedUnits === 0 ? "no unit is" : `only ${completedUnits} of ${totalRooms} units are`} 100% finished yet — the remaining work is spread across many units.
+              </p>
 
               {/* Floors */}
               <div className="text-xs text-muted-foreground">
@@ -593,8 +598,8 @@ export default function Overview() {
                   </RechartsPieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No budget data available
+                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                  {budgetQuery.isLoading ? "Loading budget…" : budgetQuery.isError ? "Couldn't load budget data." : "No budget category breakdown in the sheet yet."}
                 </div>
               )}
             </div>
@@ -632,13 +637,17 @@ export default function Overview() {
             </div>
           </CardHeader>
           <CardContent className="pt-4">
-            {/* Overall timeline progress */}
-            <div className="space-y-2 mb-4">
+            {/* Schedule elapsed — how much of the planned timeline window has passed
+                (NOT work completion; this is why it can read 100% while work is partial). */}
+            <div className="space-y-1.5 mb-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Overall Progress</span>
+                <span className="text-muted-foreground">Schedule elapsed</span>
                 <span className={getCompletionColor(timelineProgressPercent)}>{timelineProgressPercent}%</span>
               </div>
               <Progress value={timelineProgressPercent} className="h-3 bg-white/10" />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Share of the planned timeline weeks that have passed — not work completed.
+              </p>
             </div>
 
             {/* Key stats row */}
@@ -679,7 +688,9 @@ export default function Overview() {
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground py-2">No upcoming milestones</p>
+                <p className="py-2 text-sm text-muted-foreground">
+                  {timelineQuery.isLoading ? "Loading timeline…" : "No upcoming milestones — every scheduled timeline item is already in the past."}
+                </p>
               )}
             </div>
           </CardContent>
