@@ -385,6 +385,8 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
   const tally = useMemo(() => tallyFloors(data.floors), [data.floors]);
   const mismatches = data.floors.filter((f) => f.mismatch);
   const [highlight, setHighlight] = useState<string | null>(null);
+  // Floors read 4 → 27 (ascending), consistent with Corridors.
+  const displayFloors = useMemo(() => [...data.floors].reverse(), [data.floors]);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -401,13 +403,13 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
           <h3 className="mb-2 text-sm font-semibold text-white">Section A <span className="text-xs font-normal text-muted-foreground">({headersA.length} tasks)</span></h3>
-          <Heatmap floors={data.floors} headers={headersA} section="A" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
+          <Heatmap floors={displayFloors} headers={headersA} section="A" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
         </CardContent>
       </Card>
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
           <h3 className="mb-2 text-sm font-semibold text-white">Section B <span className="text-xs font-normal text-muted-foreground">({headersB.length} tasks)</span></h3>
-          <Heatmap floors={data.floors} headers={headersB} section="B" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
+          <Heatmap floors={displayFloors} headers={headersB} section="B" highlight={highlight ?? undefined} checkboxLabel="Fully done" />
         </CardContent>
       </Card>
     </div>
