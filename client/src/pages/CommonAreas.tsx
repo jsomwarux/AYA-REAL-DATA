@@ -14,45 +14,81 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AlertCircle, AlertTriangle, Check, Loader2, Flag } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, Loader2, Flag, ChevronRight } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Status styling (§7.3 common-area states)
 // ---------------------------------------------------------------------------
+// StatusState palette — used for the Temp/Lobby segmented bar + grouped list.
 const STATUS: Record<StatusState, { cell: string; dot: string; label: string }> = {
   done: { cell: "bg-emerald-500/80", dot: "bg-emerald-500", label: "Done" },
   "in-progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
-  blocker: { cell: "bg-red-500/80 ring-1 ring-red-300/60", dot: "bg-red-500", label: "Blocker" },
-  "in-motion": { cell: "bg-amber-500/70", dot: "bg-amber-500", label: "Ordered" },
-  "not-started": { cell: "border border-white/25 bg-white/[0.06]", dot: "border border-white/30 bg-white/10", label: "Not started" },
-  other: { cell: "bg-fuchsia-500/40", dot: "bg-fuchsia-500", label: "Other" },
+  blocker: { cell: "bg-red-500/80", dot: "bg-red-500", label: "Blocker" },
+  "in-motion": { cell: "bg-amber-500/80", dot: "bg-amber-500", label: "Ordered" },
+  "not-started": { cell: "bg-slate-500/70", dot: "bg-slate-500", label: "Not started" },
+  other: { cell: "bg-fuchsia-500/60", dot: "bg-fuchsia-500", label: "Other" },
 };
-// Same palette as hex, for the SVG donut.
-const STATUS_HEX: Record<StatusState, string> = {
-  done: "#10b981",
-  "in-progress": "#0ea5e9",
-  "in-motion": "#f59e0b",
-  blocker: "#ef4444",
-  "not-started": "#64748b",
-  other: "#d946ef",
-};
-const LEGEND_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
 
-function statusLabel(s: StatusState, blockerLabel: string): string {
-  return s === "blocker" ? blockerLabel : STATUS[s].label;
+// Cell coloring is by the EXACT sheet value, so every distinct status gets its own
+// FILLED color — "Not Started" (slate) is distinct from "Not Yet" (violet), and neither
+// renders blank. Keyed by normalized value (lowercase, collapsed spaces).
+const VALUE_STYLE: Record<string, { cell: string; dot: string; label: string }> = {
+  "completed": { cell: "bg-emerald-500/80", dot: "bg-emerald-500", label: "Completed" },
+  "done": { cell: "bg-emerald-500/80", dot: "bg-emerald-500", label: "Done" },
+  "in progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
+  "waiting on product": { cell: "bg-red-500/80", dot: "bg-red-500", label: "Waiting on product" },
+  "need to order": { cell: "bg-red-500/80", dot: "bg-red-500", label: "Need to order" },
+  "ordered": { cell: "bg-amber-500/80", dot: "bg-amber-500", label: "Ordered" },
+  "not started": { cell: "bg-slate-500/70", dot: "bg-slate-500", label: "Not Started" },
+  "not yet": { cell: "bg-violet-500/60", dot: "bg-violet-500", label: "Not Yet" },
+};
+// The ONLY blank-rendered state: a genuinely empty sheet cell (explicitly labeled).
+const NO_DATA = { cell: "border border-dashed border-white/25", dot: "border border-dashed border-white/40", label: "No data (empty cell)" };
+const OTHER_VAL = { cell: "bg-fuchsia-500/60", dot: "bg-fuchsia-500", label: "Other" };
+
+function normVal(raw: string | null | undefined): string {
+  return (raw ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+function styleForValue(raw: string | null | undefined): { cell: string; dot: string; label: string; key: string } {
+  const n = normVal(raw);
+  if (n === "") return { ...NO_DATA, key: "" };
+  const s = VALUE_STYLE[n];
+  if (s) return { ...s, key: n };
+  return { ...OTHER_VAL, label: (raw ?? "").trim() || "Other", key: n };
 }
 
-function Legend({ blockerLabel }: { blockerLabel: string }) {
+// Legend is built from the values ACTUALLY present in the grid, so it matches the
+// cells cell-for-cell (empty always shown last if present).
+const VALUE_ORDER = ["completed", "done", "in progress", "ordered", "waiting on product", "need to order", "not started", "not yet"];
+function presentValues(floors: CommonAreaFloor[], section?: "A" | "B") {
+  const seen = new Map<string, { key: string; label: string; dot: string }>();
+  for (const f of floors) for (const t of f.tasks) {
+    if (section && t.section !== section) continue;
+    const st = styleForValue(t.rawValue);
+    if (!seen.has(st.key)) seen.set(st.key, { key: st.key, label: st.label, dot: st.dot });
+  }
+  return [...seen.values()].sort((a, b) => {
+    const rank = (k: string) => (k === "" ? 999 : VALUE_ORDER.indexOf(k) < 0 ? 998 : VALUE_ORDER.indexOf(k));
+    return rank(a.key) - rank(b.key);
+  });
+}
+
+function Legend({ floors, section }: { floors: CommonAreaFloor[]; section?: "A" | "B" }) {
+  const items = presentValues(floors, section);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-      {LEGEND_ORDER.map((s) => (
-        <span key={s} className="flex items-center gap-1.5">
-          <span className={cn("h-2.5 w-2.5 rounded-sm", STATUS[s].dot)} />
-          {statusLabel(s, blockerLabel)}
+      {items.map((it) => (
+        <span key={it.key || "empty"} className="flex items-center gap-1.5">
+          <span className={cn("h-2.5 w-2.5 rounded-sm", it.dot)} />
+          {it.label}
         </span>
       ))}
     </div>
   );
+}
+
+function statusLabel(s: StatusState, blockerLabel: string): string {
+  return s === "blocker" ? blockerLabel : STATUS[s].label;
 }
 
 function CompletionBar({ done, total }: { done: number; total: number }) {
@@ -141,16 +177,12 @@ function Heatmap({
                 </td>
                 {floors.map((f) => {
                   const t = cellsFor(f)[i];
-                  const blank = !t?.rawValue || !t.rawValue.trim();
+                  const st = styleForValue(t?.rawValue);
                   return (
                     <td key={f.floor} className="p-0">
                       <div
-                        className={cn(
-                          "mx-auto h-7 w-9 rounded-sm",
-                          blank ? "border border-dashed border-white/20" : STATUS[t.status].cell,
-                          hot && "ring-2 ring-white",
-                        )}
-                        title={`Floor ${f.floor} · ${header} · ${t?.rawValue?.trim() || "(blank)"}`}
+                        className={cn("mx-auto h-7 w-9 rounded-sm", st.cell, hot && "ring-2 ring-white")}
+                        title={`Floor ${f.floor} · ${header} · ${t?.rawValue?.trim() || "(empty cell — no data)"}`}
                       />
                     </td>
                   );
@@ -230,13 +262,19 @@ function BlockerLead({
 }) {
   const groups = blockerGroups(floors, section);
   const total = groups.reduce((n, g) => n + g.floors.length, 0);
+  const [open, setOpen] = useState(true); // blocker summary defaults to expanded
   if (total === 0) return null;
   return (
     <div className="rounded-md border border-red-500/30 bg-red-500/[0.06] p-2.5">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-300">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="mb-1.5 flex w-full items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-300"
+      >
+        <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-90")} />
         <AlertCircle className="h-3.5 w-3.5" /> {blockerLabel}
         <span className="text-red-300/70">({total} blocked cell{total > 1 ? "s" : ""})</span>
-      </div>
+      </button>
+      {open && (
       <ul className="space-y-0.5">
         {groups.map((g) => (
           <li key={g.task}>
@@ -255,6 +293,7 @@ function BlockerLead({
           </li>
         ))}
       </ul>
+      )}
     </div>
   );
 }
@@ -273,46 +312,39 @@ function tallyFloors(floors: CommonAreaFloor[], section?: "A" | "B") {
 }
 
 // ---------------------------------------------------------------------------
-// Status donut (Temp/Lobby — no floor dimension, so a chart instead of a grid)
+// Segmented status bar (Temp/Lobby — no floor dimension). ONE 100%-wide bar split
+// into colored segments sized by task count per status — the whole lobby's work as a
+// pipeline at a glance, matching the grid colour language better than a pie.
 // ---------------------------------------------------------------------------
-function StatusDonut({ segments, total, done }: { segments: { status: StatusState; count: number }[]; total: number; done: number }) {
-  const size = 150,
-    stroke = 24,
-    r = (size - stroke) / 2,
-    c = size / 2;
-  const circ = 2 * Math.PI * r;
+function SegmentedBar({ segments, total, done, blockerLabel }: { segments: { status: StatusState; count: number }[]; total: number; done: number; blockerLabel: string }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  let acc = 0;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
-      <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
-      <g transform={`rotate(-90 ${c} ${c})`}>
-        {segments.map((s) => {
-          const len = total > 0 ? circ * (s.count / total) : 0;
-          const el = (
-            <circle
-              key={s.status}
-              cx={c}
-              cy={c}
-              r={r}
-              fill="none"
-              stroke={STATUS_HEX[s.status]}
-              strokeWidth={stroke}
-              strokeDasharray={`${len} ${circ - len}`}
-              strokeDashoffset={-acc}
-            />
-          );
-          acc += len;
-          return el;
-        })}
-      </g>
-      <text x={c} y={c - 2} textAnchor="middle" dominantBaseline="middle" fill="#fff" style={{ fontSize: "26px", fontWeight: 700 }}>
-        {pct}%
-      </text>
-      <text x={c} y={c + 18} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" style={{ fontSize: "10px", letterSpacing: "0.06em" }}>
-        DONE
-      </text>
-    </svg>
+    <div>
+      <div className="mb-2 flex items-baseline gap-2">
+        <span className="text-3xl font-bold text-emerald-300">{pct}%</span>
+        <span className="text-sm text-muted-foreground">done · {done} of {total} tasks</span>
+      </div>
+      <div className="flex h-7 w-full overflow-hidden rounded-md bg-white/5">
+        {segments.map((s) => (
+          <div
+            key={s.status}
+            className={cn("flex h-full items-center justify-center", STATUS[s.status].cell)}
+            style={{ width: `${total > 0 ? (s.count / total) * 100 : 0}%` }}
+            title={`${statusLabel(s.status, blockerLabel)}: ${s.count}`}
+          >
+            {total > 0 && s.count / total >= 0.07 && <span className="px-1 text-[11px] font-semibold text-white">{s.count}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {segments.map((s) => (
+          <span key={s.status} className="flex items-center gap-1.5 text-muted-foreground">
+            <span className={cn("h-2.5 w-2.5 rounded-sm", STATUS[s.status].dot)} />
+            {statusLabel(s.status, blockerLabel)} <b className="text-white">{s.count}</b>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -324,11 +356,13 @@ function CorridorsView({ data }: { data: CommonAreaResponse }) {
   const tally = useMemo(() => tallyFloors(data.floors), [data.floors]);
   const mismatches = data.floors.filter((f) => f.mismatch);
   const [highlight, setHighlight] = useState<string | null>(null);
+  // Floors read 4 → 27 (ascending): leftmost column = 4TH, rightmost = 27TH.
+  const displayFloors = useMemo(() => [...data.floors].reverse(), [data.floors]);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <CompletionBar done={tally.done} total={tally.total} />
-        <Legend blockerLabel="Waiting on product" />
+        <Legend floors={data.floors} />
       </div>
       {mismatches.length > 0 && (
         <p className="flex items-center gap-1.5 text-xs text-amber-200">
@@ -338,7 +372,7 @@ function CorridorsView({ data }: { data: CommonAreaResponse }) {
       <BlockerLead floors={data.floors} blockerLabel="Waiting on product" highlight={highlight} onPick={setHighlight} />
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-3">
-          <Heatmap floors={data.floors} headers={headers} highlight={highlight ?? undefined} checkboxLabel="Fully completed" />
+          <Heatmap floors={displayFloors} headers={headers} highlight={highlight ?? undefined} checkboxLabel="Fully completed" />
         </CardContent>
       </Card>
     </div>
@@ -355,7 +389,7 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <CompletionBar done={tally.done} total={tally.total} />
-        <Legend blockerLabel="Blocker" />
+        <Legend floors={data.floors} />
       </div>
       {mismatches.length > 0 && (
         <p className="flex items-center gap-1.5 text-xs text-amber-200">
@@ -381,7 +415,8 @@ function StaircaseView({ data }: { data: CommonAreaResponse }) {
 }
 
 const LOBBY_GROUP_ORDER: StatusState[] = ["blocker", "in-progress", "in-motion", "not-started", "done", "other"];
-const DONUT_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
+// Bar reads left→right as a pipeline: done first (green), … , not-started last (slate).
+const SEGMENT_ORDER: StatusState[] = ["done", "in-progress", "in-motion", "blocker", "not-started", "other"];
 
 function LobbyView({ data }: { data: LobbyResponse }) {
   const byStatus = useMemo(() => {
@@ -394,35 +429,15 @@ function LobbyView({ data }: { data: LobbyResponse }) {
     return m;
   }, [data.tasks]);
 
-  const donutSegments = DONUT_ORDER.filter((s) => byStatus.has(s)).map((s) => ({ status: s, count: byStatus.get(s)!.length }));
+  const segments = SEGMENT_ORDER.filter((s) => byStatus.has(s)).map((s) => ({ status: s, count: byStatus.get(s)!.length }));
   const groups = LOBBY_GROUP_ORDER.filter((s) => byStatus.has(s)).map((s) => ({ status: s, tasks: byStatus.get(s)! }));
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <CompletionBar done={data.completion.done} total={data.completion.total} />
-        <Legend blockerLabel="Need to order" />
-      </div>
-
-      {/* Donut for the glance */}
+      {/* Segmented pipeline bar for the glance (replaces the pie) */}
       <Card className="border-white/10 bg-white/[0.02]">
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-6">
-            <StatusDonut segments={donutSegments} total={data.completion.total} done={data.completion.done} />
-            <ul className="min-w-[180px] space-y-1 text-xs">
-              {donutSegments.map(({ status, count }) => (
-                <li key={status} className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 flex-shrink-0 rounded-sm" style={{ background: STATUS_HEX[status] }} />
-                  <span className="text-white/90">{statusLabel(status, "Need to order")}</span>
-                  <span className="ml-auto tabular-nums text-muted-foreground">{count}</span>
-                </li>
-              ))}
-              <li className="mt-1 flex items-center gap-2 border-t border-white/10 pt-1 text-muted-foreground">
-                <span className="text-white/90">Total</span>
-                <span className="ml-auto tabular-nums">{data.completion.total}</span>
-              </li>
-            </ul>
-          </div>
+          <SegmentedBar segments={segments} total={data.completion.total} done={data.completion.done} blockerLabel="Need to order" />
         </CardContent>
       </Card>
 
