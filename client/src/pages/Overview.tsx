@@ -11,6 +11,8 @@ import {
   fetchConstructionProgressData,
   fetchBudgetData,
   fetchTimelineData,
+  fetchExpansionRollup,
+  type RollupTower,
   RoomProgress,
 } from "@/lib/api";
 import {
@@ -39,6 +41,7 @@ import {
   Clock,
   ListChecks,
   PieChart,
+  Package,
 } from "lucide-react";
 import {
   BarChart,
@@ -134,8 +137,16 @@ export default function Overview() {
     enabled: isManagement,
   });
 
+  // Delivery roll-up (furniture parts) — construction-related, shown to all users.
+  const rollupQuery = useQuery({
+    queryKey: ["expansion-rollup"],
+    queryFn: fetchExpansionRollup,
+    retry: false,
+    staleTime: 1000 * 60 * 2,
+  });
+
   const handleRefresh = async () => {
-    const promises: Promise<any>[] = [constructionProgressQuery.refetch()];
+    const promises: Promise<any>[] = [constructionProgressQuery.refetch(), rollupQuery.refetch()];
     if (isManagement) {
       promises.push(budgetQuery.refetch(), timelineQuery.refetch());
     }
@@ -164,6 +175,23 @@ export default function Overview() {
     : 0;
 
   const completedUnits = roomCompletions.filter((c: any) => c.overall.percentage === 100).length;
+
+  // ── Parts Delivered (furniture) — SAME count-summing as Floor→Room / Containers:
+  //    delivered = Σ received-part weight; applicable = non-N/A received parts. ──
+  const deliveredFor = (tower: RollupTower) => {
+    let num = 0, den = 0;
+    for (const f of tower.floors) for (const r of f.rooms) for (const pkg of r.packages) {
+      for (const p of pkg.received?.parts ?? []) {
+        if (p.bucket !== "excluded") { den++; num += p.weight; }
+      }
+    }
+    return { num, den };
+  };
+  const towers = rollupQuery.data?.towers ?? [];
+  const hrDelivered = towers.filter((t) => t.tower === "HR").reduce((a, t) => { const c = deliveredFor(t); return { num: a.num + c.num, den: a.den + c.den }; }, { num: 0, den: 0 });
+  const lrDelivered = towers.filter((t) => t.tower === "LR").reduce((a, t) => { const c = deliveredFor(t); return { num: a.num + c.num, den: a.den + c.den }; }, { num: 0, den: 0 });
+  const totalDelivered = { num: hrDelivered.num + lrDelivered.num, den: hrDelivered.den + lrDelivered.den };
+  const dPct = (c: { num: number; den: number }) => (c.den > 0 ? Math.round((c.num / c.den) * 100) : 0);
 
   // Floor data for chart
   const floors = getUniqueFloors(rooms);
@@ -321,7 +349,7 @@ export default function Overview() {
       )}
 
       {/* ═══ TOP-LEVEL KPI STATS ═══ */}
-      <div className={`mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 ${isManagement ? 'lg:grid-cols-4' : 'lg:grid-cols-1 max-w-md'}`}>
+      <div className={`mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 ${isManagement ? 'lg:grid-cols-5' : 'lg:grid-cols-2 max-w-2xl'}`}>
         <StatCard
           title="Construction Progress"
           value={`${overallCompletion}%`}
@@ -329,6 +357,20 @@ export default function Overview() {
           changeType={overallCompletion >= 50 ? "positive" : "neutral"}
           icon={<Building2 className="h-5 w-5" />}
           accentColor="teal"
+        />
+        <StatCard
+          title="Parts Delivered"
+          value={rollupQuery.data ? `${dPct(totalDelivered)}%` : rollupQuery.isLoading ? "…" : "—"}
+          change={
+            rollupQuery.data
+              ? `${totalDelivered.num.toLocaleString()} of ${totalDelivered.den.toLocaleString()} parts · HR ${dPct(hrDelivered)}% · LR ${dPct(lrDelivered)}%`
+              : rollupQuery.isLoading
+                ? "Loading delivery…"
+                : "Delivery data unavailable"
+          }
+          changeType={dPct(totalDelivered) >= 50 ? "positive" : "neutral"}
+          icon={<Package className="h-5 w-5" />}
+          accentColor="blue"
         />
         {isManagement && (
           <>
