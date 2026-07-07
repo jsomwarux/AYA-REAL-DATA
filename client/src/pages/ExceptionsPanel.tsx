@@ -254,6 +254,8 @@ export default function ExceptionsPanel() {
             <EmptyState icon={<AlertCircle className="h-10 w-10 text-muted-foreground" />} title="Nothing matches your filters" body="Try widening the tower or tab filter." />
           ) : (
             <div className="space-y-6">
+              {/* Visual priority ranking of the worst Not Found gaps (respects filters) */}
+              <NotFoundChart items={filtered.filter((i) => i.reason === "Not Found")} />
               {tiers.map((tier) => (
                 <TierSection key={tier.key} tier={tier} />
               ))}
@@ -268,6 +270,46 @@ export default function ExceptionsPanel() {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+/** Horizontal bar chart of the top ~12 most-missing part types by room count —
+ *  the worst procurement gaps at a glance. Reflects the passed (filtered) items. */
+const CHART_TOP = 12;
+function NotFoundChart({ items }: { items: ExceptionItem[] }) {
+  const bars = useMemo(() => {
+    const groups = rollupByPart(items, (i) => i.package, (i) => i.part);
+    return groups
+      .map((g) => ({ package: g.package, part: g.part, count: new Set(g.items.map((i) => `${i.tower}:${i.roomNo}`)).size }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, CHART_TOP);
+  }, [items]);
+
+  if (bars.length === 0) return null;
+  const max = bars[0].count || 1;
+
+  return (
+    <Card className="border-red-500/30 bg-red-500/[0.05]">
+      <CardContent className="p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <PackageSearch className="h-4 w-4 text-red-300" />
+          <h3 className="text-sm font-semibold text-red-200">Biggest procurement gaps — most-missing parts</h3>
+          <span className="text-xs text-muted-foreground">top {bars.length} Not Found, by rooms</span>
+        </div>
+        <ul className="space-y-1.5">
+          {bars.map((b, i) => (
+            <li key={i} className="flex items-center gap-2 text-xs">
+              <span className="w-32 flex-shrink-0 truncate text-right text-white/90 sm:w-44" title={`${b.package} · ${b.part}`}>{b.part}</span>
+              <div className="h-4 flex-1 overflow-hidden rounded bg-white/5">
+                <div className="flex h-full items-center justify-end rounded bg-red-500/70 pr-1.5" style={{ width: `${Math.max((b.count / max) * 100, 6)}%` }}>
+                  <span className="text-[10px] font-semibold tabular-nums text-white">{b.count}</span>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
 
 function CountCard({ label, value, tone, icon: Icon }: { label: string; value: number; tone: Tone | "slate"; icon: typeof PackageSearch }) {
   const cls = tone === "slate" ? { border: "border-white/10", bg: "bg-white/5", text: "text-muted-foreground" } : TONE[tone];
