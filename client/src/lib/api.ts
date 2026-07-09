@@ -355,53 +355,43 @@ export async function fetchDriveFiles(folderUrl: string): Promise<DriveFilesResp
   return handleResponse<DriveFilesResponse>(response);
 }
 
-// Budget Types
-export interface BudgetItem {
-  id: number;
-  category: string;
-  vendor: string;
-  project: string;
-  status: string;
-  subtotal: number;
+// Budget Types — sourced from the "Schedule Summary" tab (see shared/lib/budget.ts).
+export interface BudgetLineItem {
+  id: number;                // sheet row number
+  name: string;              // column A
+  category: string;          // column F, raw trimmed ("" grouped as Uncategorized)
+  displayCategory: string;   // pretty label (typos fixed; blank → "Uncategorized")
+  estimatedCost: number;     // column C
+  paid: number;              // column D
+  requiredForLowRise: boolean; // column E
+}
+
+export interface BudgetCategory {
+  name: string;              // raw grouping key (or "Uncategorized")
+  displayName: string;       // pretty label
+  total: number;             // Σ estimated cost in this category
+  pct: number;               // % of estimatedBeforeContingency
+  count: number;
 }
 
 export interface BudgetTotals {
-  total: number;
-  contingency: number;
-  totalBudget: number;
-  hardCosts: number;
-  softCosts: number;
-  paidThusFar: number;
-  costPerRoom: number;
-  costPerBedroom: number;
-  costPerBathroom: number;
-  totalRooms: number;
-}
-
-export interface CategoryBreakdown {
-  name: string;
-  total: number;
-  paid: number;
-}
-
-export interface VendorBreakdown {
-  name: string;
-  total: number;
-}
-
-export interface StatusBreakdown {
-  status: string;
-  count: number;
-  total: number;
+  estimatedBeforeContingency: number; // Σ column C (the category chart sums to this)
+  contingencyRate: number;            // 0.10
+  contingency: number;                // Σ C × rate
+  total: number;                      // headline "Total Budget" (incl. contingency)
+  paid: number;                       // Σ column D
+  paidPct: number;                    // paid / total × 100
+  remaining: number;                  // total − paid
+  units: number;                      // 166
+  costPerUnit: number;                // total / units
 }
 
 export interface BudgetData {
-  items: BudgetItem[];
+  tab: string;
   totals: BudgetTotals;
-  categoryBreakdown: CategoryBreakdown[];
-  vendorBreakdown: VendorBreakdown[];
-  statusBreakdown: StatusBreakdown[];
-  itemCount: number;
+  categories: BudgetCategory[]; // sorted by total desc
+  items: BudgetLineItem[];
+  meta: { headerRow: number; firstItemRow: number; lastItemRow: number; totalRow: number; lineItemCount: number };
   lastUpdated: string;
 }
 

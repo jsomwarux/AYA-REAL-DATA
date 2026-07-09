@@ -186,13 +186,17 @@ export async function getDriveFileStream(fileId: string): Promise<{ stream: Node
 // Fetch data from a Google Sheet
 export async function fetchSheetData(
   spreadsheetId: string,
-  range: string
+  range: string,
+  // 'UNFORMATTED_VALUE' returns raw cell values (numbers as JS numbers, not "$1,234"),
+  // needed when we sum money to the cent. Omit for the default formatted-string behavior.
+  valueRenderOption?: 'FORMATTED_VALUE' | 'UNFORMATTED_VALUE'
 ): Promise<SheetData> {
   const sheets = getGoogleSheetsClient();
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range,
+    ...(valueRenderOption ? { valueRenderOption } : {}),
   });
 
   const values = response.data.values || [];

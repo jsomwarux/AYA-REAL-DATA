@@ -5,7 +5,6 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -21,22 +20,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fetchBudgetData, BudgetItem } from "@/lib/api";
-import { BudgetItemModal } from "@/components/budget/BudgetItemModal";
+import { fetchBudgetData, type BudgetLineItem } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { toastSuccess } from "@/hooks/use-toast";
 import {
   DollarSign,
   TrendingUp,
-  Building2,
-  FileText,
+  Wallet,
+  Calculator,
+  Percent,
+  Home,
   Search,
-  Users,
-  PieChart,
+  BarChart3,
   ChevronDown,
   ChevronUp,
-  BedDouble,
-  Bath,
 } from "lucide-react";
 import {
   BarChart,
@@ -47,47 +44,32 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  PieChart as RechartsPieChart,
-  Pie,
-  Legend,
+  LabelList,
 } from "recharts";
 
-// Format currency
+// Whole-dollar currency.
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
 }
 
-// Format currency compact
-function formatCurrencyCompact(value: number, decimals: number = 0): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(decimals)}K`;
-  }
+// Compact currency ($1.2M / $340K).
+function formatCurrencyCompact(value: number): string {
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return formatCurrency(value);
 }
 
-// Status badge colors
-function getStatusColor(status: string): string {
-  const s = status.toLowerCase();
-  if (s.includes('contract') || s.includes('signed')) return 'bg-green-500/20 text-green-400';
-  if (s.includes('realistic')) return 'bg-blue-500/20 text-blue-400';
-  if (s.includes('rough')) return 'bg-amber-500/20 text-amber-400';
-  if (s.includes('awaiting')) return 'bg-purple-500/20 text-purple-400';
-  if (s === 'n/a' || s === 'n.a') return 'bg-gray-500/20 text-gray-400';
-  return 'bg-white/10 text-muted-foreground';
-}
-
-// Chart colors
+// Recharts palette (categorical).
 const CHART_COLORS = [
-  '#14b8a6', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444',
-  '#22c55e', '#ec4899', '#06b6d4', '#f97316', '#6366f1',
+  "#14b8a6", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+  "#22c55e", "#ec4899", "#06b6d4", "#f97316", "#6366f1",
+  "#84cc16", "#a855f7", "#0ea5e9", "#eab308", "#f43f5e",
+  "#10b981", "#d946ef", "#38bdf8", "#fb923c", "#4f46e5", "#94a3b8",
 ];
 
 export default function Budget() {
@@ -95,18 +77,14 @@ export default function Budget() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [vendorFilter, setVendorFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<keyof BudgetItem>("subtotal");
+  const [sortField, setSortField] = useState<keyof BudgetLineItem>("estimatedCost");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [showAllVendors, setShowAllVendors] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<BudgetItem | null>(null);
 
   const budgetQuery = useQuery({
     queryKey: ["budget"],
     queryFn: fetchBudgetData,
     retry: false,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 60 * 2,
   });
 
   const handleRefresh = async () => {
@@ -116,489 +94,301 @@ export default function Budget() {
 
   const isLoading = budgetQuery.isLoading;
   const data = budgetQuery.data;
+  const totals = data?.totals;
 
-  // Get unique values for filters
-  const categories = useMemo(() => {
-    if (!data?.items) return [];
-    return [...new Set(data.items.map(item => item.category))].sort();
-  }, [data?.items]);
+  // Category filter options — the pretty display names, in the chart's descending order.
+  const categoryOptions = useMemo(
+    () => (data?.categories || []).map((c) => c.displayName),
+    [data?.categories],
+  );
 
-  const statuses = useMemo(() => {
-    if (!data?.items) return [];
-    return [...new Set(data.items.map(item => item.status))].sort();
-  }, [data?.items]);
+  // Horizontal bar-chart data (descending). Each bar carries a precomputed "$X · Y%" label.
+  const categoryChartData = useMemo(() => {
+    if (!data?.categories) return [];
+    return data.categories.map((cat, index) => ({
+      name: cat.displayName,
+      value: cat.total,
+      pct: cat.pct,
+      label: `${formatCurrencyCompact(cat.total)} · ${cat.pct.toFixed(1)}%`,
+      color: CHART_COLORS[index % CHART_COLORS.length],
+    }));
+  }, [data?.categories]);
 
-  const vendors = useMemo(() => {
-    if (!data?.items) return [];
-    return [...new Set(data.items.map(item => item.vendor).filter(v => v))].sort();
-  }, [data?.items]);
-
-  // Filter and sort items
   const filteredItems = useMemo(() => {
     if (!data?.items) return [];
-
     let items = [...data.items];
-
-    // Apply filters
     if (categoryFilter !== "all") {
-      items = items.filter(item => item.category === categoryFilter);
-    }
-    if (statusFilter !== "all") {
-      items = items.filter(item => item.status === statusFilter);
-    }
-    if (vendorFilter !== "all") {
-      items = items.filter(item => item.vendor === vendorFilter);
+      items = items.filter((it) => it.displayCategory === categoryFilter);
     }
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      items = items.filter(item =>
-        item.project.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query) ||
-        item.vendor.toLowerCase().includes(query)
+      const q = searchQuery.toLowerCase();
+      items = items.filter(
+        (it) =>
+          it.name.toLowerCase().includes(q) ||
+          it.displayCategory.toLowerCase().includes(q),
       );
     }
-
-    // Sort
     items.sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
-
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortDirection === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
-
       const aNum = Number(aVal) || 0;
       const bNum = Number(bVal) || 0;
-      return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+      return sortDirection === "asc" ? aNum - bNum : bNum - aNum;
     });
-
     return items;
-  }, [data?.items, categoryFilter, statusFilter, vendorFilter, searchQuery, sortField, sortDirection]);
+  }, [data?.items, categoryFilter, searchQuery, sortField, sortDirection]);
 
-  // Calculate filtered totals
-  const filteredTotal = useMemo(() => {
-    return filteredItems.reduce((sum, item) => sum + item.subtotal, 0);
-  }, [filteredItems]);
+  const filteredTotal = useMemo(
+    () => filteredItems.reduce((s, it) => s + it.estimatedCost, 0),
+    [filteredItems],
+  );
 
-  const handleSort = (field: keyof BudgetItem) => {
+  const handleSort = (field: keyof BudgetLineItem) => {
     if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      setSortDirection((p) => (p === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
-
-  const SortIcon = ({ field }: { field: keyof BudgetItem }) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ?
-      <ChevronUp className="h-4 w-4 inline ml-1" /> :
-      <ChevronDown className="h-4 w-4 inline ml-1" />;
-  };
-
-  // Prepare chart data for categories (top 8)
-  const categoryChartData = useMemo(() => {
-    if (!data?.categoryBreakdown) return [];
-    return data.categoryBreakdown.slice(0, 8).map((cat, index) => ({
-      name: cat.name.length > 15 ? cat.name.substring(0, 15) + '...' : cat.name,
-      fullName: cat.name,
-      value: cat.total,
-      color: CHART_COLORS[index % CHART_COLORS.length],
-    }));
-  }, [data?.categoryBreakdown]);
-
-  // Prepare pie chart data for paid vs remaining
-  const paidVsRemainingData = useMemo(() => {
-    if (!data?.totals) return [];
-    const remaining = data.totals.totalBudget - data.totals.paidThusFar;
-    return [
-      { name: 'Paid', value: data.totals.paidThusFar, color: '#22c55e' },
-      { name: 'Remaining', value: remaining > 0 ? remaining : 0, color: '#3b82f6' },
-    ];
-  }, [data?.totals]);
-
-  // Vendors to show (top 10 or all)
-  const displayedVendors = useMemo(() => {
-    if (!data?.vendorBreakdown) return [];
-    return showAllVendors ? data.vendorBreakdown : data.vendorBreakdown.slice(0, 10);
-  }, [data?.vendorBreakdown, showAllVendors]);
+  const SortIcon = ({ field }: { field: keyof BudgetLineItem }) =>
+    sortField !== field ? null : sortDirection === "asc" ? (
+      <ChevronUp className="ml-1 inline h-4 w-4" />
+    ) : (
+      <ChevronDown className="ml-1 inline h-4 w-4" />
+    );
 
   return (
     <DashboardLayout
-      title="Budget Overview"
-      subtitle="Project budget tracking and analysis"
+      title="Budget"
+      subtitle={
+        data?.lastUpdated
+          ? `From the "Schedule Summary" tab · ${data.meta.lineItemCount} line items`
+          : "Project budget from the Schedule Summary tab"
+      }
       onRefresh={handleRefresh}
       isLoading={isLoading}
     >
-      {/* Stats Grid */}
-      <div className="mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3">
+      {/* Money-first cards */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 lg:grid-cols-3">
         <StatCard
           title="Total Budget"
-          value={formatCurrencyCompact(data?.totals?.totalBudget || 0)}
-          change="Including contingency"
+          value={formatCurrency(totals?.total || 0)}
+          change="Including 10% contingency"
           changeType="neutral"
           icon={<DollarSign className="h-5 w-5" />}
           accentColor="teal"
         />
         <StatCard
           title="Paid Thus Far"
-          value={formatCurrencyCompact(data?.totals?.paidThusFar || 0)}
-          change={data?.totals?.totalBudget ? `${Math.round((data.totals.paidThusFar / data.totals.totalBudget) * 100)}% of budget` : '0%'}
+          value={formatCurrency(totals?.paid || 0)}
+          change={totals ? `${Math.round(totals.paidPct)}% of total budget` : "—"}
           changeType="positive"
           icon={<TrendingUp className="h-5 w-5" />}
-          accentColor="teal"
-        />
-        <StatCard
-          title="Hard Costs"
-          value={formatCurrencyCompact(data?.totals?.hardCosts || 0)}
-          change={`${data?.categoryBreakdown?.filter(c => c.name.toLowerCase() !== 'soft costs').length || 0} categories`}
-          changeType="neutral"
-          icon={<Building2 className="h-5 w-5" />}
           accentColor="blue"
         />
         <StatCard
-          title="Soft Costs"
-          value={formatCurrencyCompact(data?.totals?.softCosts || 0)}
-          change="Non-construction"
+          title="Remaining to Complete"
+          value={formatCurrency(totals?.remaining || 0)}
+          change="Total budget minus paid"
           changeType="neutral"
-          icon={<FileText className="h-5 w-5" />}
+          icon={<Wallet className="h-5 w-5" />}
           accentColor="purple"
         />
         <StatCard
-          title="Cost Per Bedroom"
-          value={formatCurrencyCompact(data?.totals?.costPerBedroom || 0, 1)}
-          change={`${data?.totals?.totalRooms || 166} units`}
+          title="Estimated Cost"
+          value={formatCurrency(totals?.estimatedBeforeContingency || 0)}
+          change="Before contingency"
           changeType="neutral"
-          icon={<BedDouble className="h-5 w-5" />}
+          icon={<Calculator className="h-5 w-5" />}
+          accentColor="teal"
+        />
+        <StatCard
+          title="Contingency (10%)"
+          value={formatCurrency(totals?.contingency || 0)}
+          change="On the estimated cost"
+          changeType="neutral"
+          icon={<Percent className="h-5 w-5" />}
           accentColor="amber"
         />
         <StatCard
-          title="Cost Per Bathroom"
-          value={formatCurrencyCompact(data?.totals?.costPerBathroom || 0, 1)}
-          change={`${data?.totals?.totalRooms || 166} units`}
+          title="Cost per unit (166 units)"
+          value={formatCurrency(totals?.costPerUnit || 0)}
+          change="Total budget ÷ 166"
           changeType="neutral"
-          icon={<Bath className="h-5 w-5" />}
-          accentColor="amber"
+          icon={<Home className="h-5 w-5" />}
+          accentColor="blue"
         />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-6 sm:mb-8">
-        {/* Category Breakdown Chart */}
-        <Card className="border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <PieChart className="h-5 w-5 text-teal-400" />
-              Budget by Category
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="h-[240px] sm:h-[300px]">
-              {categoryChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryChartData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis
-                      type="number"
-                      stroke="rgba(255,255,255,0.5)"
-                      fontSize={12}
-                      tickFormatter={(value) => formatCurrencyCompact(value)}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="rgba(255,255,255,0.5)"
-                      fontSize={10}
-                      width={80}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(217 33% 17%)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px",
-                        color: "white"
-                      }}
-                      formatter={(value: number, name: string, props: any) => [
-                        formatCurrency(value),
-                        props.payload.fullName
-                      ]}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {categoryChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No category data available
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Paid vs Remaining Pie Chart */}
-        <Card className="border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <DollarSign className="h-5 w-5 text-green-400" />
-              Paid vs Remaining
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="h-[240px] sm:h-[300px]">
-              {paidVsRemainingData.length > 0 && data?.totals?.totalBudget ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={paidVsRemainingData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
-                    >
-                      {paidVsRemainingData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(217 33% 17%)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px",
-                        color: "white"
-                      }}
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
-                    <Legend />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No payment data available
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Status Breakdown & Vendor Summary Row */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 mb-6 sm:mb-8">
-        {/* Status Breakdown */}
-        <Card className="border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <FileText className="h-5 w-5 text-blue-400" />
-              Budget by Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
-            {data?.statusBreakdown?.map((status, index) => {
-              const percentage = data.totals.total > 0
-                ? Math.round((status.total / data.totals.total) * 100)
-                : 0;
-              return (
-                <div key={status.status} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge className={getStatusColor(status.status)}>
-                        {status.status}
-                      </Badge>
-                      <span className="text-muted-foreground">
-                        ({status.count} items)
-                      </span>
-                    </div>
-                    <span className="font-medium text-white">
-                      {formatCurrency(status.total)}
-                    </span>
-                  </div>
-                  <Progress
-                    value={percentage}
-                    className="h-2 bg-white/10"
-                  />
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Vendor Summary */}
-        <Card className="border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Users className="h-5 w-5 text-amber-400" />
-              Top Vendors by Spend
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-3 max-h-[240px] sm:h-[300px] overflow-y-auto pr-2">
-              {displayedVendors.map((vendor, index) => (
-                <div
-                  key={vendor.name}
-                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+      {/* Estimated cost by category (before contingency) */}
+      <Card className="mb-6 border-white/10 sm:mb-8">
+        <CardHeader className="border-b border-white/10">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-white">
+            <BarChart3 className="h-5 w-5 text-teal-400" />
+            Estimated cost by category (before contingency)
+            <span className="text-xs font-normal text-muted-foreground">
+              sums to {formatCurrency(totals?.estimatedBeforeContingency || 0)}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {categoryChartData.length > 0 ? (
+            <div style={{ height: Math.max(320, categoryChartData.length * 26) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={categoryChartData}
+                  layout="vertical"
+                  margin={{ top: 4, right: 96, bottom: 4, left: 8 }}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground w-5">
-                      {index + 1}.
-                    </span>
-                    <span className="text-xs sm:text-sm text-white truncate max-w-[120px] sm:max-w-[180px]">
-                      {vendor.name}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium text-teal-400">
-                    {formatCurrency(vendor.total)}
-                  </span>
-                </div>
-              ))}
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    stroke="rgba(255,255,255,0.5)"
+                    fontSize={11}
+                    tickFormatter={(v) => formatCurrencyCompact(v)}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke="rgba(255,255,255,0.6)"
+                    fontSize={11}
+                    width={150}
+                    interval={0}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(217 33% 17%)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "white",
+                    }}
+                    formatter={(value: number, _name, props: any) => [
+                      `${formatCurrency(value)} · ${props.payload.pct.toFixed(1)}% of estimated`,
+                      props.payload.name,
+                    ]}
+                  />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                    {categoryChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                    <LabelList dataKey="label" position="right" fill="rgba(255,255,255,0.75)" fontSize={11} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            {data?.vendorBreakdown && data.vendorBreakdown.length > 10 && (
-              <button
-                onClick={() => setShowAllVendors(!showAllVendors)}
-                className="w-full mt-4 text-sm text-muted-foreground hover:text-white transition-colors"
-              >
-                {showAllVendors
-                  ? 'Show less'
-                  : `Show all ${data.vendorBreakdown.length} vendors`}
-              </button>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <div className="flex h-[240px] items-center justify-center text-muted-foreground">
+              {isLoading ? "Loading…" : "No category data available"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Detailed Table */}
+      {/* Line items */}
       <Card className="border-white/10">
         <CardHeader className="border-b border-white/10">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-            <CardTitle className="flex items-center gap-2 text-white text-base sm:text-lg flex-wrap">
-              <FileText className="h-5 w-5 text-teal-400" />
-              Line Items
-              <Badge variant="outline" className="text-[10px] sm:text-xs">
-                {filteredItems.length}
-              </Badge>
-              {filteredItems.length !== data?.items?.length && (
-                <span className="text-xs sm:text-sm text-muted-foreground">
-                  ({formatCurrencyCompact(filteredTotal)})
-                </span>
-              )}
-            </CardTitle>
-          </div>
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base text-white sm:text-lg">
+            <BarChart3 className="h-5 w-5 text-teal-400" />
+            Line Items
+            <Badge variant="outline" className="text-[10px] sm:text-xs">
+              {filteredItems.length}
+            </Badge>
+            {filteredItems.length !== (data?.items?.length || 0) && (
+              <span className="text-xs text-muted-foreground sm:text-sm">
+                ({formatCurrencyCompact(filteredTotal)})
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
-            <div className="relative flex-1 min-w-[160px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="mb-4 flex flex-wrap gap-2 sm:mb-6 sm:gap-4">
+            <div className="relative min-w-[160px] flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search..."
+                placeholder="Search line items…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white/5 border-white/10 h-9 text-sm"
+                className="h-9 border-white/10 bg-white/5 pl-9 text-sm"
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[130px] sm:w-[180px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
+              <SelectTrigger className="h-9 w-[150px] border-white/10 bg-white/5 text-xs sm:w-[200px] sm:text-sm">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[130px] sm:w-[180px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {statuses.map(status => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={vendorFilter} onValueChange={setVendorFilter}>
-              <SelectTrigger className="w-[130px] sm:w-[180px] bg-white/5 border-white/10 h-9 text-xs sm:text-sm">
-                <SelectValue placeholder="Vendor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vendors</SelectItem>
-                {vendors.map(vendor => (
-                  <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
+                {categoryOptions.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Table */}
-          <div className="rounded-md border border-white/10 overflow-hidden">
+          <div className="overflow-hidden rounded-md border border-white/10">
             <div className="max-h-[500px] overflow-y-auto">
               <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white text-xs sm:text-sm"
-                      onClick={() => handleSort('project')}
+                      className="cursor-pointer text-xs text-muted-foreground hover:text-white sm:text-sm"
+                      onClick={() => handleSort("name")}
                     >
-                      Project <SortIcon field="project" />
+                      Line Item <SortIcon field="name" />
                     </TableHead>
                     <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white text-xs sm:text-sm hidden sm:table-cell"
-                      onClick={() => handleSort('vendor')}
+                      className="hidden cursor-pointer text-xs text-muted-foreground hover:text-white sm:table-cell sm:text-sm"
+                      onClick={() => handleSort("displayCategory")}
                     >
-                      Vendor <SortIcon field="vendor" />
+                      Category <SortIcon field="displayCategory" />
                     </TableHead>
                     <TableHead
-                      className="text-muted-foreground cursor-pointer hover:text-white text-xs sm:text-sm hidden md:table-cell"
-                      onClick={() => handleSort('status')}
+                      className="cursor-pointer text-right text-xs text-muted-foreground hover:text-white sm:text-sm"
+                      onClick={() => handleSort("estimatedCost")}
                     >
-                      Status <SortIcon field="status" />
+                      Estimated <SortIcon field="estimatedCost" />
                     </TableHead>
                     <TableHead
-                      className="text-muted-foreground text-right cursor-pointer hover:text-white text-xs sm:text-sm"
-                      onClick={() => handleSort('subtotal')}
+                      className="hidden cursor-pointer text-right text-xs text-muted-foreground hover:text-white md:table-cell sm:text-sm"
+                      onClick={() => handleSort("paid")}
                     >
-                      Amount <SortIcon field="subtotal" />
+                      Paid <SortIcon field="paid" />
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredItems.length > 0 ? (
                     filteredItems.map((item) => (
-                      <TableRow
-                        key={item.id}
-                        className="border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
-                        onClick={() => setSelectedItem(item)}
-                      >
-                        <TableCell className="text-white text-xs sm:text-sm py-2.5 sm:py-4">
-                          <div className="font-medium truncate max-w-[200px] sm:max-w-[300px]">{item.project}</div>
-                          <div className="text-[10px] sm:hidden text-muted-foreground mt-0.5">{item.vendor || item.category}</div>
+                      <TableRow key={item.id} className="border-white/10 hover:bg-white/5">
+                        <TableCell className="py-2.5 text-xs text-white sm:py-4 sm:text-sm">
+                          <div className="max-w-[220px] truncate font-medium sm:max-w-[380px]" title={item.name}>
+                            {item.name}
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-muted-foreground sm:hidden">
+                            {item.displayCategory}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-xs sm:text-sm py-2.5 sm:py-4 hidden sm:table-cell">
-                          {item.vendor || '-'}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell py-2.5 sm:py-4">
-                          <Badge className={`${getStatusColor(item.status)} text-[10px] sm:text-xs`}>
-                            {item.status}
+                        <TableCell className="hidden py-2.5 sm:table-cell sm:py-4">
+                          <Badge className="bg-white/10 text-[10px] text-muted-foreground sm:text-xs">
+                            {item.displayCategory}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-medium text-teal-400 text-xs sm:text-sm py-2.5 sm:py-4 whitespace-nowrap">
-                          {item.subtotal > 0 ? formatCurrencyCompact(item.subtotal) : '-'}
+                        <TableCell className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-teal-400 sm:py-4 sm:text-sm">
+                          {formatCurrency(item.estimatedCost)}
+                        </TableCell>
+                        <TableCell className="hidden whitespace-nowrap py-2.5 text-right text-xs text-muted-foreground md:table-cell sm:py-4 sm:text-sm">
+                          {item.paid > 0 ? formatCurrency(item.paid) : "—"}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                         No items match your filters
                       </TableCell>
                     </TableRow>
@@ -609,13 +399,6 @@ export default function Budget() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Budget Item Detail Modal */}
-      <BudgetItemModal
-        item={selectedItem}
-        isOpen={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
-      />
     </DashboardLayout>
   );
 }

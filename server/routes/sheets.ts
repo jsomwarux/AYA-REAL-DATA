@@ -3,6 +3,7 @@ import { fetchSheetData, fetchSheetDataWithHyperlinks, fetchMultipleRanges, getS
 import { db } from '../db';
 import { sheetRows } from '@shared/schema';
 import { eq, and, inArray } from 'drizzle-orm';
+import { buildScheduleSummaryBudget } from '@shared/lib/budget';
 
 const router = Router();
 
@@ -700,329 +701,60 @@ router.get('/drive-file/:fileId', async (req, res) => {
 
 // Get Budget data
 router.get('/budget', async (req, res) => {
+  // Budget tab — sourced from the "Schedule Summary" tab of the Master Budget sheet.
+  // Reads line items (cols A name / C Estimated Cost / D Paid / F Category), then the pure
+  // engine (shared/lib/budget) applies the boundary rule + recomputes the category rollup
+  // and money-first totals. Read-only; never writes.
   console.log('[budget] Endpoint called');
   try {
     const spreadsheetId = process.env.BUDGET_SHEET_ID;
-    console.log('[budget] Sheet ID configured:', spreadsheetId ? 'YES' : 'NO');
-
     if (!spreadsheetId) {
       console.error('[budget] BUDGET_SHEET_ID not set');
       return res.status(400).json({
         error: 'Budget sheet ID not configured',
-        message: 'Please set BUDGET_SHEET_ID in environment variables'
+        message: 'Please set BUDGET_SHEET_ID in environment variables',
       });
     }
 
-    // Dynamically find tab names to handle client renaming
-    const spreadsheetInfo = await getSpreadsheetInfo(spreadsheetId);
-    const availableTabs = spreadsheetInfo.sheets?.map(s => s.title) || [];
-    console.log('[budget] Available tabs:', availableTabs);
-
-    const detailsTab = availableTabs.find(t =>
-      t?.toLowerCase().includes('budget') && t?.toLowerCase().includes('detail')
-    ) || 'Budget Details';
-    const summaryTab = availableTabs.find(t =>
-      t?.toLowerCase().includes('budget') && t?.toLowerCase().includes('summar')
-    ) || 'Budget Summary';
-
-    console.log('[budget] Resolved tab names - Details:', detailsTab, '| Summary:', summaryTab);
-
-    // Fetch both Budget Details and Budget Summary data (A:AZ for future column additions)
-    const detailsRange = `'${detailsTab}'!A:AZ`;
-    const summaryRange = `'${summaryTab}'!A:AZ`;
-
-    console.log('[budget] Fetching data from sheet:', spreadsheetId);
-    const allData = await fetchMultipleRanges(spreadsheetId, [detailsRange, summaryRange]);
-    const data = allData.get(detailsRange);
-    const summaryData = allData.get(summaryRange);
-    console.log('[budget] Details data rows:', data?.rawValues?.length || 0, '| Summary data rows:', summaryData?.rawValues?.length || 0);
-
-    // Process Budget Details data
-    let budgetItems: GoogleSheetRow[] = [];
-    let totals = {
-      total: 0,
-      contingency: 0,
-      totalBudget: 0,
-      hardCosts: 0,
-      softCosts: 0,
-      paidThusFar: 0,
-      costPerRoom: 0,
-      costPerBedroom: 0,
-      costPerBathroom: 0,
-      totalRooms: 166,
-    };
-    const categoryTotals: Record<string, number> = {};
-    const categoryPaid: Record<string, number> = {};
-    const vendorTotals: Record<string, number> = {};
-    const statusCounts: Record<string, { count: number; total: number }> = {};
-
-    // Process Budget Summary to get "Paid Thus Far" totals
-    if (summaryData && summaryData.rawValues && summaryData.rawValues.length > 0) {
-      const summaryHeaders = summaryData.rawValues.find((row: string[]) =>
-        row.some(cell => cell && cell.toString().toLowerCase().includes('summary scope'))
-      );
-
-      // Find the header row index
-      const headerRowIndex = summaryData.rawValues.findIndex((row: string[]) =>
-        row.some(cell => cell && cell.toString().toLowerCase().includes('summary scope'))
-      );
-
-      if (headerRowIndex >= 0) {
-        const headers = summaryData.rawValues[headerRowIndex] as string[];
-        // Find column indices in summary
-        const scopeIdx = headers.findIndex(h => h?.toLowerCase().includes('summary scope') || h?.toLowerCase().includes('scope'));
-        const amountIdx = headers.findIndex(h => h?.toLowerCase().includes('amount'));
-        const paidIdx = headers.findIndex(h => h?.toLowerCase().includes('paid'));
-        const perKeyIdx = headers.findIndex(h => h?.toLowerCase().includes('key'));
-
-        console.log('[budget] Summary column indices:', { scopeIdx, amountIdx, paidIdx, perKeyIdx });
-
-        // Process summary rows
-        const summaryRows = summaryData.rawValues.slice(headerRowIndex + 1);
-        summaryRows.forEach((row: string[]) => {
-          const scope = row[scopeIdx]?.toString().trim() || '';
-          const paidRaw = row[paidIdx];
-
-          // Parse paid amount
-          let paid = 0;
-          if (paidRaw !== undefined && paidRaw !== null && paidRaw !== '' && paidRaw !== '-') {
-            const cleanValue = String(paidRaw).replace(/[$,\s]/g, '');
-            const parsed = parseFloat(cleanValue);
-            if (!isNaN(parsed)) {
-              paid = parsed;
-            }
-          }
-
-          // Map summary scope names to category names and track paid amounts
-          if (scope && paid > 0) {
-            // Extract category name from "Total X" format
-            const categoryMatch = scope.match(/^Total\s+(.+)$/i);
-            if (categoryMatch) {
-              const categoryName = categoryMatch[1].trim();
-              categoryPaid[categoryName] = paid;
-
-              // Also try variations
-              if (categoryName.toLowerCase() === 'exteroir') {
-                categoryPaid['Exterior Work'] = paid;
-              } else if (categoryName.toLowerCase() === 'signage') {
-                categoryPaid['Interior Signage'] = paid;
-              } else if (categoryName.toLowerCase().includes('construction material')) {
-                categoryPaid['Bathrooms'] = (categoryPaid['Bathrooms'] || 0) + paid;
-              } else if (categoryName.toLowerCase().includes('contractor')) {
-                categoryPaid['Bedrooms'] = (categoryPaid['Bedrooms'] || 0) + paid;
-              } else if (categoryName.toLowerCase().includes('ff&e')) {
-                categoryPaid['FF&E'] = paid;
-                categoryPaid['Loose Accesories'] = paid;
-              } else if (categoryName.toLowerCase().includes('boh')) {
-                categoryPaid['BOH'] = paid;
-              } else if (categoryName.toLowerCase() === 'soft cost') {
-                categoryPaid['Soft costs'] = paid;
-              }
-            }
-          }
-
-          // Check for total paid row (last row with totals)
-          if (scope === '' && paid > 0 && totals.paidThusFar === 0) {
-            // This might be the grand total row
-          }
-        });
-
-        // Find the grand total paid (last row usually)
-        const lastRows = summaryData.rawValues.slice(-5);
-        for (const row of lastRows) {
-          const paidRaw = row[paidIdx];
-          if (paidRaw) {
-            const cleanValue = String(paidRaw).replace(/[$,\s]/g, '');
-            const parsed = parseFloat(cleanValue);
-            if (!isNaN(parsed) && parsed > totals.paidThusFar) {
-              totals.paidThusFar = parsed;
-            }
-          }
-        }
-      }
-    }
-
-    if (data && data.rawValues && data.rawValues.length > 0) {
-      // First row is headers
-      const headers = data.rawValues[0] as string[];
-      const dataRows = data.rawValues.slice(1);
-
-      console.log('[budget] Details headers:', headers);
-
-      // Find column indices dynamically by keyword
-      const categoryIdx = headers.findIndex(h => h?.toLowerCase().includes('category'));
-      const paymentsIdx = headers.findIndex(h => {
-        const lower = h?.toLowerCase() || '';
-        return lower.includes('payment') || lower.includes('vendor') || lower.includes('contractor') || lower.includes('supplier');
-      });
-      const projectIdx = headers.findIndex(h => h?.toLowerCase().includes('project'));
-      const statusIdx = headers.findIndex(h => h?.toLowerCase().includes('status'));
-      const subtotalIdx = headers.findIndex(h => h?.toLowerCase().includes('subtotal'));
-
-      console.log('[budget] Column indices:', { categoryIdx, paymentsIdx, projectIdx, statusIdx, subtotalIdx });
-      console.log('[budget] Data rows count:', dataRows.length);
-
-      // Forward-fill CATEGORY column: Google Sheets merged cells only return a value
-      // for the first cell in the merge. Subsequent rows get empty strings.
-      // We carry the last non-empty category value forward to fill the gaps.
-      if (categoryIdx >= 0) {
-        let lastCategory = '';
-        for (const row of dataRows) {
-          const val = row[categoryIdx]?.toString().trim() || '';
-          if (val) {
-            lastCategory = val;
-          } else if (lastCategory) {
-            row[categoryIdx] = lastCategory;
-          }
-        }
-      }
-
-      // Process each row
-      dataRows.forEach((row, rowIndex) => {
-        const category = row[categoryIdx]?.toString().trim() || '';
-        const payments = row[paymentsIdx]?.toString().trim() || '';
-        const project = row[projectIdx]?.toString().trim() || '';
-        const status = row[statusIdx]?.toString().trim() || '';
-        const subtotalRaw = row[subtotalIdx];
-
-        // Parse subtotal - handle currency formatting, dashes, and empty values
-        let subtotal = 0;
-        if (subtotalRaw !== undefined && subtotalRaw !== null && subtotalRaw !== '' && subtotalRaw !== '-') {
-          // Remove currency symbols, commas, and spaces
-          const cleanValue = String(subtotalRaw).replace(/[$,\s]/g, '');
-          const parsed = parseFloat(cleanValue);
-          if (!isNaN(parsed)) {
-            subtotal = parsed;
-          }
-        }
-
-        // Check for total rows (these have "Total" in project column)
-        const isTotal = project.toLowerCase().includes('total');
-        const isCategoryTotal = isTotal && !project.toLowerCase().includes('hard cost') &&
-                               !project.toLowerCase().includes('contingency') &&
-                               !project.toLowerCase().includes('budget');
-
-        // Check for grand totals
-        if (project.toLowerCase() === 'total' || project.toLowerCase() === 'total hard cost') {
-          totals.total = subtotal;
-        } else if (project.toLowerCase() === 'contingency') {
-          totals.contingency = subtotal;
-        } else if (project.toLowerCase() === 'total budget') {
-          totals.totalBudget = subtotal;
-        }
-
-        // Skip total rows for line items, but include regular items
-        if (!isTotal && category && project) {
-          const item: GoogleSheetRow = {
-            id: rowIndex + 2, // Excel row number (1-indexed, +1 for header)
-            category,
-            vendor: payments,
-            project,
-            status: status || 'Not Set',
-            subtotal,
-          };
-          budgetItems.push(item);
-
-          // Aggregate by category
-          if (category) {
-            if (!categoryTotals[category]) {
-              categoryTotals[category] = 0;
-            }
-            categoryTotals[category] += subtotal;
-
-            // Track hard vs soft costs
-            if (category.toLowerCase() === 'soft costs') {
-              totals.softCosts += subtotal;
-            } else {
-              totals.hardCosts += subtotal;
-            }
-          }
-
-          // Aggregate by vendor
-          if (payments) {
-            if (!vendorTotals[payments]) {
-              vendorTotals[payments] = 0;
-            }
-            vendorTotals[payments] += subtotal;
-          }
-
-          // Aggregate by status
-          const statusKey = status || 'Not Set';
-          if (!statusCounts[statusKey]) {
-            statusCounts[statusKey] = { count: 0, total: 0 };
-          }
-          statusCounts[statusKey].count += 1;
-          statusCounts[statusKey].total += subtotal;
-        }
+    // Resolve the "Schedule Summary" tab. Its real title has a TRAILING SPACE, so match by
+    // exact string first, then trimmed equality — never fuzzy/substring, so we can't grab a
+    // different tab (e.g. "Consolidated Payment Schedule ").
+    const info = await getSpreadsheetInfo(spreadsheetId);
+    const titles = (info.sheets?.map((s) => s.title).filter(Boolean) as string[]) || [];
+    const tab =
+      titles.find((t) => t === 'Schedule Summary ') ||
+      titles.find((t) => t.trim().toLowerCase() === 'schedule summary');
+    if (!tab) {
+      console.error('[budget] "Schedule Summary" tab not found. Tabs:', titles);
+      return res.status(404).json({
+        error: 'Schedule Summary tab not found',
+        message: `No "Schedule Summary" tab in the budget sheet. Available: ${titles.join(', ')}`,
       });
     }
 
-    // If totals weren't found in the sheet, calculate them
-    if (totals.total === 0) {
-      totals.total = totals.hardCosts + totals.softCosts;
-    }
-    if (totals.contingency === 0) {
-      totals.contingency = totals.total * 0.1;
-    }
-    if (totals.totalBudget === 0) {
-      totals.totalBudget = totals.total + totals.contingency;
-    }
+    // UNFORMATTED so money sums to the cent (numbers, not "$1,234"). Cols A..U cover
+    // everything we use (A/C/D/E/F); the engine stops at the first "TOTAL" row anyway.
+    const data = await fetchSheetData(spreadsheetId, `'${tab}'!A1:U430`, 'UNFORMATTED_VALUE');
+    const grid = (data.rawValues || []) as (string | number | boolean | null)[][];
 
-    // Calculate cost per room
-    if (totals.totalBudget > 0 && totals.totalRooms > 0) {
-      totals.costPerRoom = Math.round(totals.totalBudget / totals.totalRooms);
-    }
-
-    // Calculate cost per bedroom and cost per bathroom from category totals
-    if (totals.totalRooms > 0) {
-      const bedroomTotal = Object.entries(categoryTotals).find(
-        ([name]) => name.toLowerCase() === 'bedrooms'
-      );
-      const bathroomTotal = Object.entries(categoryTotals).find(
-        ([name]) => name.toLowerCase() === 'bathrooms'
-      );
-      if (bedroomTotal) {
-        totals.costPerBedroom = Math.round(bedroomTotal[1] / totals.totalRooms);
-      }
-      if (bathroomTotal) {
-        totals.costPerBathroom = Math.round(bathroomTotal[1] / totals.totalRooms);
-      }
-    }
-
-    // Sort category totals by amount (descending) and include paid amounts
-    const sortedCategories = Object.entries(categoryTotals)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, total]) => ({
-        name,
-        total,
-        paid: categoryPaid[name] || 0,
-      }));
-
-    // Sort vendor totals by amount (descending)
-    const sortedVendors = Object.entries(vendorTotals)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, total]) => ({ name, total }));
-
-    // Format status breakdown
-    const statusBreakdown = Object.entries(statusCounts)
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([status, data]) => ({ status, ...data }));
+    const summary = buildScheduleSummaryBudget(grid);
+    console.log(
+      `[budget] tab="${tab}" items=${summary.meta.lineItemCount} ` +
+        `ΣC=${summary.totals.estimatedBeforeContingency} ΣD=${summary.totals.paid} ` +
+        `rows ${summary.meta.firstItemRow}..${summary.meta.lastItemRow} totalRow=${summary.meta.totalRow}`,
+    );
 
     res.json({
-      items: budgetItems,
-      totals,
-      categoryBreakdown: sortedCategories,
-      vendorBreakdown: sortedVendors,
-      statusBreakdown,
-      itemCount: budgetItems.length,
+      tab,
+      totals: summary.totals,
+      categories: summary.categories,
+      items: summary.items,
+      meta: summary.meta,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('Error fetching budget data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch budget data',
-      message: error.message
-    });
+    console.error('[budget] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch budget data', message: error.message });
   }
 });
 

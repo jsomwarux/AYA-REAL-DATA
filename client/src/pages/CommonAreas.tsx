@@ -301,7 +301,9 @@ function BlockerLead({
   );
 }
 
-function tallyFloors(floors: CommonAreaFloor[], section?: "A" | "B") {
+// Exported so the Overview glance tile reuses the EXACT same completion math
+// (done = tasks with status "done" / all task cells) — no independent recompute.
+export function tallyFloors(floors: CommonAreaFloor[], section?: "A" | "B") {
   let done = 0,
     total = 0;
   for (const f of floors) {

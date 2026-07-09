@@ -12,6 +12,9 @@ import {
   fetchBudgetData,
   fetchTimelineData,
   fetchExpansionRollup,
+  fetchExpansionExceptions,
+  fetchCommonArea,
+  fetchLobby,
   type RollupTower,
   RoomProgress,
 } from "@/lib/api";
@@ -23,6 +26,8 @@ import {
   calculateFloorCompletion,
   getCompletionColor,
 } from "@/components/construction-progress/utils";
+// Reuse the Common Areas tab's EXACT completion math (no independent recompute).
+import { tallyFloors } from "@/pages/CommonAreas";
 import { TaskDetailModal } from "@/components/construction-progress/TaskDetailModal";
 import { RoomDetailModal } from "@/components/construction-progress/RoomDetailModal";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -39,9 +44,10 @@ import {
   Layers,
   CheckCircle2,
   Clock,
-  ListChecks,
-  PieChart,
+  BarChart3,
   Package,
+  ShieldAlert,
+  LayoutGrid,
 } from "lucide-react";
 import {
   BarChart,
@@ -51,9 +57,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
-  PieChart as RechartsPieChart,
-  Pie,
 } from "recharts";
 
 // Chart colors matching design system
@@ -145,10 +148,50 @@ export default function Overview() {
     staleTime: 1000 * 60 * 2,
   });
 
+  // Procurement Issues + Common Areas glance tiles — gated to management tier (like
+  // Budget/Timeline). Query keys MATCH those tabs' own queries, so the cache is shared
+  // and the numbers are guaranteed identical to the detail tabs (no independent
+  // recompute). enabled:isManagement means non-management users never fetch them.
+  const exceptionsQuery = useQuery({
+    queryKey: ["expansion-exceptions"],
+    queryFn: fetchExpansionExceptions,
+    retry: false,
+    staleTime: 1000 * 60 * 2,
+    enabled: isManagement,
+  });
+  const corridorsQuery = useQuery({
+    queryKey: ["expansion-corridors"],
+    queryFn: () => fetchCommonArea("corridors"),
+    retry: false,
+    staleTime: 1000 * 60 * 2,
+    enabled: isManagement,
+  });
+  const staircaseQuery = useQuery({
+    queryKey: ["expansion-staircase"],
+    queryFn: () => fetchCommonArea("staircase"),
+    retry: false,
+    staleTime: 1000 * 60 * 2,
+    enabled: isManagement,
+  });
+  const lobbyQuery = useQuery({
+    queryKey: ["expansion-lobby"],
+    queryFn: fetchLobby,
+    retry: false,
+    staleTime: 1000 * 60 * 2,
+    enabled: isManagement,
+  });
+
   const handleRefresh = async () => {
     const promises: Promise<any>[] = [constructionProgressQuery.refetch(), rollupQuery.refetch()];
     if (isManagement) {
-      promises.push(budgetQuery.refetch(), timelineQuery.refetch());
+      promises.push(
+        budgetQuery.refetch(),
+        timelineQuery.refetch(),
+        exceptionsQuery.refetch(),
+        corridorsQuery.refetch(),
+        staircaseQuery.refetch(),
+        lobbyQuery.refetch(),
+      );
     }
     await Promise.all(promises);
     toastSuccess("Data Refreshed", "Dashboard data has been updated.");
@@ -224,34 +267,44 @@ export default function Overview() {
       type: 'Bedroom' as const
     })),
   ].sort((a, b) => a.percentage - b.percentage);
-  const tasksNeedingAttention = allTasks.slice(0, 5);
+  // Only genuinely-behind tasks (< 50% complete), up to 5 — NO padding with near-done
+  // work. This keeps the "Needs Attention" header honest: over the current data it
+  // surfaces just Bedroom Finish Paint (1%) and Bedroom HVAC+Thermostat (24%), not the
+  // 72–75% items the old slice(0,5) pulled in. If none qualify, the panel shows an
+  // "all on track" empty-state (handled in the render).
+  const tasksNeedingAttention = allTasks.filter(t => t.percentage < 50).slice(0, 5);
 
   // ── Budget Data ──
   const budgetData = budgetQuery.data;
-  const totalBudget = budgetData?.totals?.totalBudget || 0;
-  const paidThusFar = budgetData?.totals?.paidThusFar || 0;
+  const totalBudget = budgetData?.totals?.total || 0; // incl. 10% contingency
+  const paidThusFar = budgetData?.totals?.paid || 0;
+  const estimatedBefore = budgetData?.totals?.estimatedBeforeContingency || 0;
   const budgetSpentPercent = totalBudget > 0 ? Math.round((paidThusFar / totalBudget) * 100) : 0;
 
-  // Top categories by spend for pie chart
-  const topCategories = (budgetData?.categoryBreakdown || [])
-    .sort((a, b) => b.total - a.total)
+  // Top 6 categories by estimated cost (engine already sorts desc; pretty display names).
+  // pct is each category's share of the BEFORE-contingency total — the same basis the
+  // Budget tab uses, so the numbers reconcile. We render these as a ranked list (not a
+  // pie) so the 6 shown honestly don't imply they're the whole 21-category total.
+  const topCategories = (budgetData?.categories || [])
     .slice(0, 6)
-    .map(cat => ({
-      name: cat.name,
-      value: cat.total,
-    }));
+    .map(cat => ({ name: cat.displayName, value: cat.total, pct: cat.pct }));
 
-  // Status breakdown
-  const statusBreakdown = budgetData?.statusBreakdown || [];
+  // ── Procurement Issues — SAME derivation as the Procurement Issues tab ──
+  // LEAD figure = "Needs attention" (severity "attention"); "Not Found" is shown only
+  // as a muted secondary line ("flagged, pending review") — never headlined, because
+  // the meaning of "Not Found" is an open client question (not necessarily lost).
+  const excItems = exceptionsQuery.data?.items || [];
+  const attentionCount = exceptionsQuery.data?.counts?.attention ?? excItems.filter(i => i.severity === "attention").length;
+  const notFoundCount = excItems.filter(i => i.reason === "Not Found").length;
 
-  // Top vendor by spend
-  const vendors = budgetData?.vendorBreakdown || [];
-  const topVendorRaw = vendors.length > 0 ? vendors[0] : null;
-  // Count items for top vendor
-  const topVendorItemCount = topVendorRaw
-    ? (budgetData?.items || []).filter(item => item.vendor === topVendorRaw.name).length
-    : 0;
-  const topVendor = topVendorRaw ? { name: topVendorRaw.name, total: topVendorRaw.total, count: topVendorItemCount } : null;
+  // ── Common Areas completion — reuse the Common Areas tab's own tallyFloors math ──
+  const areaPct = (done?: number, total?: number) => (total && total > 0 ? Math.round((done! / total) * 100) : null);
+  const corridorsT = corridorsQuery.data ? tallyFloors(corridorsQuery.data.floors) : undefined;
+  const staircaseT = staircaseQuery.data ? tallyFloors(staircaseQuery.data.floors) : undefined;
+  const lobbyT = lobbyQuery.data?.completion;
+  const corridorsPct = areaPct(corridorsT?.done, corridorsT?.total);
+  const staircasePct = areaPct(staircaseT?.done, staircaseT?.total);
+  const lobbyPct = areaPct(lobbyT?.done, lobbyT?.total);
 
   // ── Timeline Data ──
   const timelineData = timelineQuery.data;
@@ -348,8 +401,12 @@ export default function Overview() {
         </div>
       )}
 
-      {/* ═══ TOP-LEVEL KPI STATS ═══ */}
-      <div className={`mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 ${isManagement ? 'lg:grid-cols-5' : 'lg:grid-cols-2 max-w-2xl'}`}>
+      {/* ═══ TOP-LEVEL KPI STATS — one glance tile per main tab ═══ */}
+      {/* Mgmt: 6 tiles (Construction · Delivery · Procurement · Common Areas · Budget · Timeline) → 2 rows of 3
+          at lg (comfortable width for the 3-percentage Common Areas tile).
+          Non-mgmt: just the 2 ungated tiles (Construction · Delivery) → one clean 2-col row, no empty cell.
+          "Cost per unit" was dropped from here (vanity metric, still on the Budget tab). */}
+      <div className={`mb-6 sm:mb-8 grid gap-3 sm:gap-4 grid-cols-2 ${isManagement ? 'lg:grid-cols-3' : 'lg:grid-cols-2 max-w-2xl'}`}>
         <StatCard
           title="Construction Progress"
           value={`${overallCompletion}%`}
@@ -372,6 +429,59 @@ export default function Overview() {
           icon={<Package className="h-5 w-5" />}
           accentColor="blue"
         />
+        {/* Procurement Issues + Common Areas — management-tier glance tiles (gated like Budget/Timeline). */}
+        {isManagement && (<>
+        {/* Procurement Issues — leads with the actionable "needs attention" count.
+            "Not Found" appears only as a muted secondary line, never headlined. */}
+        <Link href="/exceptions">
+          <Card className="group h-full cursor-pointer border-white/10 transition-all hover:border-red-500/30">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Procurement Issues</p>
+                  <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                    {exceptionsQuery.isLoading ? "…" : exceptionsQuery.isError ? "—" : attentionCount}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">parts flagged for follow-up</p>
+                  {!exceptionsQuery.isLoading && !exceptionsQuery.isError && notFoundCount > 0 && (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/60">{notFoundCount.toLocaleString()} flagged, pending review</p>
+                  )}
+                </div>
+                <div className="rounded-xl bg-red-500/15 p-2.5 text-red-400 transition-transform group-hover:scale-110">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        {/* Common Areas — three area completions, read straight from that tab's tallyFloors. */}
+        <Link href="/common-areas">
+          <Card className="group h-full cursor-pointer border-white/10 transition-all hover:border-violet-500/30">
+            <CardContent className="p-4 sm:p-5">
+              <div className="mb-2 flex items-start justify-between">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Common Areas</p>
+                <div className="rounded-xl bg-violet-500/15 p-2.5 text-violet-400 transition-transform group-hover:scale-110">
+                  <LayoutGrid className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="flex items-end justify-between gap-1">
+                {[
+                  { label: "Corridors", pct: corridorsPct, loading: corridorsQuery.isLoading },
+                  { label: "Staircase", pct: staircasePct, loading: staircaseQuery.isLoading },
+                  { label: "Temp/Lobby", pct: lobbyPct, loading: lobbyQuery.isLoading },
+                ].map((a) => (
+                  <div key={a.label} className="text-center">
+                    <p className="text-lg sm:text-xl font-semibold tracking-tight text-white">
+                      {a.loading || a.pct === null ? "…" : `${a.pct}%`}
+                    </p>
+                    <p className="text-[10px] leading-tight text-muted-foreground">{a.label}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        </>)}
         {isManagement && (
           <>
             <StatCard
@@ -389,14 +499,6 @@ export default function Overview() {
               changeType={eventsThisWeek.length > 0 ? "positive" : "neutral"}
               icon={<Calendar className="h-5 w-5" />}
               accentColor="purple"
-            />
-            <StatCard
-              title="Top Vendor"
-              value={topVendor?.name ? (topVendor.name.length > 14 ? topVendor.name.slice(0, 14) + '…' : topVendor.name) : (budgetQuery.isLoading ? '…' : 'Not available')}
-              change={topVendor ? `${formatCurrencyCompact(topVendor.total)} across ${topVendor.count} items` : (budgetQuery.isLoading ? 'Loading budget…' : 'No vendor data in the budget sheet yet')}
-              changeType="neutral"
-              icon={<ListChecks className="h-5 w-5" />}
-              accentColor="amber"
             />
           </>
         )}
@@ -514,6 +616,12 @@ export default function Overview() {
                     </div>
                   </button>
                 ))
+              ) : allTasks.length > 0 ? (
+                <div className="flex h-[200px] flex-col items-center justify-center gap-2 text-center">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                  <p className="text-sm font-medium text-white">All tasks on track</p>
+                  <p className="text-xs text-muted-foreground">Every tracked task is at least 50% complete.</p>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-[200px] text-muted-foreground">
                   No task data available
@@ -557,104 +665,64 @@ export default function Overview() {
               {/* Key budget metrics */}
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Hard Costs</p>
-                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.hardCosts || 0)}</p>
+                  <p className="text-xs text-muted-foreground">Estimated (before contingency)</p>
+                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.estimatedBeforeContingency || 0)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Soft Costs</p>
-                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.softCosts || 0)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Contingency</p>
+                  <p className="text-xs text-muted-foreground">Contingency (10%)</p>
                   <p className="text-sm font-medium text-white">{formatCurrencyCompact(budgetData?.totals?.contingency || 0)}</p>
                 </div>
                 <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Paid ({budgetSpentPercent}% of total)</p>
+                  <p className="text-sm font-medium text-white">{formatCurrencyCompact(paidThusFar)}</p>
+                </div>
+                <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Remaining</p>
-                  <p className="text-sm font-medium text-teal-400">{formatCurrencyCompact(totalBudget - paidThusFar)}</p>
+                  <p className="text-sm font-medium text-teal-400">{formatCurrencyCompact(budgetData?.totals?.remaining || 0)}</p>
                 </div>
               </div>
-
-              {/* Status breakdown */}
-              {statusBreakdown.length > 0 && (
-                <div className="pt-2 border-t border-white/10">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">By Status</p>
-                  <div className="space-y-2">
-                    {statusBreakdown.map((s) => (
-                      <div key={s.status} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-blue-400" />
-                          <span className="text-muted-foreground">{s.status}</span>
-                        </div>
-                        <span className="text-white">{s.count} items · {formatCurrencyCompact(s.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Budget Breakdown Pie Chart */}
+        {/* Budget by Category — top 6 (ranked list, not a pie, to avoid implying 6 = whole) */}
         <Card className="border-white/10">
           <CardHeader className="border-b border-white/10">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-white">
-                <PieChart className="h-5 w-5 text-blue-400" />
+                <BarChart3 className="h-5 w-5 text-blue-400" />
                 Budget by Category
               </CardTitle>
               <Link href="/budget">
                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">
-                  View All <ChevronRight className="ml-1 h-4 w-4" />
+                  View all in Budget <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[220px] sm:h-[280px]">
-              {topCategories.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={topCategories}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {topCategories.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(217 33% 17%)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px",
-                        color: "white"
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), '']}
-                    />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                  {budgetQuery.isLoading ? "Loading budget…" : budgetQuery.isError ? "Couldn't load budget data." : "No budget category breakdown in the sheet yet."}
-                </div>
-              )}
-            </div>
-            {/* Legend below chart */}
-            {topCategories.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
+            {topCategories.length > 0 ? (
+              <div className="space-y-3">
                 {topCategories.map((cat, i) => (
-                  <div key={cat.name} className="flex items-center gap-2 text-xs">
-                    <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                    <span className="text-muted-foreground truncate">{cat.name}</span>
-                    <span className="text-white ml-auto font-medium">{formatCurrencyCompact(cat.value)}</span>
+                  <div key={cat.name} className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="truncate text-white">{cat.name}</span>
+                      <span className="ml-auto flex-shrink-0 font-medium text-white">{formatCurrencyCompact(cat.value)}</span>
+                      <span className="w-12 flex-shrink-0 text-right text-xs text-muted-foreground">{cat.pct.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(1, cat.pct)}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    </div>
                   </div>
                 ))}
+                <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Top 6 of {budgetData?.categories?.length ?? 0} categories · each shown as its share of the {formatCurrencyCompact(estimatedBefore)} estimated total (before contingency).
+                </p>
+              </div>
+            ) : (
+              <div className="flex h-[240px] items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                {budgetQuery.isLoading ? "Loading budget…" : budgetQuery.isError ? "Couldn't load budget data." : "No budget categories to show."}
               </div>
             )}
           </CardContent>
@@ -813,7 +881,7 @@ export default function Overview() {
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-white">Budget</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Vendor spend & line items</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Cost by category, paid & remaining</p>
                     </div>
                     <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-400 transition-colors" />
                   </div>
