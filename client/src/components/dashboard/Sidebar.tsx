@@ -59,7 +59,7 @@ const mainNavItems: NavItem[] = [
     requiredAuth: "anyAuthenticated",
   },
   {
-    title: "Exceptions",
+    title: "Procurement Issues",
     href: "/exceptions",
     icon: <ShieldAlert className="h-5 w-5" />,
     iconColor: "text-red-400",
@@ -75,7 +75,7 @@ const mainNavItems: NavItem[] = [
     requiredAuth: "construction",
   },
   {
-    title: "Floor → Room",
+    title: "Delivery & Installation",
     href: "/rollup",
     icon: <Layers className="h-5 w-5" />,
     iconColor: "text-indigo-400",

@@ -46,14 +46,14 @@ function Router() {
 
         {/* Exceptions Panel - lead view across all 4 room tabs */}
         <Route path="/exceptions">
-          <TabPasswordGate tab="construction" title="Exceptions">
+          <TabPasswordGate tab="construction" title="Procurement Issues">
             <ExceptionsPanel />
           </TabPasswordGate>
         </Route>
 
         {/* Floor → Room Rollup - received vs installed per package */}
         <Route path="/rollup">
-          <TabPasswordGate tab="construction" title="Floor → Room Rollup">
+          <TabPasswordGate tab="construction" title="Delivery & Installation">
             <FloorRoomRollup />
           </TabPasswordGate>
         </Route>

@@ -27,9 +27,9 @@ interface MobileNavItem {
 
 const mobileNavItems: MobileNavItem[] = [
   { title: "Overview", href: "/overview", icon: <LayoutDashboard className="h-5 w-5" />, iconColor: "text-teal-400", requiredAuth: "anyAuthenticated" },
-  { title: "Exceptions", href: "/exceptions", icon: <ShieldAlert className="h-5 w-5" />, iconColor: "text-red-400", requiredAuth: "construction" },
+  { title: "Procurement Issues", href: "/exceptions", icon: <ShieldAlert className="h-5 w-5" />, iconColor: "text-red-400", requiredAuth: "construction" },
   { title: "Construction", href: "/construction", icon: <Building2 className="h-5 w-5" />, iconColor: "text-blue-400", requiredAuth: "construction" },
-  { title: "Floor → Room", href: "/rollup", icon: <Layers className="h-5 w-5" />, iconColor: "text-indigo-400", requiredAuth: "construction" },
+  { title: "Delivery & Installation", href: "/rollup", icon: <Layers className="h-5 w-5" />, iconColor: "text-indigo-400", requiredAuth: "construction" },
   { title: "Containers", href: "/containers", icon: <Container className="h-5 w-5" />, iconColor: "text-cyan-400", requiredAuth: "construction" },
   { title: "Common Areas", href: "/common-areas", icon: <LayoutGrid className="h-5 w-5" />, iconColor: "text-violet-400", requiredAuth: "construction" },
   { title: "Budget", href: "/budget", icon: <DollarSign className="h-5 w-5" />, iconColor: "text-green-400", managementOnly: true, requiredAuth: "management" },

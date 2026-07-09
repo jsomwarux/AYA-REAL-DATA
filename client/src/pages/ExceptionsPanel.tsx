@@ -146,7 +146,7 @@ function buildTiers(items: ExceptionItem[], tabOrder: string[]): Tier[] {
 // ---------------------------------------------------------------------------
 
 export default function ExceptionsPanel() {
-  useDocumentTitle("Exceptions");
+  useDocumentTitle("Procurement Issues");
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["expansion-exceptions"],
@@ -190,7 +190,7 @@ export default function ExceptionsPanel() {
 
   return (
     <DashboardLayout
-      title="Exceptions"
+      title="Procurement Issues"
       subtitle={lastUpdated ? `Problem parts across all room tabs · synced ${lastUpdated}` : "Problem parts across all room tabs"}
       onRefresh={handleRefresh}
       isLoading={isLoading}

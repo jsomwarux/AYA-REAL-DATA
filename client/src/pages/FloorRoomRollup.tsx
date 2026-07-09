@@ -125,7 +125,7 @@ function receivedLoudHeaders(pkg: RollupPackage): Set<string> {
 // ---------------------------------------------------------------------------
 
 export default function FloorRoomRollup() {
-  useDocumentTitle("Floor → Room Rollup");
+  useDocumentTitle("Delivery & Installation");
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["expansion-rollup"],
@@ -157,7 +157,7 @@ export default function FloorRoomRollup() {
 
   return (
     <DashboardLayout
-      title="Floor → Room Rollup"
+      title="Delivery & Installation"
       subtitle={lastUpdated ? `Received vs Installed · synced ${lastUpdated}` : "Per-package received vs installed, by tower → floor → room"}
       onRefresh={handleRefresh}
       isLoading={isLoading}
