@@ -29,22 +29,21 @@ const STATUS: Record<StatusState, { cell: string; dot: string; label: string }> 
   other: { cell: "bg-fuchsia-500/60", dot: "bg-fuchsia-500", label: "Other" },
 };
 
-// Cell coloring is by the EXACT sheet value, so every distinct status gets its own
-// FILLED color — "Not Started" (slate) is distinct from "Not Yet" (violet), and neither
-// renders blank. Keyed by normalized value (lowercase, collapsed spaces).
+// Cell colors MATCH THE GOOGLE SHEET's own status-dropdown (chip) colors, per value —
+// the sheet is the source of truth, even where a color is saturated. These are the
+// exact standard-palette swatches the sheet uses for each dropdown value (verified
+// against the Corridors + Staircase dropdowns). "Not Started" (brick red #a61c00) and
+// "Not Yet" (peach #f9cb9c) are DIFFERENT sheet statuses with different colors — kept
+// distinct, never merged. Every value is a FILLED cell; only a genuinely empty cell is
+// blank. Keyed by normalized value (lowercase, collapsed spaces); the same hex drives
+// both the grid cell and the legend swatch so the legend matches the grid exactly.
 const VALUE_STYLE: Record<string, { cell: string; dot: string; label: string }> = {
-  "completed": { cell: "bg-emerald-500/80", dot: "bg-emerald-500", label: "Completed" },
-  "done": { cell: "bg-emerald-500/80", dot: "bg-emerald-500", label: "Done" },
-  "in progress": { cell: "bg-sky-500/70", dot: "bg-sky-500", label: "In progress" },
-  "waiting on product": { cell: "bg-red-500/80", dot: "bg-red-500", label: "Waiting on product" },
-  "need to order": { cell: "bg-red-500/80", dot: "bg-red-500", label: "Need to order" },
-  "ordered": { cell: "bg-amber-500/80", dot: "bg-amber-500", label: "Ordered" },
-  // Not-done states are MUTED/receding so the green "done" region pops. The app's
-  // background is a dark NAVY, so low-opacity neutrals get tinted blue and collapse
-  // together — these two are pushed apart on BOTH lightness and hue: Not Yet = a
-  // lighter, soft blue-slate; Not Started = a darker, neutral zinc (reads greyer/cooler).
-  "not started": { cell: "bg-zinc-700/60", dot: "bg-zinc-500", label: "Not Started" },
-  "not yet": { cell: "bg-slate-500/45", dot: "bg-slate-400", label: "Not Yet" },
+  "completed": { cell: "bg-[#b6d7a8]", dot: "bg-[#b6d7a8]", label: "Completed" },
+  "done": { cell: "bg-[#b6d7a8]", dot: "bg-[#b6d7a8]", label: "Done" },
+  "in progress": { cell: "bg-[#ffe599]", dot: "bg-[#ffe599]", label: "In progress" },
+  "waiting on product": { cell: "bg-[#6d9eeb]", dot: "bg-[#6d9eeb]", label: "Waiting on product" },
+  "not started": { cell: "bg-[#a61c00]", dot: "bg-[#a61c00]", label: "Not Started" },
+  "not yet": { cell: "bg-[#f9cb9c]", dot: "bg-[#f9cb9c]", label: "Not Yet" },
 };
 // The ONLY blank-rendered state: a genuinely empty sheet cell (explicitly labeled).
 const NO_DATA = { cell: "border border-dashed border-white/25", dot: "border border-dashed border-white/40", label: "No data (empty cell)" };
@@ -63,7 +62,7 @@ function styleForValue(raw: string | null | undefined): { cell: string; dot: str
 
 // Legend is built from the values ACTUALLY present in the grid, so it matches the
 // cells cell-for-cell (empty always shown last if present).
-const VALUE_ORDER = ["completed", "done", "in progress", "ordered", "waiting on product", "need to order", "not started", "not yet"];
+const VALUE_ORDER = ["completed", "done", "in progress", "waiting on product", "not yet", "not started"];
 function presentValues(floors: CommonAreaFloor[], section?: "A" | "B") {
   const seen = new Map<string, { key: string; label: string; dot: string }>();
   for (const f of floors) for (const t of f.tasks) {
