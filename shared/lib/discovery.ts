@@ -96,9 +96,14 @@ export interface DiscoveredPackage {
 
 export interface LeadingColumns {
   floor?: number;
-  roomLine?: number; // blank-header leading column
+  /** "Floor %" (col B) — the sheet's own installation % for the whole floor.
+   *  Merged across the floor's rows, so it is carried forward like Floor. */
+  floorPct?: number;
+  roomLine?: number; // blank-header leading column, or a "Lines" header
   roomType?: number;
   whiteBox?: number;
+  /** "Room %" (col F) — the sheet's own installation % for that room. */
+  roomPct?: number;
   roomNo: number;
 }
 
@@ -141,10 +146,22 @@ function mapLeadingColumns(header: ReadonlyArray<string | null | undefined>, fir
       if (leading.roomLine === undefined) leading.roomLine = c; // blank header = Room Line
       continue;
     }
-    if (n.includes('floor')) leading.floor = c;
-    else if (n.includes('room type') || n === 'type') leading.roomType = c;
+    // The "%" columns are matched FIRST: "Floor %" contains "floor" and "Room %"
+    // contains "room", so a looser match would let them shadow the Floor / Room #
+    // label columns they sit next to.
+    if (/^floor\s*%$/.test(n)) {
+      if (leading.floorPct === undefined) leading.floorPct = c;
+    } else if (/^room\s*%$/.test(n)) {
+      if (leading.roomPct === undefined) leading.roomPct = c;
+    } else if (n.includes('floor')) {
+      if (leading.floor === undefined) leading.floor = c;
+    } else if (n.includes('room type') || n === 'type') leading.roomType = c;
     else if (n.includes('white box') || n.includes('whitebox') || n.includes('white-box')) leading.whiteBox = c;
     else if (n === 'room #' || n === 'room#' || n.includes('room #') || n === 'room no' || n === 'room') leading.roomNo = c;
+    // Room Line is usually a blank header, but the sheet also labels it "LINES".
+    else if (n === 'lines' || n === 'line' || n.includes('room line')) {
+      if (leading.roomLine === undefined) leading.roomLine = c;
+    }
   }
   return leading;
 }
@@ -249,6 +266,14 @@ export function buildRoomRows(
   const { leading } = structure;
   const rows: RoomRow[] = [];
   let currentFloor = ''; // carried forward across merged Floor cells
+  let currentFloorPct: number | null = null; // ditto for the merged Floor % cell
+
+  /** Whole-percent value of a %-column cell, or null (blank / no such column). */
+  const pctAt = (r: number, col: number | undefined): number | null => {
+    if (col === undefined) return null;
+    const v = normalizeManualPct(cell(grid, r, col));
+    return v === null ? null : Math.round(v);
+  };
 
   for (let r = structure.firstDataRowIndex; r < grid.length; r++) {
     if (leading.roomNo < 0 || isBlank(cell(grid, r, leading.roomNo))) continue;
@@ -263,6 +288,11 @@ export function buildRoomRows(
     const floorCell = leading.floor !== undefined ? cell(grid, r, leading.floor).trim() : '';
     if (floorCell) currentFloor = floorCell;
     const floor = currentFloor || deriveFloorFromRoomNo(roomNo);
+
+    // "Floor %" is merged the same way as Floor — carry the last seen value forward.
+    const floorPctCell = pctAt(r, leading.floorPct);
+    if (floorPctCell !== null) currentFloorPct = floorPctCell;
+    const floorPct = leading.floorPct === undefined ? null : currentFloorPct;
 
     const packages: PackageResult[] = structure.packages.map((pkg) => {
       const rawParts = pkg.parts.map((p) => cell(grid, r, p.colIndex));
@@ -297,16 +327,12 @@ export function buildRoomRows(
       };
     });
 
-    // Installation % is taken DIRECTLY from the sheet's Completion % cell (not recomputed).
-    const installedPct =
-      structure.completionCol !== undefined
-        ? (() => {
-            const v = normalizeManualPct(cell(grid, r, structure.completionCol!));
-            return v === null ? null : Math.round(v);
-          })()
-        : null;
+    // Installation % is taken DIRECTLY from the sheet (never recomputed): the "Room %"
+    // column the sheet now maintains, falling back to the older trailing "Completion %"
+    // column when a tab still tracks it there.
+    const installedPct = pctAt(r, leading.roomPct) ?? pctAt(r, structure.completionCol);
 
-    rows.push({ roomNo, floor, line, type, installedPct, packages });
+    rows.push({ roomNo, floor, floorPct, line, type, installedPct, packages });
   }
 
   return rows;

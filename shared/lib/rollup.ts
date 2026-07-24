@@ -101,14 +101,21 @@ export function buildTowerRollup(
       }))
       .filter((p) => p.received || p.installed);
 
-    // Installation % (sheet Completion %) + applicable installed-part count (the weight
-    // for floor/tower averages: non-N/A parts on the installation side).
+    // Installation % (the sheet's own Room %) + applicable installed-part count
+    // (non-N/A parts on the installation side — context, not a weight).
     const installedPct = ri?.installedPct ?? null;
     let installedApplicable = 0;
     if (ri) for (const pkg of ri.packages) for (const p of pkg.parts) if (p.bucket !== 'excluded') installedApplicable++;
 
     return { key, roomNo: meta.roomNo, floor: meta.floor, line: meta.line, type: meta.type, installedPct, installedApplicable, packages };
   });
+
+  // The sheet's own "Floor %" per floor (merged col B on the Installation tab, already
+  // carried forward per row). First non-null wins; rows of one floor all agree.
+  const sheetFloorPct = new Map<string, number>();
+  for (const r of installationRooms) {
+    if (r.floorPct !== null && !sheetFloorPct.has(r.floor)) sheetFloorPct.set(r.floor, r.floorPct);
+  }
 
   // Group by floor, sort floors high→low, rooms low→high (stable on key for dups).
   const floorMap = new Map<string, RollupRoom[]>();
@@ -121,7 +128,15 @@ export function buildTowerRollup(
   const floors: RollupFloor[] = [...floorMap.entries()]
     .map(([floor, rooms]) => {
       const sorted = rooms.slice().sort((a, b) => num(a.roomNo) - num(b.roomNo) || a.key.localeCompare(b.key));
-      return { floor, installedPct: weightedInstalled(sorted), rooms: sorted };
+      const roomsAvgPct = averageInstalled(sorted);
+      const sheetPct = sheetFloorPct.get(floor) ?? null;
+      return {
+        floor,
+        installedPct: sheetPct ?? roomsAvgPct,
+        roomsAvgPct,
+        installedFromSheet: sheetPct !== null,
+        rooms: sorted,
+      };
     })
     .sort((a, b) => num(b.floor) - num(a.floor));
 
@@ -129,24 +144,18 @@ export function buildTowerRollup(
     ...new Set([...duplicatedRoomNos(containersRooms), ...duplicatedRoomNos(installationRooms)]),
   ].sort((a, b) => num(a) - num(b));
 
-  return { tower, containersTab, installationTab, installedPct: weightedInstalled(rollupRooms), floors, duplicateRooms };
+  return { tower, containersTab, installationTab, installedPct: averageInstalled(rollupRooms), floors, duplicateRooms };
 }
 
-/** Part-count-weighted average of rooms' Completion% values (never a sum of %s).
- *  Weight = each room's applicable installed-part count; falls back to a simple
- *  average if no room has applicable parts but some have a Completion% value. */
-function weightedInstalled(rooms: RollupRoom[]): number | null {
-  let wsum = 0, w = 0, simpleSum = 0, simpleN = 0;
+/** Average of rooms' Room % values (never a sum of %s), null when no room has one.
+ *  A plain per-room average on purpose: it is exactly how the sheet derives its own
+ *  Floor % from the Room % column, so tower / floor / room agree with the sheet. */
+function averageInstalled(rooms: RollupRoom[]): number | null {
+  let sum = 0, n = 0;
   for (const r of rooms) {
     if (r.installedPct === null) continue;
-    simpleSum += r.installedPct;
-    simpleN++;
-    if (r.installedApplicable > 0) {
-      wsum += r.installedPct * r.installedApplicable;
-      w += r.installedApplicable;
-    }
+    sum += r.installedPct;
+    n++;
   }
-  if (w > 0) return Math.round(wsum / w);
-  if (simpleN > 0) return Math.round(simpleSum / simpleN);
-  return null;
+  return n > 0 ? Math.round(sum / n) : null;
 }

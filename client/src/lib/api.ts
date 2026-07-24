@@ -117,14 +117,16 @@ export interface RollupRoom {
   floor: string;
   line: string;
   type: string;
-  installedPct: number | null;   // sheet Completion % (HR DL / LR CU), not recomputed
-  installedApplicable: number;   // non-N/A installed-part count (weight for averages)
+  installedPct: number | null;   // sheet's own "Room %" (col F), not recomputed
+  installedApplicable: number;   // non-N/A installed-part count
   packages: RollupPackage[];
 }
 
 export interface RollupFloor {
   floor: string;
-  installedPct: number | null;   // part-count-weighted avg of rooms' Completion%
+  installedPct: number | null;   // sheet's own "Floor %" (col B), else avg of Room %
+  roomsAvgPct: number | null;    // avg of this floor's Room % values (always computed)
+  installedFromSheet: boolean;   // true when installedPct is the sheet's Floor %
   rooms: RollupRoom[];
 }
 
@@ -132,7 +134,7 @@ export interface RollupTower {
   tower: 'HR' | 'LR';
   containersTab: string;
   installationTab: string;
-  installedPct: number | null;   // part-count-weighted avg across the tower's rooms
+  installedPct: number | null;   // avg of every Room % in the tower (as the sheet averages)
   floors: RollupFloor[];
   duplicateRooms: string[];   // Room #s spanning multiple rows (e.g. suite main + LV)
 }

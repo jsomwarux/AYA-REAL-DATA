@@ -9,8 +9,16 @@ import type { RoomRow, PackageResult } from '../../types/dashboard';
 function pkg(name: string, recomputedPct: number, manualPct: number | null, mismatch = false, unrecordedCount = 0): PackageResult {
   return { name, recomputedPct, manualPct, mismatch, unrecordedCount, naOnly: false, parts: [] };
 }
-function room(roomNo: string, floor: string, line: string, type: string, packages: PackageResult[], installedPct: number | null = null): RoomRow {
-  return { roomNo, floor, line, type, installedPct, packages };
+function room(
+  roomNo: string,
+  floor: string,
+  line: string,
+  type: string,
+  packages: PackageResult[],
+  installedPct: number | null = null,
+  floorPct: number | null = null,
+): RoomRow {
+  return { roomNo, floor, floorPct, line, type, installedPct, packages };
 }
 /** A package with `applicable` non-N/A installed parts (for weighting). */
 function instPkg(applicable: number): PackageResult {
@@ -18,23 +26,50 @@ function instPkg(applicable: number): PackageResult {
   return { name: 'HEADBOARD', recomputedPct: 0, manualPct: null, mismatch: false, unrecordedCount: 0, naOnly: false, parts };
 }
 
-test('buildTowerRollup: installedPct = part-count-WEIGHTED average of room Completion%, never a sum', () => {
-  // Room 701: 100% with 8 applicable parts; Room 601: 0% with 2 applicable parts.
-  // Weighted = (100·8 + 0·2)/(8+2) = 80 (a plain average would be a wrong 50).
+test("buildTowerRollup: a floor's installedPct is the sheet's own Floor %, never a sum", () => {
+  // Floor 7 rooms read 44% and 74%; the sheet's Floor % cell (merged, carried onto
+  // every row of the floor) says 59% — the sheet's own number wins.
   const installation = [
-    room('701', '7', 'L', 'K', [instPkg(8)], 100),
-    room('601', '6', 'L', 'K', [instPkg(2)], 0),
+    room('701', '7', 'L', 'K', [instPkg(8)], 44, 59),
+    room('702', '7', 'L', 'K', [instPkg(8)], 74, 59),
   ];
   const r = buildTowerRollup('LR', 'c', 'i', [], installation);
-  assert.equal(r.installedPct, 80); // tower: weighted, not 50
-  assert.equal(r.floors.find((f) => f.floor === '7')!.installedPct, 100);
-  assert.equal(r.floors.find((f) => f.floor === '6')!.installedPct, 0);
+  const floor7 = r.floors.find((f) => f.floor === '7')!;
+  assert.equal(floor7.installedPct, 59);
+  assert.equal(floor7.installedFromSheet, true);
+  assert.equal(floor7.roomsAvgPct, 59); // (44+74)/2 = 59 — same rule the sheet uses
 });
 
-test('buildTowerRollup: installedPct is null when the sheet Completion% is blank', () => {
+test('buildTowerRollup: no sheet Floor % → floor falls back to the average of its Room %', () => {
+  const installation = [
+    room('701', '7', 'L', 'K', [instPkg(8)], 100),
+    room('702', '7', 'L', 'K', [instPkg(2)], 0),
+  ];
+  const r = buildTowerRollup('LR', 'c', 'i', [], installation);
+  assert.equal(r.floors[0].installedPct, 50); // plain average, not part-count-weighted
+  assert.equal(r.floors[0].installedFromSheet, false);
+  assert.equal(r.floors[0].roomsAvgPct, 50);
+});
+
+test("buildTowerRollup: tower installedPct = average of every room's Room %", () => {
+  // Floor 7 (one room at 100%) + floor 6 (three rooms at 0%) → 25%, NOT the 50%
+  // a floor-of-floors average would give.
+  const installation = [
+    room('701', '7', 'L', 'K', [instPkg(8)], 100, 100),
+    room('601', '6', 'L', 'K', [instPkg(2)], 0, 0),
+    room('602', '6', 'L', 'K', [instPkg(2)], 0, 0),
+    room('603', '6', 'L', 'K', [instPkg(2)], 0, 0),
+  ];
+  const r = buildTowerRollup('LR', 'c', 'i', [], installation);
+  assert.equal(r.installedPct, 25);
+});
+
+test('buildTowerRollup: installedPct is null when the sheet has no Room % / Floor %', () => {
   const r = buildTowerRollup('LR', 'c', 'i', [], [room('701', '7', 'L', 'K', [instPkg(5)], null)]);
   assert.equal(r.installedPct, null);
   assert.equal(r.floors[0].installedPct, null);
+  assert.equal(r.floors[0].installedFromSheet, false);
+  assert.equal(r.floors[0].roomsAvgPct, null);
 });
 
 test('buildTowerRollup: joins received (Containers) + installed (Installation) per package', () => {

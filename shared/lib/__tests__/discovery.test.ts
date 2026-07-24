@@ -165,6 +165,45 @@ test('buildRoomRows: floor carries forward across merged (blank) Floor cells', (
   assert.equal(rows[1].floor, '27'); // carried forward
 });
 
+// ---------------------------------------------------------------------------
+// Installation %: the sheet's own "Floor %" (col B) + "Room %" (col F) columns
+// ---------------------------------------------------------------------------
+test('buildRoomRows: reads Room % / Floor % without shadowing the Floor and Room # labels', () => {
+  const installTab = getTab('HR Installation Progress') as Tab;
+  // The live Installation layout: A Floor, B Floor %, C LINES, D Room Type,
+  // E WHITE BOX, F Room %, G Room #, then packages.
+  const header = ['Floor', 'Floor %', 'LINES', 'Room Type', 'WHITE BOX', 'Room %', 'Room #', 'HEADBOARD PACKAGE', 'Panel'];
+  const grid = [
+    header,
+    ['27', '26%', 'HR- Line 1', 'King', '100%', '38%', '2701', '100%', 'Installed'],
+    ['', '', 'HR- Line 2', 'Queen', '100%', '33%', '2702', '95%', 'Installed'], // merged Floor / Floor %
+    ['26', '27%', 'HR- Line 1', 'King', '100%', '38%', '2601', '100%', 'Installed'],
+  ];
+
+  const struct = discoverRoomTabStructure(grid);
+  assert.equal(struct.leading.floor, 0); // "Floor %" must not claim the Floor column
+  assert.equal(struct.leading.floorPct, 1);
+  assert.equal(struct.leading.roomPct, 5);
+  assert.equal(struct.leading.roomNo, 6);
+  assert.equal(struct.leading.roomLine, 2); // "LINES" header, not a blank one
+
+  const rows = buildRoomRows(grid, struct, installTab);
+  assert.deepEqual(rows.map((r) => r.roomNo), ['2701', '2702', '2601']);
+  assert.deepEqual(rows.map((r) => r.floor), ['27', '27', '26']);
+  assert.deepEqual(rows.map((r) => r.line), ['HR- Line 1', 'HR- Line 2', 'HR- Line 1']);
+  assert.deepEqual(rows.map((r) => r.installedPct), [38, 33, 38]); // Room %, per room
+  assert.deepEqual(rows.map((r) => r.floorPct), [26, 26, 27]); // Floor % carried across the merge
+});
+
+test('buildRoomRows: falls back to the trailing Completion % when there is no Room % column', () => {
+  const installTab = getTab('HR Installation Progress') as Tab;
+  const header = ['Floor', '', 'Room Type', 'WHITE BOX', 'Room #', 'HEADBOARD PACKAGE', 'Panel', 'Completion %'];
+  const grid = [header, ['27', 'L1', 'King', 'TRUE', '2701', '100%', 'Installed', '61%']];
+  const rows = buildRoomRows(grid, discoverRoomTabStructure(grid), installTab);
+  assert.equal(rows[0].installedPct, 61);
+  assert.equal(rows[0].floorPct, null); // no Floor % column on this layout
+});
+
 test('discoverCommonAreaFloors: reads floors from the sheet, drops all-blank phantom rows, keeps all-Not-Started', () => {
   // Row 1 = decorative banner; row 2 = headers; data from row 3 (§8). Fixed cols
   // for corridors: A=AREA B=WHITE BOX C=FULLY COMPLETED D=FLOOR, tasks E+.

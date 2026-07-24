@@ -69,7 +69,7 @@ function roomMismatchCount(room: RollupRoom): number {
   let n = 0;
   for (const pkg of room.packages) {
     if (pkg.received?.mismatch) n++;
-    // Installed side has no mismatch: its % comes straight from the sheet's Completion %.
+    // Installed side has no mismatch: its % comes straight from the sheet's Room %.
   }
   return n;
 }
@@ -194,7 +194,7 @@ export default function FloorRoomRollup() {
 
           {/* Legend — plain site language */}
           <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span><span className="font-semibold text-white">% delivered</span> is counted from the Containers parts; <span className="font-semibold text-white">% installed</span> is the sheet's own Completion % (shown per room / floor / tower).</span>
+            <span><span className="font-semibold text-white">% delivered</span> is counted from the Containers parts; <span className="font-semibold text-sky-300">% installed</span> is the sheet's own Room % per room and Floor % per floor (the tower is the average of its rooms).</span>
             <span className="inline-flex items-center gap-1">
               <span className="rounded border border-red-500/50 bg-red-500/15 px-1 font-semibold text-red-200">4 problems</span> {LABELS.problemsPhrase}
             </span>
@@ -270,13 +270,26 @@ const floorDeliveryCounts = (floor: RollupFloor): DeliveryCounts => sumCounts(fl
 const towerDeliveryCounts = (tower: RollupTower): DeliveryCounts => sumCounts(tower.floors.flatMap((f) => f.rooms.map(roomDeliveryCounts)));
 const pctOf = (num: number, den: number): number => (den > 0 ? Math.round((num / den) * 100) : 0);
 
-/** Prominent count-summed "% delivered" + bar, plus a smaller "% installed" taken
- *  straight from the sheet's Completion % (weighted-avg at floor/tower; null → n/a). */
-function DeliveryStat({ counts, installedPct, size = "md" }: { counts: DeliveryCounts; installedPct: number | null; size?: "md" | "lg" }) {
+/** Prominent count-summed "% delivered" + bar, alongside "% installed" taken straight
+ *  from the sheet's own Room % / Floor % columns. The two are different measures, so
+ *  installed keeps its own sky colour instead of the delivered green/amber scale;
+ *  it only greys out to "n/a" when the sheet has no number at all. */
+function DeliveryStat({
+  counts,
+  installedPct,
+  installedTitle,
+  size = "md",
+}: {
+  counts: DeliveryCounts;
+  installedPct: number | null;
+  installedTitle?: string;
+  size?: "md" | "lg";
+}) {
   const delivered = pctOf(counts.dNum, counts.dDen);
   const big = size === "lg";
+  const hasInstalled = installedPct !== null;
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-3">
       <div className="flex items-center gap-1.5" title={`Delivered: ${counts.dNum}/${counts.dDen} parts received (N/A excluded)`}>
         <span className={cn("font-semibold tabular-nums", big ? "text-base" : "text-sm", pctText(delivered))}>{delivered}%</span>
         <span className="text-[9px] uppercase tracking-wide text-muted-foreground">delivered</span>
@@ -284,15 +297,39 @@ function DeliveryStat({ counts, installedPct, size = "md" }: { counts: DeliveryC
           <div className={cn("h-full rounded", pctBar(delivered))} style={{ width: `${delivered}%` }} />
         </div>
       </div>
-      <div className="flex items-center gap-1 opacity-75" title="Installed % — the sheet's own Completion % (not recomputed)">
-        <span className="text-xs tabular-nums text-muted-foreground">{installedPct === null ? "n/a" : `${installedPct}%`}</span>
-        <span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">inst.</span>
-        <div className="h-1 w-10 overflow-hidden rounded bg-white/10">
-          <div className="h-full rounded bg-sky-400/70" style={{ width: `${installedPct ?? 0}%` }} />
+      <div
+        className="flex items-center gap-1.5"
+        title={installedTitle ?? (hasInstalled ? "Installed — the sheet's own Room % (not recomputed)" : "The sheet has no Room % for this yet")}
+      >
+        <span
+          className={cn(
+            "tabular-nums",
+            big ? "text-base font-semibold" : "text-sm font-medium",
+            hasInstalled ? "text-sky-300" : "text-muted-foreground",
+          )}
+        >
+          {hasInstalled ? `${installedPct}%` : "n/a"}
+        </span>
+        <span className="text-[9px] uppercase tracking-wide text-muted-foreground">installed</span>
+        <div className={cn("h-1.5 overflow-hidden rounded bg-white/10", big ? "w-28" : "w-16 sm:w-20")}>
+          <div className="h-full rounded bg-sky-400" style={{ width: `${installedPct ?? 0}%` }} />
         </div>
       </div>
     </div>
   );
+}
+
+/** Plain-language tooltip for a floor's installed %: says where the number came from,
+ *  and names the rooms' own average when the sheet's Floor % reads differently. */
+function floorInstalledTitle(floor: RollupFloor): string {
+  if (floor.installedPct === null) return "The sheet has no Room % for this floor yet";
+  if (!floor.installedFromSheet) {
+    return `Installed ${floor.installedPct}% — the average of this floor's Room % (the sheet has no Floor % here)`;
+  }
+  const base = `Installed ${floor.installedPct}% — the sheet's own Floor %`;
+  return floor.roomsAvgPct !== null && Math.abs(floor.roomsAvgPct - floor.installedPct) >= 2
+    ? `${base}. This floor's rooms average ${floor.roomsAvgPct}%.`
+    : base;
 }
 
 /** "1105" → "1105"; "1105","1106" → "1105 & 1106"; a,b,c → "a, b & c". */
@@ -323,7 +360,16 @@ function TowerSection({ tower, ...t }: { tower: RollupTower } & ToggleProps) {
           </span>
         )}
         <div className="ml-auto">
-          <DeliveryStat counts={towerDeliveryCounts(tower)} installedPct={tower.installedPct} size="lg" />
+          <DeliveryStat
+            counts={towerDeliveryCounts(tower)}
+            installedPct={tower.installedPct}
+            installedTitle={
+              tower.installedPct === null
+                ? "The sheet has no Room % for this tower yet"
+                : `Installed ${tower.installedPct}% — the average of every room's Room % in the tower`
+            }
+            size="lg"
+          />
         </div>
       </div>
       <div className="space-y-2">
@@ -348,7 +394,7 @@ function FloorRow({ tower, floor, ...t }: { tower: RollupTower; floor: RollupFlo
         <Layers className="h-4 w-4 text-teal-400" />
         <span className="font-medium text-white">Floor {floor.floor}</span>
         <div className="ml-auto flex items-center gap-3">
-          <DeliveryStat counts={floorDeliveryCounts(floor)} installedPct={floor.installedPct} />
+          <DeliveryStat counts={floorDeliveryCounts(floor)} installedPct={floor.installedPct} installedTitle={floorInstalledTitle(floor)} />
           <span className="hidden text-xs text-muted-foreground sm:inline">{floor.rooms.length} rooms</span>
         </div>
       </button>
@@ -383,7 +429,15 @@ function RoomRow({ tower, room, ...t }: { tower: RollupTower; room: RollupRoom }
           <span className="truncate text-xs text-muted-foreground">{[room.line, room.type].filter(Boolean).join(" · ")}</span>
         )}
         <div className="ml-auto flex items-center gap-3">
-          <DeliveryStat counts={roomDeliveryCounts(room)} installedPct={room.installedPct} />
+          <DeliveryStat
+            counts={roomDeliveryCounts(room)}
+            installedPct={room.installedPct}
+            installedTitle={
+              room.installedPct === null
+                ? "The sheet has no Room % for this room yet"
+                : `Installed ${room.installedPct}% — the sheet's own Room % for this room`
+            }
+          />
           <span className="flex items-center gap-1.5">
             {loud.length > 0 && (
               <span className="rounded border border-red-500/50 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">
@@ -512,7 +566,7 @@ function PackageRow({
           <span className="text-sm font-medium text-white">{pkg.name}</span>
         </span>
         {/* Received % is per-package (recomputed from Containers parts). Installation is
-            tracked as ONE Completion % per room (shown at the room level), not per package. */}
+            tracked as ONE Room % per room (shown at the room level), not per package. */}
         <PctCell label="Received" side={pkg.received} loud={sideLoud(pkg.received?.parts)} />
       </button>
       {open && (

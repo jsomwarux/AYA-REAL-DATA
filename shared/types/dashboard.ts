@@ -113,11 +113,15 @@ export interface PackageResult {
 export interface RoomRow {
   roomNo: string;
   floor: string;       // Floor (carried forward across merged cells; falls back to room #)
-  line: string;        // Room Line, e.g. "LR-LINE1" (blank-header leading column)
+  /** The sheet's own "Floor %" (col B) — installation completion for the whole floor,
+   *  0-100. Merged across the floor's rows, so it is carried forward like Floor.
+   *  null when the tab has no such column or it is blank. */
+  floorPct: number | null;
+  line: string;        // Room Line, e.g. "LR-LINE1" (blank header, or a "LINES" header)
   type: string;        // Room Type, e.g. "King", "LR-CAVE", "King ADA"
-  /** Installation completion taken DIRECTLY from the sheet's "Completion %" column
-   *  (HR col DL / LR col CU) — 0-100, or null if the cell is blank/absent. Installation
-   *  tabs only; null on Containers tabs. NOT recomputed from part cells. */
+  /** Installation completion taken DIRECTLY from the sheet's "Room %" column (col F),
+   *  falling back to the older trailing "Completion %" column — 0-100, or null if
+   *  blank/absent. Installation tabs only. NOT recomputed from part cells. */
   installedPct: number | null;
   packages: PackageResult[];
 }
@@ -143,17 +147,23 @@ export interface RollupRoom {
   floor: string;
   line: string;
   type: string;
-  /** Installation % from the Installation tab's Completion % cell (sheet-sourced). */
+  /** Installation % from the Installation tab's "Room %" cell (sheet-sourced). */
   installedPct: number | null;
-  /** Applicable (non-N/A) installed-part count — the weight for floor/tower averages. */
+  /** Applicable (non-N/A) installed-part count — context for how much the room tracks. */
   installedApplicable: number;
   packages: RollupPackage[];
 }
 
 export interface RollupFloor {
   floor: string;
-  /** Part-count-weighted average of the rooms' Completion% values (NOT a sum). */
+  /** The floor's installation %: the sheet's own "Floor %" when it has one, else the
+   *  average of this floor's Room % values (which is how the sheet computes it). */
   installedPct: number | null;
+  /** Average of this floor's rooms' Room % values — always computed, so the UI can
+   *  show it when the sheet's Floor % disagrees. null if no room has a Room %. */
+  roomsAvgPct: number | null;
+  /** True when installedPct came from the sheet's own Floor % cell. */
+  installedFromSheet: boolean;
   rooms: RollupRoom[];
 }
 
@@ -161,7 +171,8 @@ export interface RollupTower {
   tower: Tower;
   containersTab: string;
   installationTab: string;
-  /** Part-count-weighted average of all the tower's rooms' Completion% values. */
+  /** Average of every room's Room % in the tower — the same simple average the sheet
+   *  uses for Floor %, so tower / floor / room numbers reconcile. */
   installedPct: number | null;
   floors: RollupFloor[];
   /** Room #s that appear on more than one row in either tab (joined by occurrence
